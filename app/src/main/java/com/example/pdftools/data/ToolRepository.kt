@@ -85,7 +85,8 @@ object ToolRepository {
             name = "Scan to PDF",
             icon = Icons.Filled.DocumentScanner,
             category = ToolCategory.ORGANIZE_PDF,
-            description = "Scan physical documents using your camera and save them as PDF."
+            description = "Scan physical documents using your camera and save them as PDF.",
+            isImplemented = true
         ),
 
         // ── OPTIMIZE_PDF ──────────────────────────────────────────────
@@ -110,7 +111,8 @@ object ToolRepository {
             name = "OCR PDF",
             icon = Icons.Filled.TextFields,
             category = ToolCategory.OPTIMIZE_PDF,
-            description = "Recognize and extract text from scanned PDF documents."
+            description = "Recognize and extract text from scanned PDF documents.",
+            isImplemented = true
         ),
 
         // ── CONVERT_TO_PDF ────────────────────────────────────────────
@@ -277,7 +279,8 @@ object ToolRepository {
             name = "Compare PDF",
             icon = Icons.Filled.Compare,
             category = ToolCategory.PDF_SECURITY,
-            description = "Highlight differences between two PDF documents side by side."
+            description = "Highlight differences between two PDF documents side by side.",
+            isImplemented = true
         )
     )
 

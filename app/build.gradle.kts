@@ -90,6 +90,9 @@ dependencies {
   androidTestImplementation(libs.androidx.test.runner)
   androidTestImplementation(libs.androidx.test.espresso.core)
 
+  // ML Kit Text Recognition (On-device OCR)
+  implementation("com.google.android.gms:play-services-mlkit-text-recognition:19.0.0")
+
   // Navigation
   implementation(libs.androidx.navigation3.ui)
   implementation(libs.androidx.navigation3.runtime)

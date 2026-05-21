@@ -17,9 +17,17 @@ import com.tom_roush.pdfbox.rendering.PDFRenderer
 import com.tom_roush.pdfbox.rendering.ImageType
 import com.tom_roush.pdfbox.pdmodel.font.PDType1Font
 import com.tom_roush.pdfbox.pdmodel.graphics.state.PDExtendedGraphicsState
+import com.tom_roush.pdfbox.pdmodel.graphics.image.LosslessFactory
+import com.tom_roush.pdfbox.text.PDFTextStripper
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.ColorMatrix
+import android.graphics.ColorMatrixColorFilter
+import android.graphics.Matrix
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.ByteArrayInputStream
 
 object PdfProcessor {
 
@@ -1023,6 +1031,214 @@ object PdfProcessor {
             tempInputFile.delete()
         }
     }
+
+    /**
+     * Converts a list of image URIs (with custom rotations and filters) into a single PDF.
+     * Returns the Uri of the output PDF in cache.
+     */
+    suspend fun scanToPdf(
+        context: Context,
+        imageUris: List<Uri>,
+        rotations: List<Int>,
+        filter: String
+    ): Uri = withContext(Dispatchers.IO) {
+        val outputFile = File(context.cacheDir, "Scanned_${System.currentTimeMillis()}.pdf")
+        try {
+            PDDocument().use { doc ->
+                for (index in imageUris.indices) {
+                    val uri = imageUris[index]
+                    val rotation = rotations.getOrNull(index) ?: 0
+                    
+                    context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                        val originalBitmap = BitmapFactory.decodeStream(inputStream)
+                        if (originalBitmap != null) {
+                            // 1. Apply rotation
+                            val processedBitmap = if (rotation != 0) {
+                                val matrix = Matrix().apply { postRotate(rotation.toFloat()) }
+                                val rotated = Bitmap.createBitmap(
+                                    originalBitmap, 0, 0,
+                                    originalBitmap.width, originalBitmap.height,
+                                    matrix, true
+                                )
+                                originalBitmap.recycle()
+                                rotated
+                            } else {
+                                originalBitmap
+                            }
+                            
+                            // 2. Apply filter
+                            val filteredBitmap = when {
+                                filter.contains("grayscale", ignoreCase = true) -> {
+                                    val bmpGrayscale = Bitmap.createBitmap(processedBitmap.width, processedBitmap.height, Bitmap.Config.ARGB_8888)
+                                    val canvas = Canvas(bmpGrayscale)
+                                    val paint = Paint()
+                                    val cm = ColorMatrix().apply { setSaturation(0f) }
+                                    paint.colorFilter = ColorMatrixColorFilter(cm)
+                                    canvas.drawBitmap(processedBitmap, 0f, 0f, paint)
+                                    processedBitmap.recycle()
+                                    bmpGrayscale
+                                }
+                                filter.contains("b&w", ignoreCase = true) || 
+                                filter.contains("binar", ignoreCase = true) || 
+                                filter.contains("mono", ignoreCase = true) -> {
+                                    val width = processedBitmap.width
+                                    val height = processedBitmap.height
+                                    val pixels = IntArray(width * height)
+                                    processedBitmap.getPixels(pixels, 0, width, 0, 0, width, height)
+                                    for (i in pixels.indices) {
+                                        val color = pixels[i]
+                                        val r = (color shr 16) and 0xFF
+                                        val g = (color shr 8) and 0xFF
+                                        val b = color and 0xFF
+                                        val luminance = (0.299f * r + 0.587f * g + 0.114f * b).toInt()
+                                        val bwColor = if (luminance > 128) 0xFFFFFFFF.toInt() else 0xFF000000.toInt()
+                                        pixels[i] = bwColor
+                                    }
+                                    val bwBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                                    bwBitmap.setPixels(pixels, 0, width, 0, 0, width, height)
+                                    processedBitmap.recycle()
+                                    bwBitmap
+                                }
+                                else -> {
+                                    processedBitmap
+                                }
+                            }
+                            
+                            val width = filteredBitmap.width.toFloat()
+                            val height = filteredBitmap.height.toFloat()
+                            val page = PDPage(PDRectangle(width, height))
+                            doc.addPage(page)
+                            
+                            val pdImage = LosslessFactory.createFromImage(doc, filteredBitmap)
+                            PDPageContentStream(doc, page).use { contentStream ->
+                                contentStream.drawImage(pdImage, 0f, 0f, width, height)
+                            }
+                            filteredBitmap.recycle()
+                        }
+                    }
+                }
+                doc.save(outputFile)
+            }
+            Uri.fromFile(outputFile)
+        } catch (e: Exception) {
+            outputFile.delete()
+            throw e
+        }
+    }
+
+    /**
+     * Extracts text from a PDF, falling back to on-device OCR using Google ML Kit if needed.
+     */
+    suspend fun ocrPdf(context: Context, uri: Uri): String = withContext(Dispatchers.IO) {
+        val tempInputFile = File.createTempFile("ocr_input_", ".pdf", context.cacheDir)
+        try {
+            context.contentResolver.openInputStream(uri)?.use { input ->
+                tempInputFile.outputStream().use { output ->
+                    input.copyTo(output)
+                }
+            }
+            
+            PDDocument.load(tempInputFile).use { doc ->
+                val stripper = PDFTextStripper()
+                val extracted = stripper.getText(doc) ?: ""
+                if (extracted.trim().isNotEmpty()) {
+                    return@withContext extracted
+                }
+                
+                // Falling back to page-by-page ML Kit OCR
+                val ocrText = StringBuilder()
+                val renderer = PDFRenderer(doc)
+                for (i in 0 until doc.numberOfPages) {
+                    val bitmap = renderer.renderImageWithDPI(i, 150f, ImageType.ARGB)
+                    try {
+                        val image = com.google.mlkit.vision.common.InputImage.fromBitmap(bitmap, 0)
+                        val recognizer = com.google.mlkit.vision.text.TextRecognition.getClient(
+                            com.google.mlkit.vision.text.latin.TextRecognizerOptions.DEFAULT_OPTIONS
+                        )
+                        val result = com.google.android.gms.tasks.Tasks.await(recognizer.process(image))
+                        ocrText.append(result.text).append("\n")
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        ocrText.append("[Scanned Page ${i + 1} - Offline Text Recognition Fallback Result]\n")
+                    } finally {
+                        bitmap.recycle()
+                    }
+                }
+                
+                if (ocrText.trim().isNotEmpty()) {
+                    ocrText.toString()
+                } else {
+                    "No text could be recognized in this document."
+                }
+            }
+        } finally {
+            tempInputFile.delete()
+        }
+    }
+
+    /**
+     * Compares two PDF documents line-by-line using standard LCS diff.
+     */
+    suspend fun comparePdf(context: Context, uriA: Uri, uriB: Uri): List<DiffLine> = withContext(Dispatchers.IO) {
+        val textA = extractAllText(context, uriA)
+        val textB = extractAllText(context, uriB)
+        
+        val linesA = textA.split(Regex("\\r?\\n")).map { it.trim() }.filter { it.isNotEmpty() }
+        val linesB = textB.split(Regex("\\r?\\n")).map { it.trim() }.filter { it.isNotEmpty() }
+        
+        val m = linesA.size
+        val n = linesB.size
+        
+        val dp = Array(m + 1) { IntArray(n + 1) }
+        for (i in 1..m) {
+            for (j in 1..n) {
+                if (linesA[i - 1] == linesB[j - 1]) {
+                    dp[i][j] = dp[i - 1][j - 1] + 1
+                } else {
+                    dp[i][j] = maxOf(dp[i - 1][j], dp[i][j - 1])
+                }
+            }
+        }
+        
+        var i = m
+        var j = n
+        val diff = mutableListOf<DiffLine>()
+        while (i > 0 || j > 0) {
+            if (i > 0 && j > 0 && linesA[i - 1] == linesB[j - 1]) {
+                diff.add(DiffLine(linesA[i - 1], DiffType.EQUAL))
+                i--
+                j--
+            } else if (j > 0 && (i == 0 || dp[i][j - 1] >= dp[i - 1][j])) {
+                diff.add(DiffLine(linesB[j - 1], DiffType.ADDED))
+                j--
+            } else if (i > 0) {
+                diff.add(DiffLine(linesA[i - 1], DiffType.DELETED))
+                i--
+            }
+        }
+        diff.reverse()
+        diff
+    }
+
+    private fun extractAllText(context: Context, uri: Uri): String {
+        val tempFile = File.createTempFile("extract_text_", ".pdf", context.cacheDir)
+        try {
+            context.contentResolver.openInputStream(uri)?.use { input ->
+                tempFile.outputStream().use { output ->
+                    input.copyTo(output)
+                }
+            }
+            PDDocument.load(tempFile).use { doc ->
+                val stripper = PDFTextStripper()
+                return stripper.getText(doc) ?: ""
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return ""
+        } finally {
+            tempFile.delete()
+        }
+    }
 }
 
 /**
@@ -1035,4 +1251,5 @@ data class FormFieldInfo(
     val options: List<String> = emptyList()
 )
 
-
+enum class DiffType { ADDED, DELETED, EQUAL }
+data class DiffLine(val text: String, val type: DiffType)

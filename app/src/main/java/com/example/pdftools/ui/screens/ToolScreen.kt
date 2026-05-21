@@ -113,6 +113,18 @@ import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.aspectRatio
+import android.content.ClipboardManager
+import android.content.ClipData
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -170,11 +182,28 @@ fun ToolScreen(
     // Page count state for Sign & Redact page index sliders
     var totalPagesForSignRedact by remember { mutableStateOf(1) }
 
+    // Phase 9 States
+    val scanImageRotations = remember { mutableStateListOf<Int>() }
+    var scanImageFilter by remember { mutableStateOf("Original") }
+    var ocrResultText by remember { mutableStateOf("") }
+    var comparePdfFileB by remember { mutableStateOf<Uri?>(null) }
+    val comparisonDiffResults = remember { mutableStateListOf<com.example.pdftools.data.DiffLine>() }
+
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(selectedFiles.toList()) {
-        if (selectedFiles.isEmpty()) return@LaunchedEffect
+        if (selectedFiles.isEmpty()) {
+            scanImageRotations.clear()
+            return@LaunchedEffect
+        }
+
+        while (scanImageRotations.size < selectedFiles.size) {
+            scanImageRotations.add(0)
+        }
+        while (scanImageRotations.size > selectedFiles.size) {
+            scanImageRotations.removeAt(scanImageRotations.size - 1)
+        }
 
         // Organize PDF page loading
         if (tool.id == "organize_pdf") {
@@ -252,6 +281,14 @@ fun ToolScreen(
         }
     }
 
+    val comparePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            comparePdfFileB = uri
+        }
+    }
+
     Scaffold(
         modifier = modifier.fillMaxSize(),
         topBar = {
@@ -321,7 +358,7 @@ fun ToolScreen(
                     FilePickerZone(
                         accentColor = accentColor,
                         onPickFiles = {
-                            val mimeTypes = if (tool.id == "jpg_to_pdf") {
+                            val mimeTypes = if (tool.id == "jpg_to_pdf" || tool.id == "scan_to_pdf") {
                                 arrayOf("image/jpeg", "image/png", "image/webp")
                             } else {
                                 arrayOf("application/pdf")
@@ -1825,6 +1862,516 @@ fun ToolScreen(
                 }
             }
 
+            if (selectedFiles.isNotEmpty() && !isComplete && tool.id == "scan_to_pdf") {
+                item {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Text(
+                            text = "Captured Images",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        
+                        val chunks = selectedFiles.toList().chunked(2)
+                        chunks.forEachIndexed { rowIndex, pair ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                pair.forEachIndexed { colIndex, uri ->
+                                    val globalIndex = rowIndex * 2 + colIndex
+                                    val rotation = scanImageRotations.getOrNull(globalIndex) ?: 0
+                                    val thumbnail = rememberThumbnailBitmap(context, uri)
+                                    
+                                    Card(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .aspectRatio(0.75f),
+                                        shape = RoundedCornerShape(16.dp),
+                                        colors = CardDefaults.cardColors(
+                                            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                                        ),
+                                        border = androidx.compose.foundation.BorderStroke(
+                                            1.dp,
+                                            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                                        )
+                                    ) {
+                                        Box(modifier = Modifier.fillMaxSize()) {
+                                            if (thumbnail != null) {
+                                                Image(
+                                                    bitmap = thumbnail.asImageBitmap(),
+                                                    contentDescription = "Image thumbnail",
+                                                    contentScale = ContentScale.Crop,
+                                                    modifier = Modifier
+                                                        .fillMaxSize()
+                                                        .graphicsLayer {
+                                                            rotationZ = rotation.toFloat()
+                                                        }
+                                                )
+                                            } else {
+                                                Box(
+                                                    modifier = Modifier.fillMaxSize(),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    CircularProgressIndicator(color = accentColor)
+                                                }
+                                            }
+                                            
+                                            Box(
+                                                modifier = Modifier
+                                                    .padding(8.dp)
+                                                    .background(Color.Black.copy(alpha = 0.6f), CircleShape)
+                                                    .size(28.dp),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text(
+                                                    text = "${globalIndex + 1}",
+                                                    color = Color.White,
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
+                                            
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .align(Alignment.BottomCenter)
+                                                    .background(Color.Black.copy(alpha = 0.5f))
+                                                    .padding(vertical = 4.dp, horizontal = 8.dp),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                IconButton(
+                                                    onClick = {
+                                                        if (globalIndex < scanImageRotations.size) {
+                                                            scanImageRotations[globalIndex] = (scanImageRotations[globalIndex] + 90) % 360
+                                                        }
+                                                    },
+                                                    modifier = Modifier.size(32.dp)
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Filled.RotateRight,
+                                                        contentDescription = "Rotate",
+                                                        tint = Color.White,
+                                                        modifier = Modifier.size(18.dp)
+                                                    )
+                                                }
+                                                IconButton(
+                                                    onClick = {
+                                                        selectedFiles.removeAt(globalIndex)
+                                                    },
+                                                    modifier = Modifier.size(32.dp)
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Filled.Delete,
+                                                        contentDescription = "Remove",
+                                                        tint = Color.White,
+                                                        modifier = Modifier.size(18.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                
+                                if (pair.size == 1) {
+                                    Spacer(modifier = Modifier.weight(1f))
+                                }
+                            }
+                        }
+                        
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        Text(
+                            text = "Visual Enhancement Filter",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            val filters = listOf("Original", "Grayscale", "B&W Binarization")
+                            filters.forEach { f ->
+                                val isSelected = scanImageFilter == f
+                                val bg = if (isSelected) accentColor else MaterialTheme.colorScheme.surfaceContainerLow
+                                val tc = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+                                
+                                Card(
+                                    onClick = { scanImageFilter = f },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(48.dp),
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = bg,
+                                        contentColor = tc
+                                    )
+                                ) {
+                                    Box(
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = f,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            textAlign = TextAlign.Center
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (isComplete && tool.id == "ocr_pdf" && ocrResultText.isNotEmpty()) {
+                item {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
+                        shape = RoundedCornerShape(20.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                        ),
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.dp,
+                            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                        )
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text(
+                                        text = "Extracted Text Results",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = "${ocrResultText.length} characters recognized",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    IconButton(
+                                        onClick = {
+                                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                            val clip = ClipData.newPlainText("Recognized Text", ocrResultText)
+                                            clipboard.setPrimaryClip(clip)
+                                            Toast.makeText(context, "Text copied to clipboard", Toast.LENGTH_SHORT).show()
+                                        },
+                                        modifier = Modifier
+                                            .clip(CircleShape)
+                                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Filled.InsertDriveFile,
+                                            contentDescription = "Copy text",
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    IconButton(
+                                        onClick = {
+                                            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                                type = "text/plain"
+                                                putExtra(Intent.EXTRA_TEXT, ocrResultText)
+                                            }
+                                            context.startActivity(Intent.createChooser(shareIntent, "Share Extracted Text"))
+                                        },
+                                        modifier = Modifier
+                                            .clip(CircleShape)
+                                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Filled.Share,
+                                            contentDescription = "Share text",
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+                            
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(max = 300.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                                    .padding(12.dp)
+                            ) {
+                                val scrollState = rememberScrollState()
+                                SelectionContainer {
+                                    Text(
+                                        text = ocrResultText,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontFamily = FontFamily.Monospace,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .verticalScroll(scrollState)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (selectedFiles.isNotEmpty() && !isComplete && tool.id == "compare_pdf") {
+                item {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Text(
+                            text = "Documents to Compare",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = accentColor.copy(alpha = 0.08f)
+                            )
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .clip(CircleShape)
+                                        .background(accentColor.copy(alpha = 0.2f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "A",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = accentColor
+                                    )
+                                }
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Primary Document (PDF A)",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        text = selectedFiles.firstOrNull()?.lastPathSegment ?: "No file chosen",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+                        }
+                        
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (comparePdfFileB != null) accentColor.copy(alpha = 0.08f) else MaterialTheme.colorScheme.surfaceContainerLow
+                            ),
+                            border = if (comparePdfFileB == null) androidx.compose.foundation.BorderStroke(
+                                1.dp,
+                                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                            ) else null,
+                            onClick = {
+                                comparePickerLauncher.launch(arrayOf("application/pdf"))
+                            }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .clip(CircleShape)
+                                        .background(if (comparePdfFileB != null) accentColor.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surfaceVariant),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "B",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (comparePdfFileB != null) accentColor else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Secondary Document (PDF B)",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        text = comparePdfFileB?.lastPathSegment ?: "Tap to choose PDF B",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                                if (comparePdfFileB == null) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Add,
+                                        contentDescription = "Choose file",
+                                        tint = accentColor
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (isComplete && tool.id == "compare_pdf" && comparisonDiffResults.isNotEmpty()) {
+                item {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
+                        shape = RoundedCornerShape(20.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                        ),
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.dp,
+                            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                        )
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            Column {
+                                Text(
+                                    text = "Side-by-Side Comparison",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = "Calculated using LCS line-by-line diff",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(max = 400.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                                    .padding(8.dp)
+                            ) {
+                                val scrollState = rememberScrollState()
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .verticalScroll(scrollState),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    comparisonDiffResults.forEach { line ->
+                                        val (bg, tc, prefix) = when (line.type) {
+                                            com.example.pdftools.data.DiffType.ADDED -> Triple(
+                                                Color(0xFFE8F5E9),
+                                                Color(0xFF2E7D32),
+                                                "+ "
+                                            )
+                                            com.example.pdftools.data.DiffType.DELETED -> Triple(
+                                                Color(0xFFFFEBEE),
+                                                Color(0xFFC62828),
+                                                "- "
+                                            )
+                                            com.example.pdftools.data.DiffType.EQUAL -> Triple(
+                                                Color.Transparent,
+                                                MaterialTheme.colorScheme.onSurface,
+                                                "  "
+                                            )
+                                        }
+                                        
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .background(bg, RoundedCornerShape(4.dp))
+                                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = "$prefix${line.text}",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                fontFamily = FontFamily.Monospace,
+                                                color = tc
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            val addedCount = comparisonDiffResults.count { it.type == com.example.pdftools.data.DiffType.ADDED }
+                            val deletedCount = comparisonDiffResults.count { it.type == com.example.pdftools.data.DiffType.DELETED }
+                            
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                Text(
+                                    text = "$addedCount additions (+)",
+                                    color = Color(0xFF2E7D32),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier
+                                        .background(Color(0xFFE8F5E9), RoundedCornerShape(8.dp))
+                                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                                )
+                                Text(
+                                    text = "$deletedCount deletions (-)",
+                                    color = Color(0xFFC62828),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier
+                                        .background(Color(0xFFFFEBEE), RoundedCornerShape(8.dp))
+                                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
             // Action button / Processing bar
             if (selectedFiles.isNotEmpty() && !isComplete) {
                 item {
@@ -2015,6 +2562,43 @@ fun ToolScreen(
                                                 )
                                                 outputUris.add(uri)
                                                 RecentFilesRepository.addRecent(context, "Filled_${System.currentTimeMillis().toString().takeLast(4)}.pdf", tool.id, uri.toString())
+                                            }
+                                            "scan_to_pdf" -> {
+                                                val uri = PdfProcessor.scanToPdf(context, selectedFiles.toList(), scanImageRotations.toList(), scanImageFilter)
+                                                outputUris.add(uri)
+                                                RecentFilesRepository.addRecent(context, "Scanned_${System.currentTimeMillis().toString().takeLast(4)}.pdf", tool.id, uri.toString())
+                                            }
+                                            "ocr_pdf" -> {
+                                                val text = PdfProcessor.ocrPdf(context, selectedFiles.first())
+                                                ocrResultText = text
+                                                // Write summary to txt for exporting
+                                                val tempTxt = File(context.cacheDir, "OCR_Result_${System.currentTimeMillis()}.txt")
+                                                tempTxt.writeText(text)
+                                                val txtUri = Uri.fromFile(tempTxt)
+                                                outputUris.add(txtUri)
+                                                RecentFilesRepository.addRecent(context, "OCR_${System.currentTimeMillis().toString().takeLast(4)}.txt", tool.id, txtUri.toString())
+                                            }
+                                            "compare_pdf" -> {
+                                                if (comparePdfFileB == null) {
+                                                    throw IllegalArgumentException("Please choose secondary Document B to compare.")
+                                                }
+                                                val diffs = PdfProcessor.comparePdf(context, selectedFiles.first(), comparePdfFileB!!)
+                                                comparisonDiffResults.clear()
+                                                comparisonDiffResults.addAll(diffs)
+                                                // Write summary formatted text to txt for exporting
+                                                val formattedDiff = diffs.joinToString("\n") { line ->
+                                                    val prefix = when (line.type) {
+                                                        com.example.pdftools.data.DiffType.ADDED -> "+ "
+                                                        com.example.pdftools.data.DiffType.DELETED -> "- "
+                                                        com.example.pdftools.data.DiffType.EQUAL -> "  "
+                                                    }
+                                                    "$prefix${line.text}"
+                                                }
+                                                val tempTxt = File(context.cacheDir, "Comparison_${System.currentTimeMillis()}.txt")
+                                                tempTxt.writeText(formattedDiff)
+                                                val txtUri = Uri.fromFile(tempTxt)
+                                                outputUris.add(txtUri)
+                                                RecentFilesRepository.addRecent(context, "Compare_${System.currentTimeMillis().toString().takeLast(4)}.txt", tool.id, txtUri.toString())
                                             }
                                         }
                                         isComplete = true
@@ -2461,6 +3045,9 @@ private fun getActionButtonText(toolId: String): String {
         "sign_pdf" -> "Sign PDF"
         "redact_pdf" -> "Redact PDF"
         "pdf_forms" -> "Fill PDF Forms"
+        "scan_to_pdf" -> "Assemble Scan"
+        "ocr_pdf" -> "Extract Text"
+        "compare_pdf" -> "Compare PDFs"
         else -> "Process"
     }
 }
@@ -2828,6 +3415,23 @@ fun PositionPreviewCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
             )
+        }
+    }
+}
+
+@Composable
+private fun rememberThumbnailBitmap(context: Context, uri: Uri): Bitmap? {
+    return remember(uri) {
+        try {
+            context.contentResolver.openInputStream(uri)?.use { stream ->
+                val options = BitmapFactory.Options().apply {
+                    inSampleSize = 8
+                }
+                BitmapFactory.decodeStream(stream, null, options)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
         }
     }
 }

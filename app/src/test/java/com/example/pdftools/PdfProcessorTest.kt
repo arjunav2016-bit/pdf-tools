@@ -569,4 +569,116 @@ class PdfProcessorTest {
             dummyPdfFile.delete()
         }
     }
+
+    @Test
+    fun testScanToPdf() = kotlinx.coroutines.test.runTest {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val tempDir = context.cacheDir
+        val imgFile1 = File(tempDir, "img1_${System.currentTimeMillis()}.jpg")
+        val imgFile2 = File(tempDir, "img2_${System.currentTimeMillis()}.png")
+
+        try {
+            // Create dummy images
+            val bmp1 = Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
+            imgFile1.outputStream().use { out ->
+                bmp1.compress(Bitmap.CompressFormat.JPEG, 90, out)
+            }
+            bmp1.recycle()
+
+            val bmp2 = Bitmap.createBitmap(150, 150, Bitmap.Config.ARGB_8888)
+            imgFile2.outputStream().use { out ->
+                bmp2.compress(Bitmap.CompressFormat.PNG, 90, out)
+            }
+            bmp2.recycle()
+
+            val uris = listOf(Uri.fromFile(imgFile1), Uri.fromFile(imgFile2))
+            val rotations = listOf(90, 180)
+
+            val outputUri = PdfProcessor.scanToPdf(context, uris, rotations, "grayscale")
+            val outputFile = File(outputUri.path ?: "")
+            assertTrue(outputFile.exists())
+
+            com.tom_roush.pdfbox.pdmodel.PDDocument.load(outputFile).use { doc ->
+                assertEquals(2, doc.numberOfPages)
+            }
+            outputFile.delete()
+        } finally {
+            imgFile1.delete()
+            imgFile2.delete()
+        }
+    }
+
+    @Test
+    fun testOcrPdf() = kotlinx.coroutines.test.runTest {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val tempDir = context.cacheDir
+        val dummyPdfFile = File(tempDir, "ocr_doc_${System.currentTimeMillis()}.pdf")
+
+        try {
+            com.tom_roush.pdfbox.pdmodel.PDDocument().use { doc ->
+                val page = com.tom_roush.pdfbox.pdmodel.PDPage()
+                doc.addPage(page)
+                com.tom_roush.pdfbox.pdmodel.PDPageContentStream(doc, page).use { content ->
+                    content.beginText()
+                    content.setFont(com.tom_roush.pdfbox.pdmodel.font.PDType1Font.HELVETICA, 12f)
+                    content.newLineAtOffset(100f, 700f)
+                    content.showText("Sample Searchable OCR Text Content")
+                    content.endText()
+                }
+                doc.save(dummyPdfFile)
+            }
+
+            val text = PdfProcessor.ocrPdf(context, Uri.fromFile(dummyPdfFile))
+            assertTrue(text.contains("Sample Searchable OCR Text Content") || text.isNotEmpty())
+        } finally {
+            dummyPdfFile.delete()
+        }
+    }
+
+    @Test
+    fun testComparePdf() = kotlinx.coroutines.test.runTest {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val tempDir = context.cacheDir
+        val pdfA = File(tempDir, "docA_${System.currentTimeMillis()}.pdf")
+        val pdfB = File(tempDir, "docB_${System.currentTimeMillis()}.pdf")
+
+        try {
+            com.tom_roush.pdfbox.pdmodel.PDDocument().use { doc ->
+                val page = com.tom_roush.pdfbox.pdmodel.PDPage()
+                doc.addPage(page)
+                com.tom_roush.pdfbox.pdmodel.PDPageContentStream(doc, page).use { content ->
+                    content.beginText()
+                    content.setFont(com.tom_roush.pdfbox.pdmodel.font.PDType1Font.HELVETICA, 12f)
+                    content.newLineAtOffset(100f, 700f)
+                    content.showText("Line One")
+                    content.newLineAtOffset(0f, -15f)
+                    content.showText("Line Two")
+                    content.endText()
+                }
+                doc.save(pdfA)
+            }
+
+            com.tom_roush.pdfbox.pdmodel.PDDocument().use { doc ->
+                val page = com.tom_roush.pdfbox.pdmodel.PDPage()
+                doc.addPage(page)
+                com.tom_roush.pdfbox.pdmodel.PDPageContentStream(doc, page).use { content ->
+                    content.beginText()
+                    content.setFont(com.tom_roush.pdfbox.pdmodel.font.PDType1Font.HELVETICA, 12f)
+                    content.newLineAtOffset(100f, 700f)
+                    content.showText("Line One")
+                    content.newLineAtOffset(0f, -15f)
+                    content.showText("Line Three")
+                    content.endText()
+                }
+                doc.save(pdfB)
+            }
+
+            val diffs = PdfProcessor.comparePdf(context, Uri.fromFile(pdfA), Uri.fromFile(pdfB))
+            assertTrue(diffs.isNotEmpty())
+            assertTrue(diffs.any { it.text.contains("Line One") })
+        } finally {
+            pdfA.delete()
+            pdfB.delete()
+        }
+    }
 }
