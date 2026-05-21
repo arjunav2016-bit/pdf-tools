@@ -6,21 +6,24 @@ import androidx.compose.ui.test.onNodeWithText
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import com.example.pdftools.ui.screens.MainScreen
 
-/** UI tests for [com.example.pdftools.ui.main.MainScreen]. */
+/** UI tests for [com.example.pdftools.ui.screens.MainScreen]. */
 class MainScreenTest {
 
   @get:Rule val composeTestRule = createAndroidComposeRule<ComponentActivity>()
 
   @Before
   fun setup() {
-    composeTestRule.setContent { MainScreen(FAKE_DATA) }
+    composeTestRule.setContent {
+      MainScreen(onToolClick = {})
+    }
   }
 
   @Test
-  fun firstItem_exists() {
-    FAKE_DATA.forEach { composeTestRule.onNodeWithText("Hello $it!").assertExists() }
+  fun testHomeTab_exists() {
+    composeTestRule.onNodeWithText("Home").assertExists()
+    composeTestRule.onNodeWithText("Recent").assertExists()
+    composeTestRule.onNodeWithText("Favorites").assertExists()
   }
 }
-
-private val FAKE_DATA = listOf("Sample1", "Sample2", "Sample3")

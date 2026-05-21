@@ -28,8 +28,8 @@ import com.example.pdftools.data.PdfTool
 
 enum class AppTab(val title: String) {
     HOME("Home"),
-    FAVORITES("Favorites"),
-    RECENT("Recent")
+    RECENT("Recent"),
+    FAVORITES("Favorites")
 }
 
 @Composable
@@ -55,17 +55,6 @@ fun MainScreen(
                     }
                 )
                 NavigationBarItem(
-                    selected = currentTab == AppTab.FAVORITES,
-                    onClick = { currentTab = AppTab.FAVORITES },
-                    label = { Text("Favorites") },
-                    icon = {
-                        Icon(
-                            imageVector = if (currentTab == AppTab.FAVORITES) Icons.Filled.Star else Icons.Outlined.Star,
-                            contentDescription = "Favorites"
-                        )
-                    }
-                )
-                NavigationBarItem(
                     selected = currentTab == AppTab.RECENT,
                     onClick = { currentTab = AppTab.RECENT },
                     label = { Text("Recent") },
@@ -73,6 +62,17 @@ fun MainScreen(
                         Icon(
                             imageVector = if (currentTab == AppTab.RECENT) Icons.Filled.History else Icons.Outlined.History,
                             contentDescription = "Recent"
+                        )
+                    }
+                )
+                NavigationBarItem(
+                    selected = currentTab == AppTab.FAVORITES,
+                    onClick = { currentTab = AppTab.FAVORITES },
+                    label = { Text("Favorites") },
+                    icon = {
+                        Icon(
+                            imageVector = if (currentTab == AppTab.FAVORITES) Icons.Filled.Star else Icons.Outlined.Star,
+                            contentDescription = "Favorites"
                         )
                     }
                 )

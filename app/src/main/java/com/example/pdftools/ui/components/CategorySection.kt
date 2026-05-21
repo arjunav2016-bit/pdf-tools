@@ -16,8 +16,17 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Apps
+import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material.icons.filled.SwapVert
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Security
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -29,6 +38,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.pdftools.data.PdfTool
 import com.example.pdftools.data.ToolCategory
@@ -52,6 +62,15 @@ fun CategorySection(
     val isDarkTheme = isSystemInDarkTheme()
     val accentColor = if (isDarkTheme) category.darkAccentColor else category.accentColor
 
+    val categoryIcon = when (category) {
+        ToolCategory.ORGANIZE_PDF -> Icons.Filled.Apps
+        ToolCategory.OPTIMIZE_PDF -> Icons.Filled.Speed
+        ToolCategory.CONVERT_TO_PDF -> Icons.Filled.SwapHoriz
+        ToolCategory.CONVERT_FROM_PDF -> Icons.Filled.SwapVert
+        ToolCategory.EDIT_PDF -> Icons.Filled.Edit
+        ToolCategory.PDF_SECURITY -> Icons.Filled.Security
+    }
+
     AnimatedVisibility(
         visible = isVisible,
         enter = fadeIn(animationSpec = tween(400)) +
@@ -72,16 +91,25 @@ fun CategorySection(
                 // Colored accent bar
                 Box(
                     modifier = Modifier
-                        .width(4.dp)
+                        .width(6.dp)
                         .height(24.dp)
-                        .clip(RoundedCornerShape(2.dp))
+                        .clip(RoundedCornerShape(3.dp))
                         .background(accentColor)
                 )
+                
+                // Category Icon
+                Icon(
+                    imageVector = categoryIcon,
+                    contentDescription = null,
+                    tint = accentColor,
+                    modifier = Modifier.size(24.dp)
+                )
+                
                 Text(
-                    text = category.displayName.uppercase(),
-                    style = MaterialTheme.typography.titleSmall,
-                    color = accentColor,
-                    letterSpacing = MaterialTheme.typography.titleSmall.letterSpacing
+                    text = category.displayName,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
             }
 
@@ -90,11 +118,7 @@ fun CategorySection(
                     .fillMaxWidth()
                     .padding(4.dp)
             ) {
-                val columns = when {
-                    maxWidth < 360.dp -> 2
-                    maxWidth < 600.dp -> 3
-                    else -> 4
-                }
+                val columns = 2
                 val rowsCount = (tools.size + columns - 1) / columns
 
                 Column(

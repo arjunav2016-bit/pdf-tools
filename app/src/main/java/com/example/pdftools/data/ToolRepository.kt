@@ -1,20 +1,24 @@
 package com.example.pdftools.data
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Article
 import androidx.compose.material.icons.filled.BrandingWatermark
 import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.CallSplit
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Compare
 import androidx.compose.material.icons.filled.Compress
 import androidx.compose.material.icons.filled.ContentCut
 import androidx.compose.material.icons.filled.Crop
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.DocumentScanner
 import androidx.compose.material.icons.filled.Draw
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.GridOn
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.ListAlt
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
@@ -39,7 +43,7 @@ object ToolRepository {
         PdfTool(
             id = "merge_pdf",
             name = "Merge PDF",
-            icon = Icons.Filled.MergeType,
+            icon = Icons.Filled.ArrowUpward,
             category = ToolCategory.ORGANIZE_PDF,
             description = "Combine multiple PDF files into a single document.",
             isImplemented = true
@@ -47,30 +51,34 @@ object ToolRepository {
         PdfTool(
             id = "split_pdf",
             name = "Split PDF",
-            icon = Icons.Filled.Splitscreen,
+            icon = Icons.Filled.CallSplit,
             category = ToolCategory.ORGANIZE_PDF,
-            description = "Split a PDF into multiple smaller documents by page ranges."
+            description = "Split a PDF into multiple smaller documents by page ranges.",
+            isImplemented = true
         ),
         PdfTool(
             id = "remove_pages",
             name = "Remove Pages",
-            icon = Icons.Filled.RemoveCircleOutline,
+            icon = Icons.Filled.Delete,
             category = ToolCategory.ORGANIZE_PDF,
-            description = "Delete specific pages from a PDF document."
+            description = "Delete specific pages from a PDF document.",
+            isImplemented = true
         ),
         PdfTool(
             id = "extract_pages",
             name = "Extract Pages",
-            icon = Icons.Filled.ContentCut,
+            icon = Icons.Filled.InsertDriveFile,
             category = ToolCategory.ORGANIZE_PDF,
-            description = "Extract selected pages from a PDF into a new file."
+            description = "Extract selected pages from a PDF into a new file.",
+            isImplemented = true
         ),
         PdfTool(
             id = "organize_pdf",
             name = "Organize PDF",
             icon = Icons.Filled.SwapVert,
             category = ToolCategory.ORGANIZE_PDF,
-            description = "Reorder, rotate, and rearrange pages within a PDF."
+            description = "Reorder, rotate, and rearrange pages within a PDF.",
+            isImplemented = true
         ),
         PdfTool(
             id = "scan_to_pdf",
@@ -94,7 +102,8 @@ object ToolRepository {
             name = "Repair PDF",
             icon = Icons.Filled.Build,
             category = ToolCategory.OPTIMIZE_PDF,
-            description = "Fix corrupted or damaged PDF files and recover content."
+            description = "Fix corrupted or damaged PDF files and recover content.",
+            isImplemented = true
         ),
         PdfTool(
             id = "ocr_pdf",
@@ -177,7 +186,8 @@ object ToolRepository {
             name = "PDF to PDF/A",
             icon = Icons.Filled.Verified,
             category = ToolCategory.CONVERT_FROM_PDF,
-            description = "Convert PDF files into PDF/A format for long-term archival."
+            description = "Convert PDF files into PDF/A format for long-term archival.",
+            isImplemented = true
         ),
 
         // ── EDIT_PDF ──────────────────────────────────────────────────
@@ -186,28 +196,32 @@ object ToolRepository {
             name = "Rotate PDF",
             icon = Icons.Filled.RotateRight,
             category = ToolCategory.EDIT_PDF,
-            description = "Rotate PDF pages by 90, 180, or 270 degrees."
+            description = "Rotate PDF pages by 90, 180, or 270 degrees.",
+            isImplemented = true
         ),
         PdfTool(
             id = "add_page_numbers",
             name = "Add Page Numbers",
             icon = Icons.Filled.Pin,
             category = ToolCategory.EDIT_PDF,
-            description = "Insert page numbers at custom positions in your PDF."
+            description = "Insert page numbers at custom positions in your PDF.",
+            isImplemented = true
         ),
         PdfTool(
             id = "add_watermark",
             name = "Add Watermark",
             icon = Icons.Filled.BrandingWatermark,
             category = ToolCategory.EDIT_PDF,
-            description = "Overlay text or image watermarks onto PDF pages."
+            description = "Overlay text or image watermarks onto PDF pages.",
+            isImplemented = true
         ),
         PdfTool(
             id = "crop_pdf",
             name = "Crop PDF",
             icon = Icons.Filled.Crop,
             category = ToolCategory.EDIT_PDF,
-            description = "Trim margins and resize the visible area of PDF pages."
+            description = "Trim margins and resize the visible area of PDF pages.",
+            isImplemented = true
         ),
         PdfTool(
             id = "edit_pdf",
@@ -221,7 +235,8 @@ object ToolRepository {
             name = "PDF Forms",
             icon = Icons.Filled.ListAlt,
             category = ToolCategory.EDIT_PDF,
-            description = "Create and fill interactive form fields in PDF documents."
+            description = "Create and fill interactive form fields in PDF documents.",
+            isImplemented = true
         ),
 
         // ── PDF_SECURITY ──────────────────────────────────────────────
@@ -230,28 +245,32 @@ object ToolRepository {
             name = "Unlock PDF",
             icon = Icons.Filled.LockOpen,
             category = ToolCategory.PDF_SECURITY,
-            description = "Remove password protection and restrictions from a PDF."
+            description = "Remove password protection and restrictions from a PDF.",
+            isImplemented = true
         ),
         PdfTool(
             id = "protect_pdf",
             name = "Protect PDF",
             icon = Icons.Filled.Lock,
             category = ToolCategory.PDF_SECURITY,
-            description = "Add password encryption and permissions to secure a PDF."
+            description = "Add password encryption and permissions to secure a PDF.",
+            isImplemented = true
         ),
         PdfTool(
             id = "sign_pdf",
             name = "Sign PDF",
             icon = Icons.Filled.Draw,
             category = ToolCategory.PDF_SECURITY,
-            description = "Add digital or handwritten signatures to a PDF document."
+            description = "Add digital or handwritten signatures to a PDF document.",
+            isImplemented = true
         ),
         PdfTool(
             id = "redact_pdf",
             name = "Redact PDF",
             icon = Icons.Filled.VisibilityOff,
             category = ToolCategory.PDF_SECURITY,
-            description = "Permanently remove sensitive information from a PDF."
+            description = "Permanently remove sensitive information from a PDF.",
+            isImplemented = true
         ),
         PdfTool(
             id = "compare_pdf",
