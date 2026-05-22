@@ -1,8 +1,11 @@
 package com.example.pdftools.data
 
+import androidx.annotation.StringRes
 import androidx.compose.ui.graphics.Color
+import com.example.pdftools.R
 
 enum class ToolCategory(
+    @StringRes val displayNameResId: Int,
     val displayName: String,
     val accentColor: Color,
     val containerColor: Color,
@@ -10,6 +13,7 @@ enum class ToolCategory(
     val darkContainerColor: Color
 ) {
     ORGANIZE_PDF(
+        displayNameResId = R.string.category_organize_pdf,
         displayName = "Organize PDF",
         accentColor = Color(0xFFE74C3C),
         containerColor = Color(0xFFFDEDEB),
@@ -17,6 +21,7 @@ enum class ToolCategory(
         darkContainerColor = Color(0xFF3D1F1F)
     ),
     OPTIMIZE_PDF(
+        displayNameResId = R.string.category_optimize_pdf,
         displayName = "Optimize PDF",
         accentColor = Color(0xFF27AE60),
         containerColor = Color(0xFFE8F8EF),
@@ -24,6 +29,7 @@ enum class ToolCategory(
         darkContainerColor = Color(0xFF1A3D25)
     ),
     CONVERT_TO_PDF(
+        displayNameResId = R.string.category_convert_to_pdf,
         displayName = "Convert to PDF",
         accentColor = Color(0xFFF39C12),
         containerColor = Color(0xFFFEF5E7),
@@ -31,6 +37,7 @@ enum class ToolCategory(
         darkContainerColor = Color(0xFF3D2F0F)
     ),
     CONVERT_FROM_PDF(
+        displayNameResId = R.string.category_convert_from_pdf,
         displayName = "Convert from PDF",
         accentColor = Color(0xFF2980B9),
         containerColor = Color(0xFFEAF2F8),
@@ -38,6 +45,7 @@ enum class ToolCategory(
         darkContainerColor = Color(0xFF1A2D3D)
     ),
     EDIT_PDF(
+        displayNameResId = R.string.category_edit_pdf,
         displayName = "Edit PDF",
         accentColor = Color(0xFF8E44AD),
         containerColor = Color(0xFFF4ECF7),
@@ -45,6 +53,7 @@ enum class ToolCategory(
         darkContainerColor = Color(0xFF2D1A3D)
     ),
     PDF_SECURITY(
+        displayNameResId = R.string.category_pdf_security,
         displayName = "PDF Security",
         accentColor = Color(0xFF16A085),
         containerColor = Color(0xFFE8F6F3),

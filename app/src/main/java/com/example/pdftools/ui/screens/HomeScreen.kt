@@ -29,6 +29,18 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.draw.scale
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -42,36 +54,76 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.pdftools.R
 import com.example.pdftools.data.PdfTool
 import com.example.pdftools.data.ToolCategory
-import com.example.pdftools.data.ToolRepository
 import com.example.pdftools.ui.components.CategorySection
+import com.example.pdftools.ui.viewmodels.HomeViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     onToolClick: (PdfTool) -> Unit,
     onSettingsClick: () -> Unit = {},
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    viewModel: HomeViewModel = hiltViewModel()
 ) {
-    var searchQuery by rememberSaveable { mutableStateOf("") }
+    val searchQuery by viewModel.searchQuery.collectAsState()
     val focusRequester = remember { FocusRequester() }
+    var isSearchFocused by remember { mutableStateOf(false) }
 
     val filteredTools = remember(searchQuery) {
-        if (searchQuery.isBlank()) {
-            ToolRepository.toolsByCategory
-        } else {
-            ToolRepository.allTools
-                .filter { it.name.contains(searchQuery, ignoreCase = true) }
-                .groupBy { it.category }
+        viewModel.getFilteredTools(searchQuery)
+    }
+
+    val scrollState = rememberLazyListState()
+
+    // Parallax translation for title based on list scroll offset
+    val titleTranslationY = remember {
+        derivedStateOf {
+            if (scrollState.firstVisibleItemIndex == 0) {
+                (scrollState.firstVisibleItemScrollOffset / 4f).coerceAtMost(30f)
+            } else {
+                30f
+            }
         }
     }
+
+    // Spring animations for search field on focus
+    val searchPaddingBottom by animateDpAsState(
+        targetValue = if (isSearchFocused) 12.dp else 4.dp,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioLowBouncy,
+            stiffness = Spring.StiffnessMediumLow
+        ),
+        label = "searchPaddingBottom"
+    )
+
+    val searchScale by animateFloatAsState(
+        targetValue = if (isSearchFocused) 1.02f else 1.0f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        ),
+        label = "searchScale"
+    )
+
+    val searchBorderGlowColor by animateColorAsState(
+        targetValue = if (isSearchFocused) {
+            MaterialTheme.colorScheme.primary
+        } else {
+            MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+        },
+        animationSpec = tween(durationMillis = 250),
+        label = "searchBorderGlowColor"
+    )
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
         topBar = {
             HomeTopAppBar(
+                titleTranslationY = titleTranslationY.value,
                 onSearchClick = {
                     focusRequester.requestFocus()
                 },
@@ -80,6 +132,7 @@ fun HomeScreen(
         }
     ) { innerPadding ->
         LazyColumn(
+            state = scrollState,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding),
@@ -90,11 +143,13 @@ fun HomeScreen(
             item {
                 OutlinedTextField(
                     value = searchQuery,
-                    onValueChange = { searchQuery = it },
+                    onValueChange = { viewModel.updateSearchQuery(it) },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(bottom = 4.dp)
-                        .focusRequester(focusRequester),
+                        .padding(bottom = searchPaddingBottom)
+                        .scale(searchScale)
+                        .focusRequester(focusRequester)
+                        .onFocusChanged { isSearchFocused = it.isFocused },
                     placeholder = {
                         Text(
                             text = stringResource(R.string.search_for_tools),
@@ -111,7 +166,7 @@ fun HomeScreen(
                     },
                     trailingIcon = {
                         if (searchQuery.isNotEmpty()) {
-                            IconButton(onClick = { searchQuery = "" }) {
+                            IconButton(onClick = { viewModel.updateSearchQuery("") }) {
                                 Icon(
                                     imageVector = Icons.Filled.Close,
                                     contentDescription = stringResource(R.string.clear_search),
@@ -125,8 +180,8 @@ fun HomeScreen(
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
                         unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+                        focusedBorderColor = searchBorderGlowColor,
+                        unfocusedBorderColor = searchBorderGlowColor
                     )
                 )
             }
@@ -136,8 +191,7 @@ fun HomeScreen(
                 CategorySection(
                     category = category,
                     tools = filteredTools[category] ?: emptyList(),
-                    onToolClick = onToolClick,
-                    sectionIndex = index
+                    onToolClick = onToolClick
                 )
             }
             item {
@@ -150,6 +204,7 @@ fun HomeScreen(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun HomeTopAppBar(
+    titleTranslationY: Float,
     onSearchClick: () -> Unit,
     onSettingsClick: () -> Unit
 ) {
@@ -157,7 +212,14 @@ private fun HomeTopAppBar(
         title = {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.graphicsLayer {
+                    translationY = -titleTranslationY
+                    alpha = (1f - (titleTranslationY / 60f)).coerceIn(0.2f, 1f)
+                    val scaleVal = (1f - (titleTranslationY / 120f)).coerceIn(0.85f, 1f)
+                    scaleX = scaleVal
+                    scaleY = scaleVal
+                }
             ) {
                 Icon(
                     imageVector = Icons.Filled.PictureAsPdf,
@@ -196,3 +258,4 @@ private fun HomeTopAppBar(
         )
     )
 }
+

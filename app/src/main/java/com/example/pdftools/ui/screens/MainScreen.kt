@@ -6,6 +6,10 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.Row
+import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
@@ -16,6 +20,8 @@ import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationRail
+import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -54,65 +60,117 @@ fun MainScreen(
     modifier: Modifier = Modifier
 ) {
     val currentTab by viewModel.currentTab.collectAsState()
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val isWideScreen = configuration.screenWidthDp >= 600
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
         bottomBar = {
-            NavigationBar {
-                NavigationBarItem(
-                    selected = currentTab == AppTab.HOME,
-                    onClick = { viewModel.selectTab(AppTab.HOME) },
-                    label = { Text(stringResource(R.string.home)) },
-                    icon = {
-                        Icon(
-                            imageVector = if (currentTab == AppTab.HOME) Icons.Filled.Home else Icons.Outlined.Home,
-                            contentDescription = stringResource(R.string.home)
-                        )
-                    }
-                )
-                NavigationBarItem(
-                    selected = currentTab == AppTab.RECENT,
-                    onClick = { viewModel.selectTab(AppTab.RECENT) },
-                    label = { Text(stringResource(R.string.recent)) },
-                    icon = {
-                        Icon(
-                            imageVector = if (currentTab == AppTab.RECENT) Icons.Filled.History else Icons.Outlined.History,
-                            contentDescription = stringResource(R.string.recent)
-                        )
-                    }
-                )
-                NavigationBarItem(
-                    selected = currentTab == AppTab.FAVORITES,
-                    onClick = { viewModel.selectTab(AppTab.FAVORITES) },
-                    label = { Text(stringResource(R.string.favorites)) },
-                    icon = {
-                        Icon(
-                            imageVector = if (currentTab == AppTab.FAVORITES) Icons.Filled.Star else Icons.Outlined.Star,
-                            contentDescription = stringResource(R.string.favorites)
-                        )
-                    }
-                )
+            if (!isWideScreen) {
+                NavigationBar {
+                    NavigationBarItem(
+                        selected = currentTab == AppTab.HOME,
+                        onClick = { viewModel.selectTab(AppTab.HOME) },
+                        label = { Text(stringResource(R.string.home)) },
+                        icon = {
+                            Icon(
+                                imageVector = if (currentTab == AppTab.HOME) Icons.Filled.Home else Icons.Outlined.Home,
+                                contentDescription = stringResource(R.string.home)
+                            )
+                        }
+                    )
+                    NavigationBarItem(
+                        selected = currentTab == AppTab.RECENT,
+                        onClick = { viewModel.selectTab(AppTab.RECENT) },
+                        label = { Text(stringResource(R.string.recent)) },
+                        icon = {
+                            Icon(
+                                imageVector = if (currentTab == AppTab.RECENT) Icons.Filled.History else Icons.Outlined.History,
+                                contentDescription = stringResource(R.string.recent)
+                            )
+                        }
+                    )
+                    NavigationBarItem(
+                        selected = currentTab == AppTab.FAVORITES,
+                        onClick = { viewModel.selectTab(AppTab.FAVORITES) },
+                        label = { Text(stringResource(R.string.favorites)) },
+                        icon = {
+                            Icon(
+                                imageVector = if (currentTab == AppTab.FAVORITES) Icons.Filled.Star else Icons.Outlined.Star,
+                                contentDescription = stringResource(R.string.favorites)
+                            )
+                        }
+                    )
+                }
             }
         }
     ) { innerPadding ->
-        AnimatedContent(
-            targetState = currentTab,
-            transitionSpec = {
-                fadeIn().togetherWith(fadeOut())
-            },
+        Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding),
-            label = "TabTransition"
-        ) { tab ->
-            when (tab) {
-                AppTab.HOME -> HomeScreen(
-                    onToolClick = onToolClick,
-                    onSettingsClick = onSettingsClick,
-                    modifier = Modifier.fillMaxSize()
-                )
-                AppTab.FAVORITES -> FavoritesScreen(onToolClick = onToolClick, modifier = Modifier.fillMaxSize())
-                AppTab.RECENT -> RecentScreen(modifier = Modifier.fillMaxSize())
+                .padding(innerPadding)
+        ) {
+            if (isWideScreen) {
+                NavigationRail(
+                    header = {
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
+                ) {
+                    NavigationRailItem(
+                        selected = currentTab == AppTab.HOME,
+                        onClick = { viewModel.selectTab(AppTab.HOME) },
+                        label = { Text(stringResource(R.string.home)) },
+                        icon = {
+                            Icon(
+                                imageVector = if (currentTab == AppTab.HOME) Icons.Filled.Home else Icons.Outlined.Home,
+                                contentDescription = stringResource(R.string.home)
+                            )
+                        }
+                    )
+                    NavigationRailItem(
+                        selected = currentTab == AppTab.RECENT,
+                        onClick = { viewModel.selectTab(AppTab.RECENT) },
+                        label = { Text(stringResource(R.string.recent)) },
+                        icon = {
+                            Icon(
+                                imageVector = if (currentTab == AppTab.RECENT) Icons.Filled.History else Icons.Outlined.History,
+                                contentDescription = stringResource(R.string.recent)
+                            )
+                        }
+                    )
+                    NavigationRailItem(
+                        selected = currentTab == AppTab.FAVORITES,
+                        onClick = { viewModel.selectTab(AppTab.FAVORITES) },
+                        label = { Text(stringResource(R.string.favorites)) },
+                        icon = {
+                            Icon(
+                                imageVector = if (currentTab == AppTab.FAVORITES) Icons.Filled.Star else Icons.Outlined.Star,
+                                contentDescription = stringResource(R.string.favorites)
+                            )
+                        }
+                    )
+                }
+            }
+
+            AnimatedContent(
+                targetState = currentTab,
+                transitionSpec = {
+                    fadeIn().togetherWith(fadeOut())
+                },
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxSize(),
+                label = "TabTransition"
+            ) { tab ->
+                when (tab) {
+                    AppTab.HOME -> HomeScreen(
+                        onToolClick = onToolClick,
+                        onSettingsClick = onSettingsClick,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                    AppTab.FAVORITES -> FavoritesScreen(onToolClick = onToolClick, modifier = Modifier.fillMaxSize())
+                    AppTab.RECENT -> RecentScreen(modifier = Modifier.fillMaxSize())
+                }
             }
         }
     }

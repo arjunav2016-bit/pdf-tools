@@ -1,13 +1,20 @@
 package com.example.pdftools.data
 
 import android.content.Context
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.snapshots.SnapshotStateList
+import com.example.pdftools.data.db.RecentFileDao
+import com.example.pdftools.data.db.RecentFileEntity
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import org.json.JSONArray
-import org.json.JSONObject
 
 data class RecentFile(
     val id: String,
@@ -18,89 +25,82 @@ data class RecentFile(
 )
 
 @Singleton
-class RecentFilesRepository @Inject constructor(
-    @ApplicationContext private val context: Context
+class RecentFilesRepository(
+    private val context: Context,
+    private val recentFileDao: RecentFileDao,
+    private val coroutineScope: CoroutineScope
 ) {
-    companion object {
-        private const val PREFS_NAME = "pdf_tools_recents"
-        private const val KEY_RECENTS = "recents"
-        private const val MAX_ITEMS = 30
-    }
-    
-    private val recents = mutableStateListOf<RecentFile>()
+    @Inject
+    constructor(
+        @ApplicationContext context: Context,
+        recentFileDao: RecentFileDao
+    ) : this(context, recentFileDao, CoroutineScope(SupervisorJob() + Dispatchers.IO))
+
+    val recents: StateFlow<List<RecentFile>> = recentFileDao.getRecentsFlow()
+        .map { list ->
+            list.map {
+                RecentFile(
+                    id = it.id,
+                    fileName = it.fileName,
+                    toolId = it.toolId,
+                    filePath = it.filePath,
+                    timestamp = it.timestamp
+                )
+            }
+        }
+        .stateIn(
+            scope = coroutineScope,
+            started = SharingStarted.Eagerly,
+            initialValue = emptyList()
+        )
 
     init {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val jsonStr = prefs.getString(KEY_RECENTS, null)
-        recents.clear()
-        if (jsonStr != null) {
-            try {
-                val array = JSONArray(jsonStr)
-                val list = mutableListOf<RecentFile>()
-                for (i in 0 until array.length()) {
-                    val obj = array.getJSONObject(i)
-                    list.add(
-                        RecentFile(
-                            id = obj.getString("id"),
-                            fileName = obj.getString("fileName"),
-                            toolId = obj.getString("toolId"),
-                            filePath = obj.getString("filePath"),
-                            timestamp = obj.getLong("timestamp")
+        // Silent migration from old SharedPreferences JSON
+        coroutineScope.launch {
+            val prefs = context.getSharedPreferences("pdf_tools_recents", Context.MODE_PRIVATE)
+            val jsonStr = prefs.getString("recents", null)
+            if (jsonStr != null) {
+                try {
+                    val array = JSONArray(jsonStr)
+                    for (i in 0 until array.length()) {
+                        val obj = array.getJSONObject(i)
+                        recentFileDao.insert(
+                            RecentFileEntity(
+                                id = obj.getString("id"),
+                                fileName = obj.getString("fileName"),
+                                toolId = obj.getString("toolId"),
+                                filePath = obj.getString("filePath"),
+                                timestamp = obj.getLong("timestamp")
+                            )
                         )
-                    )
+                    }
+                } catch (e: Exception) {
+                    // Ignore decoding errors
                 }
-                recents.addAll(list)
-            } catch (e: Exception) {
-                // Ignore decoding errors
+                // Clear old preferences
+                prefs.edit().clear().apply()
             }
         }
     }
 
-    fun getRecents(): SnapshotStateList<RecentFile> = recents
-
     fun addRecent(fileName: String, toolId: String, filePath: String) {
-        // Remove existing item with same path if any
-        recents.removeAll { it.filePath == filePath }
-        
-        val newRecent = RecentFile(
-            id = System.currentTimeMillis().toString(),
-            fileName = fileName,
-            toolId = toolId,
-            filePath = filePath,
-            timestamp = System.currentTimeMillis()
-        )
-        // Add at the beginning of the list
-        recents.add(0, newRecent)
-        
-        // Trim if exceeds max items
-        if (recents.size > MAX_ITEMS) {
-            recents.removeRange(MAX_ITEMS, recents.size)
+        coroutineScope.launch {
+            recentFileDao.deleteByPath(filePath)
+            val newEntity = RecentFileEntity(
+                id = System.currentTimeMillis().toString(),
+                fileName = fileName,
+                toolId = toolId,
+                filePath = filePath,
+                timestamp = System.currentTimeMillis()
+            )
+            recentFileDao.insert(newEntity)
+            recentFileDao.trim(30)
         }
-        
-        save()
     }
 
     fun clear() {
-        recents.clear()
-        save()
-    }
-
-    private fun save() {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        try {
-            val array = JSONArray()
-            for (item in recents) {
-                val obj = JSONObject()
-                obj.put("id", item.id)
-                obj.put("fileName", item.fileName)
-                obj.put("toolId", item.toolId)
-                obj.put("filePath", item.filePath)
-                obj.put("timestamp", item.timestamp)
-                array.put(obj)
-            }
-            prefs.edit().putString(KEY_RECENTS, array.toString()).apply()
-        } catch (e: Exception) {
-            // Ignore saving errors
+        coroutineScope.launch {
+            recentFileDao.clearAll()
         }
     }
 }

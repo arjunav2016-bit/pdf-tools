@@ -30,6 +30,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -44,7 +45,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.pdftools.R
 import com.example.pdftools.ui.viewmodels.FavoritesViewModel
 import com.example.pdftools.data.PdfTool
-import com.example.pdftools.data.ToolRepository
 import com.example.pdftools.ui.components.ToolCard
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -54,13 +54,7 @@ fun FavoritesScreen(
     modifier: Modifier = Modifier,
     viewModel: FavoritesViewModel = hiltViewModel()
 ) {
-    val favoriteIds = viewModel.favorites
-    
-    val favoriteTools by remember(favoriteIds) {
-        derivedStateOf {
-            favoriteIds.mapNotNull { ToolRepository.getToolById(it) }
-        }
-    }
+    val favoriteTools by viewModel.favoriteTools.collectAsState()
 
     Scaffold(
         modifier = modifier.fillMaxSize(),

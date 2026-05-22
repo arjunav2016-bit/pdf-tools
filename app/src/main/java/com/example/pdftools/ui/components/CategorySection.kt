@@ -38,6 +38,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.pdftools.data.PdfTool
@@ -49,34 +50,33 @@ fun CategorySection(
     category: ToolCategory,
     tools: List<PdfTool>,
     onToolClick: (PdfTool) -> Unit,
-    modifier: Modifier = Modifier,
-    sectionIndex: Int = 0
+    modifier: Modifier = Modifier
 ) {
-    var isVisible by remember { mutableStateOf(false) }
+    var visible by remember { mutableStateOf(false) }
 
-    LaunchedEffect(Unit) {
-        delay(sectionIndex * 100L)
-        isVisible = true
+    LaunchedEffect(key1 = category) {
+        delay(100)
+        visible = true
     }
 
-    val isDarkTheme = isSystemInDarkTheme()
-    val accentColor = if (isDarkTheme) category.darkAccentColor else category.accentColor
-
     val categoryIcon = when (category) {
-        ToolCategory.ORGANIZE_PDF -> Icons.Filled.Apps
+        ToolCategory.ORGANIZE_PDF -> Icons.Filled.SwapVert
         ToolCategory.OPTIMIZE_PDF -> Icons.Filled.Speed
         ToolCategory.CONVERT_TO_PDF -> Icons.Filled.SwapHoriz
-        ToolCategory.CONVERT_FROM_PDF -> Icons.Filled.SwapVert
+        ToolCategory.CONVERT_FROM_PDF -> Icons.Filled.Apps
         ToolCategory.EDIT_PDF -> Icons.Filled.Edit
         ToolCategory.PDF_SECURITY -> Icons.Filled.Security
     }
 
+    val accentColor = if (isSystemInDarkTheme()) category.darkAccentColor else category.accentColor
+    val containerColor = if (isSystemInDarkTheme()) category.darkContainerColor else category.containerColor
+
     AnimatedVisibility(
-        visible = isVisible,
-        enter = fadeIn(animationSpec = tween(400)) +
+        visible = visible,
+        enter = fadeIn(animationSpec = tween(durationMillis = 400)) +
                 slideInVertically(
-                    animationSpec = tween(400),
-                    initialOffsetY = { it / 4 }
+                    initialOffsetY = { it / 3 },
+                    animationSpec = tween(durationMillis = 400)
                 )
     ) {
         Column(
@@ -100,13 +100,13 @@ fun CategorySection(
                 // Category Icon
                 Icon(
                     imageVector = categoryIcon,
-                    contentDescription = category.displayName,
+                    contentDescription = stringResource(category.displayNameResId),
                     tint = accentColor,
                     modifier = Modifier.size(24.dp)
                 )
                 
                 Text(
-                    text = category.displayName,
+                    text = stringResource(category.displayNameResId),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
@@ -118,7 +118,7 @@ fun CategorySection(
                     .fillMaxWidth()
                     .padding(4.dp)
             ) {
-                val columns = 2
+                val columns = (maxWidth / 180.dp).toInt().coerceIn(2, 4)
                 val rowsCount = (tools.size + columns - 1) / columns
 
                 Column(

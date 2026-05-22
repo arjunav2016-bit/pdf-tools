@@ -7,4 +7,6 @@ import kotlinx.serialization.Serializable
 
 @Serializable data object Settings : NavKey
 
+@Serializable data object Onboarding : NavKey
+
 @Serializable data class ToolDetail(val toolId: String) : NavKey

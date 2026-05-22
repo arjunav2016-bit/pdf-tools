@@ -1,45 +1,67 @@
 package com.example.pdftools.data
 
 import android.content.Context
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.snapshots.SnapshotStateList
+import com.example.pdftools.data.db.FavoriteDao
+import com.example.pdftools.data.db.FavoriteEntity
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 
 @Singleton
-class FavoritesRepository @Inject constructor(
-    @ApplicationContext private val context: Context
+class FavoritesRepository(
+    private val context: Context,
+    private val favoriteDao: FavoriteDao,
+    private val coroutineScope: CoroutineScope
 ) {
-    companion object {
-        private const val PREFS_NAME = "pdf_tools_favorites"
-        private const val KEY_FAVORITES = "favorites"
-    }
-    
-    private val favorites = mutableStateListOf<String>()
+    @Inject
+    constructor(
+        @ApplicationContext context: Context,
+        favoriteDao: FavoriteDao
+    ) : this(context, favoriteDao, CoroutineScope(SupervisorJob() + Dispatchers.IO))
+
+    val favorites: StateFlow<List<String>> = favoriteDao.getAll()
+        .map { list -> list.map { it.toolId } }
+        .stateIn(
+            scope = coroutineScope,
+            started = SharingStarted.Eagerly,
+            initialValue = emptyList()
+        )
 
     init {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val set = prefs.getStringSet(KEY_FAVORITES, emptySet()) ?: emptySet()
-        favorites.clear()
-        favorites.addAll(set)
+        // Silent, automatic migration from old SharedPreferences
+        coroutineScope.launch {
+            val prefs = context.getSharedPreferences("pdf_tools_favorites", Context.MODE_PRIVATE)
+            if (prefs.contains("favorites")) {
+                val set = prefs.getStringSet("favorites", null)
+                if (set != null) {
+                    set.forEach { toolId ->
+                        favoriteDao.insert(FavoriteEntity(toolId))
+                    }
+                }
+                // Clear old preferences so we only migrate once
+                prefs.edit().clear().apply()
+            }
+        }
     }
 
-    fun getFavorites(): SnapshotStateList<String> = favorites
-
-    fun isFavorite(toolId: String): Boolean = favorites.contains(toolId)
+    fun isFavorite(toolId: String): Boolean = favorites.value.contains(toolId)
 
     fun toggleFavorite(toolId: String) {
-        if (favorites.contains(toolId)) {
-            favorites.remove(toolId)
-        } else {
-            favorites.add(toolId)
+        coroutineScope.launch {
+            if (isFavorite(toolId)) {
+                favoriteDao.delete(FavoriteEntity(toolId))
+            } else {
+                favoriteDao.insert(FavoriteEntity(toolId))
+            }
         }
-        save()
-    }
-
-    private fun save() {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        prefs.edit().putStringSet(KEY_FAVORITES, favorites.toSet()).apply()
     }
 }

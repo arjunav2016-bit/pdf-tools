@@ -29,13 +29,20 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -121,7 +128,10 @@ fun SettingsScreen(
             item { Spacer(modifier = Modifier.height(4.dp)) }
 
             item {
-                SettingsGroupCard(title = stringResource(R.string.settings_appearance)) {
+                SettingsGroupCard(
+                    title = stringResource(R.string.settings_appearance),
+                    animationDelay = 50
+                ) {
                     Text(
                         text = stringResource(R.string.settings_theme),
                         style = MaterialTheme.typography.titleSmall,
@@ -143,7 +153,10 @@ fun SettingsScreen(
             }
 
             item {
-                SettingsGroupCard(title = stringResource(R.string.settings_processing_defaults)) {
+                SettingsGroupCard(
+                    title = stringResource(R.string.settings_processing_defaults),
+                    animationDelay = 100
+                ) {
                     SliderPreference(
                         title = stringResource(R.string.settings_compression_quality),
                         valueLabel = stringResource(
@@ -195,7 +208,10 @@ fun SettingsScreen(
             }
 
             item {
-                SettingsGroupCard(title = stringResource(R.string.settings_storage)) {
+                SettingsGroupCard(
+                    title = stringResource(R.string.settings_storage),
+                    animationDelay = 150
+                ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
@@ -221,7 +237,10 @@ fun SettingsScreen(
             }
 
             item {
-                SettingsGroupCard(title = stringResource(R.string.settings_about)) {
+                SettingsGroupCard(
+                    title = stringResource(R.string.settings_about),
+                    animationDelay = 200
+                ) {
                     Text(
                         text = stringResource(R.string.settings_app_version, versionName),
                         style = MaterialTheme.typography.bodyMedium
@@ -242,27 +261,50 @@ fun SettingsScreen(
 @Composable
 private fun SettingsGroupCard(
     title: String,
+    modifier: Modifier = Modifier,
+    animationDelay: Int = 0,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-        )
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        delay(animationDelay.toLong())
+        visible = true
+    }
+
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(animationSpec = tween(durationMillis = 400)) +
+                slideInVertically(
+                    initialOffsetY = { it / 4 },
+                    animationSpec = tween(durationMillis = 400)
+                ),
+        modifier = modifier
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            border = BorderStroke(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+            ),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerLow
             )
-            content()
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                content()
+            }
         }
     }
 }

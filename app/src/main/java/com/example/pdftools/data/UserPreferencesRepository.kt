@@ -5,6 +5,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -33,7 +34,8 @@ data class UserPreferences(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val compressionQuality: Int = 70,
     val exportDpi: Int = 150,
-    val defaultSaveLocation: SaveLocation = SaveLocation.INTERNAL
+    val defaultSaveLocation: SaveLocation = SaveLocation.INTERNAL,
+    val onboardingCompleted: Boolean = false
 )
 
 @Singleton
@@ -48,6 +50,7 @@ class UserPreferencesRepository internal constructor(
         val compressionQuality = intPreferencesKey("compression_quality")
         val exportDpi = intPreferencesKey("export_dpi")
         val defaultSaveLocation = stringPreferencesKey("default_save_location")
+        val onboardingCompleted = booleanPreferencesKey("onboarding_completed")
     }
 
     val preferences: Flow<UserPreferences> = dataStore.data
@@ -84,6 +87,12 @@ class UserPreferencesRepository internal constructor(
         }
     }
 
+    suspend fun setOnboardingCompleted(completed: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[Keys.onboardingCompleted] = completed
+        }
+    }
+
     private fun mapPreferences(preferences: Preferences): UserPreferences {
         return UserPreferences(
             themeMode = preferences[Keys.themeMode].toEnumOrDefault(ThemeMode.SYSTEM),
@@ -92,7 +101,8 @@ class UserPreferencesRepository internal constructor(
             exportDpi = preferences[Keys.exportDpi]?.coerceIn(72, 300)
                 ?: UserPreferences().exportDpi,
             defaultSaveLocation = preferences[Keys.defaultSaveLocation]
-                .toEnumOrDefault(SaveLocation.INTERNAL)
+                .toEnumOrDefault(SaveLocation.INTERNAL),
+            onboardingCompleted = preferences[Keys.onboardingCompleted] ?: false
         )
     }
 }

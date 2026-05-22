@@ -38,12 +38,14 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeTopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -58,7 +60,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.pdftools.R
 import com.example.pdftools.ui.viewmodels.RecentViewModel
 import com.example.pdftools.data.RecentFile
-import com.example.pdftools.data.ToolRepository
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -70,7 +71,7 @@ fun RecentScreen(
     modifier: Modifier = Modifier,
     viewModel: RecentViewModel = hiltViewModel()
 ) {
-    val recents = viewModel.recents
+    val recents by viewModel.recents.collectAsState()
     val context = LocalContext.current
 
     Scaffold(
@@ -132,6 +133,7 @@ fun RecentScreen(
                     items(recents, key = { it.id }) { recent ->
                         RecentFileItem(
                             recent = recent,
+                            tool = viewModel.getToolById(recent.toolId),
                             onOpen = { openFile(context, recent) },
                             onShare = { shareFile(context, recent) }
                         )
@@ -145,11 +147,11 @@ fun RecentScreen(
 @Composable
 private fun RecentFileItem(
     recent: RecentFile,
+    tool: com.example.pdftools.data.PdfTool?,
     onOpen: () -> Unit,
     onShare: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val tool = ToolRepository.getToolById(recent.toolId)
     val isDarkTheme = isSystemInDarkTheme()
     val accentColor = tool?.category?.let { if (isDarkTheme) it.darkAccentColor else it.accentColor } 
         ?: MaterialTheme.colorScheme.primary

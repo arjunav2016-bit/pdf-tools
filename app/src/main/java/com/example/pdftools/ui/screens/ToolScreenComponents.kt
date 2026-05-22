@@ -7,6 +7,10 @@ import android.net.Uri
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.scaleIn
 import androidx.compose.foundation.BorderStroke
@@ -46,6 +50,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -55,14 +60,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
-import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.*
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
@@ -265,6 +272,34 @@ internal fun SuccessCard(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    var triggerAnimation by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        triggerAnimation = true
+    }
+
+    val scale by animateFloatAsState(
+        targetValue = if (triggerAnimation) 1f else 0f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        ),
+        label = "scale"
+    )
+
+    val particleProgress by animateFloatAsState(
+        targetValue = if (triggerAnimation) 1f else 0f,
+        animationSpec = tween(durationMillis = 800, easing = FastOutSlowInEasing),
+        label = "particles"
+    )
+
+    val particles = remember {
+        List(15) {
+            val angle = Math.random() * 2 * Math.PI
+            val speed = 50f + Math.random().toFloat() * 150f
+            val radius = 4f + Math.random().toFloat() * 6f
+            Triple(angle, speed, radius)
+        }
+    }
 
     AnimatedVisibility(
         visible = true,
@@ -286,18 +321,48 @@ internal fun SuccessCard(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Box(
-                    modifier = Modifier
-                        .size(64.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primaryContainer),
+                    modifier = Modifier.size(120.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        imageVector = Icons.Filled.CheckCircle,
-                        contentDescription = stringResource(R.string.processing_complete),
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(36.dp)
-                    )
+                    // Canvas for particles
+                    if (particleProgress > 0f && particleProgress < 1f) {
+                        val primaryColor = MaterialTheme.colorScheme.primary
+                        val secondaryColor = MaterialTheme.colorScheme.secondary
+                        Canvas(modifier = Modifier.fillMaxSize()) {
+                            val center = Offset(size.width / 2, size.height / 2)
+                            particles.forEach { (angle, speed, radius) ->
+                                val distance = speed * particleProgress
+                                val x = center.x + (distance * Math.cos(angle)).toFloat()
+                                val y = center.y + (distance * Math.sin(angle)).toFloat()
+                                val alpha = 1f - particleProgress
+                                drawCircle(
+                                    color = if (Math.random() > 0.5) primaryColor else secondaryColor,
+                                    radius = radius * (1f - particleProgress * 0.5f),
+                                    center = Offset(x, y),
+                                    alpha = alpha
+                                )
+                            }
+                        }
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .size(64.dp)
+                            .graphicsLayer {
+                                scaleX = scale
+                                scaleY = scale
+                            }
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primaryContainer),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.CheckCircle,
+                            contentDescription = stringResource(R.string.processing_complete),
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(36.dp)
+                        )
+                    }
                 }
 
                 Text(
@@ -671,7 +736,8 @@ fun PositionPreviewCard(
             // Simulating A4 Page
             Box(
                 modifier = Modifier
-                    .size(width = 140.dp, height = 181.dp)
+                    .width(140.dp)
+                    .height(181.dp)
                     .clip(RoundedCornerShape(4.dp))
                     .background(Color.White)
                     .drawBehind {
@@ -686,7 +752,7 @@ fun PositionPreviewCard(
                 // Background simulated text lines
                 Canvas(modifier = Modifier.fillMaxSize()) {
                     val lineCount = 12
-                    val lineSpacing = size.height / (lineCount + 1)
+                    val lineSpacing = this.size.height / (lineCount + 1)
                     val paintColor = Color.LightGray.copy(alpha = 0.3f)
                     
                     for (i in 1..lineCount) {
@@ -697,14 +763,14 @@ fun PositionPreviewCard(
                             drawLine(
                                 color = paintColor,
                                 start = Offset(15f, lineY),
-                                end = Offset(size.width * 0.4f, lineY),
+                                end = Offset(this.size.width * 0.4f, lineY),
                                 strokeWidth = 3f
                             )
                         } else {
                             drawLine(
                                 color = paintColor,
                                 start = Offset(15f, lineY),
-                                end = Offset(size.width - 15f, lineY),
+                                end = Offset(this.size.width - 15f, lineY),
                                 strokeWidth = 2f
                             )
                         }
@@ -712,12 +778,12 @@ fun PositionPreviewCard(
 
                     // Render preview box
                     // standard PDF coordinate bounds: Width 612, Height 792
-                    val scaleX = size.width / 612f
-                    val scaleY = size.height / 792f
+                    val scaleX = this.size.width / 612f
+                    val scaleY = this.size.height / 792f
 
                     val rectX = x * scaleX
                     // Invert Y coordinate since PDF is bottom-left origin
-                    val rectY = size.height - (y * scaleY) - (height * scaleY)
+                    val rectY = this.size.height - (y * scaleY) - (height * scaleY)
                     val rectW = width * scaleX
                     val rectH = height * scaleY
 

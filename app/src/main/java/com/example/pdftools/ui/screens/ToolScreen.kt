@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -52,6 +53,21 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.pdftools.R
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.CornerRadius
 import com.example.pdftools.data.PdfTool
 import com.example.pdftools.ui.screens.tools.CompareResultDisplayConfig
 import com.example.pdftools.ui.screens.tools.CropToolConfig
@@ -186,157 +202,381 @@ fun ToolScreen(
             )
         }
     ) { innerPadding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .padding(horizontal = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp)
-        ) {
-            // Hero section
-            item {
-                Spacer(modifier = Modifier.height(8.dp))
-                HeroSection(tool = tool, accentColor = accentColor, containerColor = containerColor)
-            }
+        val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+        val isWideScreen = configuration.screenWidthDp >= 600
 
-            // Input File Picker / Success Area
-            item {
-                if (isComplete) {
-                    SuccessCard(
-                        tool = tool,
-                        outputUris = outputUris,
-                        onClear = { viewModel.reset() },
-                        accentColor = accentColor,
-                        containerColor = containerColor
-                    )
-                } else {
-                    FilePickerZone(
-                        accentColor = accentColor,
-                        onPickFiles = {
-                            val mimeTypes = when (tool.id) {
-                                "jpg_to_pdf", "scan_to_pdf" -> arrayOf("image/jpeg", "image/png", "image/webp")
-                                "html_to_pdf" -> arrayOf("text/html", "text/plain")
-                                "word_to_pdf" -> arrayOf("application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/msword")
-                                "ppt_to_pdf" -> arrayOf("application/vnd.openxmlformats-officedocument.presentationml.presentation", "application/vnd.ms-powerpoint")
-                                "excel_to_pdf" -> arrayOf("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.ms-excel")
-                                else -> arrayOf("application/pdf")
-                            }
-                            filePickerLauncher.launch(mimeTypes)
-                        }
-                    )
-                }
-            }
-
-            // Selected files (only show when not complete)
-            if (selectedFiles.isNotEmpty() && !isComplete) {
-                item {
-                    Text(
-                        text = "Selected Files (${selectedFiles.size})",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-                itemsIndexed(selectedFiles) { index, uri ->
-                    FileItem(
-                        fileName = uri.lastPathSegment ?: "File ${index + 1}",
-                        onRemove = { viewModel.removeFile(index) }
-                    )
-                }
-            }
-
-            // Tool-specific configurations
-            if (selectedFiles.isNotEmpty() || (tool.id == "html_to_pdf" && htmlConfig.htmlContent.isNotEmpty())) {
-                if (!isComplete) {
+        if (isWideScreen) {
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .padding(horizontal = 20.dp),
+                horizontalArrangement = Arrangement.spacedBy(24.dp)
+            ) {
+                // Left pane: Controls & configurations
+                LazyColumn(
+                    modifier = Modifier
+                        .weight(1.2f)
+                        .fillMaxHeight(),
+                    verticalArrangement = Arrangement.spacedBy(20.dp)
+                ) {
                     item {
-                        ToolConfigSection(tool = tool, viewModel = viewModel, accentColor = accentColor)
+                        Spacer(modifier = Modifier.height(8.dp))
                     }
-                } else {
-                    // Result display for tool outputs (like OCR or PDF Compare)
-                    if (tool.id == "ocr_pdf" || tool.id == "compare_pdf") {
+                    
+                    // Picker zone (when not complete)
+                    if (!isComplete) {
+                        item {
+                            FilePickerZone(
+                                accentColor = accentColor,
+                                onPickFiles = {
+                                    val mimeTypes = when (tool.id) {
+                                        "jpg_to_pdf", "scan_to_pdf" -> arrayOf("image/jpeg", "image/png", "image/webp")
+                                        "html_to_pdf" -> arrayOf("text/html", "text/plain")
+                                        "word_to_pdf" -> arrayOf("application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/msword")
+                                        "ppt_to_pdf" -> arrayOf("application/vnd.openxmlformats-officedocument.presentationml.presentation", "application/vnd.ms-powerpoint")
+                                        "excel_to_pdf" -> arrayOf("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.ms-excel")
+                                        else -> arrayOf("application/pdf")
+                                    }
+                                    filePickerLauncher.launch(mimeTypes)
+                                }
+                            )
+                        }
+                    }
+
+                    // Selected files
+                    if (selectedFiles.isNotEmpty() && !isComplete) {
+                        item {
+                            Text(
+                                text = "Selected Files (${selectedFiles.size})",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                        itemsIndexed(selectedFiles) { index, uri ->
+                            FileItem(
+                                fileName = uri.lastPathSegment ?: "File ${index + 1}",
+                                onRemove = { viewModel.removeFile(index) }
+                            )
+                        }
+                    }
+
+                    // Config
+                    if (selectedFiles.isNotEmpty() || (tool.id == "html_to_pdf" && htmlConfig.htmlContent.isNotEmpty())) {
+                        if (!isComplete) {
+                            item {
+                                ToolConfigSection(tool = tool, viewModel = viewModel, accentColor = accentColor)
+                            }
+                        }
+                    }
+
+                    // Action button
+                    val showActionButton = (selectedFiles.isNotEmpty() || (tool.id == "html_to_pdf" && htmlConfig.htmlContent.isNotEmpty())) && !isComplete
+                    if (showActionButton) {
+                        item {
+                            if (isProcessing) {
+                                Column(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    ShimmerProgressIndicator(
+                                        progress = progress,
+                                        accentColor = accentColor,
+                                        containerColor = containerColor,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = processingState?.statusMessage
+                                                ?: stringResource(R.string.processing_locally),
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        OutlinedButton(onClick = viewModel::cancelProcessing) {
+                                            Text(stringResource(R.string.cancel))
+                                        }
+                                    }
+                                }
+                            } else {
+                                Button(
+                                    onClick = {
+                                        if (requiresConfirmation) {
+                                            showDestructiveConfirmation = true
+                                        } else {
+                                            viewModel.process(tool.id, context)
+                                        }
+                                    },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(56.dp),
+                                    shape = RoundedCornerShape(16.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = accentColor
+                                    )
+                                ) {
+                                    Text(
+                                        text = getActionButtonText(tool.id),
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    
+                    item {
+                        Spacer(modifier = Modifier.height(24.dp))
+                    }
+                }
+
+                // Right pane: Hero, results & success card
+                LazyColumn(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight(),
+                    verticalArrangement = Arrangement.spacedBy(20.dp)
+                ) {
+                    item {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        HeroSection(tool = tool, accentColor = accentColor, containerColor = containerColor)
+                    }
+
+                    if (isComplete) {
+                        item {
+                            SuccessCard(
+                                tool = tool,
+                                outputUris = outputUris,
+                                onClear = { viewModel.reset() },
+                                accentColor = accentColor,
+                                containerColor = containerColor
+                            )
+                        }
+                    }
+
+                    // Result display configuration for OCR/Compare when complete
+                    if (isComplete && (tool.id == "ocr_pdf" || tool.id == "compare_pdf")) {
                         item {
                             ToolConfigSection(tool = tool, viewModel = viewModel, accentColor = accentColor)
                         }
                     }
+                    
+                    item {
+                        Spacer(modifier = Modifier.height(24.dp))
+                    }
                 }
             }
-
-            // Action button / Processing bar
-            val showActionButton = (selectedFiles.isNotEmpty() || (tool.id == "html_to_pdf" && htmlConfig.htmlContent.isNotEmpty())) && !isComplete
-            if (showActionButton) {
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .padding(horizontal = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(20.dp)
+            ) {
+                // Hero section
                 item {
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
+                    HeroSection(tool = tool, accentColor = accentColor, containerColor = containerColor)
+                }
 
-                    if (isProcessing) {
-                        Column(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            if (progress != null) {
-                                LinearProgressIndicator(
-                                    progress = { progress ?: 0f },
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(4.dp)),
-                                    color = accentColor,
-                                    trackColor = containerColor
-                                )
-                            } else {
-                                LinearProgressIndicator(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(4.dp)),
-                                    color = accentColor,
-                                    trackColor = containerColor
-                                )
-                            }
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = processingState?.statusMessage
-                                        ?: stringResource(R.string.processing_locally),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.weight(1f)
-                                )
-                                OutlinedButton(onClick = viewModel::cancelProcessing) {
-                                    Text(stringResource(R.string.cancel))
-                                }
-                            }
-                        }
-                    } else {
-                        Button(
-                            onClick = {
-                                if (requiresConfirmation) {
-                                    showDestructiveConfirmation = true
-                                } else {
-                                    viewModel.process(tool.id, context)
-                                }
-                            },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(56.dp),
-                            shape = RoundedCornerShape(16.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = accentColor
+                // Input File Picker / Success Area
+                item {
+                    AnimatedContent(
+                        targetState = isComplete,
+                        transitionSpec = {
+                            fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(300))
+                        },
+                        label = "picker_success_transition"
+                    ) { complete ->
+                        if (complete) {
+                            SuccessCard(
+                                tool = tool,
+                                outputUris = outputUris,
+                                onClear = { viewModel.reset() },
+                                accentColor = accentColor,
+                                containerColor = containerColor
                             )
-                        ) {
-                            Text(
-                                text = getActionButtonText(tool.id),
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold
+                        } else {
+                            FilePickerZone(
+                                accentColor = accentColor,
+                                onPickFiles = {
+                                    val mimeTypes = when (tool.id) {
+                                        "jpg_to_pdf", "scan_to_pdf" -> arrayOf("image/jpeg", "image/png", "image/webp")
+                                        "html_to_pdf" -> arrayOf("text/html", "text/plain")
+                                        "word_to_pdf" -> arrayOf("application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/msword")
+                                        "ppt_to_pdf" -> arrayOf("application/vnd.openxmlformats-officedocument.presentationml.presentation", "application/vnd.ms-powerpoint")
+                                        "excel_to_pdf" -> arrayOf("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.ms-excel")
+                                        else -> arrayOf("application/pdf")
+                                    }
+                                    filePickerLauncher.launch(mimeTypes)
+                                }
                             )
                         }
                     }
                 }
-            }
 
-            item {
-                Spacer(modifier = Modifier.height(24.dp))
+                // Selected files (only show when not complete)
+                if (selectedFiles.isNotEmpty() && !isComplete) {
+                    item {
+                        Text(
+                            text = "Selected Files (${selectedFiles.size})",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                    itemsIndexed(selectedFiles) { index, uri ->
+                        FileItem(
+                            fileName = uri.lastPathSegment ?: "File ${index + 1}",
+                            onRemove = { viewModel.removeFile(index) }
+                        )
+                    }
+                }
+
+                // Tool-specific configurations
+                if (selectedFiles.isNotEmpty() || (tool.id == "html_to_pdf" && htmlConfig.htmlContent.isNotEmpty())) {
+                    if (!isComplete) {
+                        item {
+                            ToolConfigSection(tool = tool, viewModel = viewModel, accentColor = accentColor)
+                        }
+                    } else {
+                        // Result display for tool outputs (like OCR or PDF Compare)
+                        if (tool.id == "ocr_pdf" || tool.id == "compare_pdf") {
+                            item {
+                                ToolConfigSection(tool = tool, viewModel = viewModel, accentColor = accentColor)
+                            }
+                        }
+                    }
+                }
+
+                // Action button / Processing bar
+                val showActionButton = (selectedFiles.isNotEmpty() || (tool.id == "html_to_pdf" && htmlConfig.htmlContent.isNotEmpty())) && !isComplete
+                if (showActionButton) {
+                    item {
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        if (isProcessing) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                ShimmerProgressIndicator(
+                                    progress = progress,
+                                    accentColor = accentColor,
+                                    containerColor = containerColor,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = processingState?.statusMessage
+                                            ?: stringResource(R.string.processing_locally),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    OutlinedButton(onClick = viewModel::cancelProcessing) {
+                                        Text(stringResource(R.string.cancel))
+                                    }
+                                }
+                            }
+                        } else {
+                            Button(
+                                onClick = {
+                                    if (requiresConfirmation) {
+                                        showDestructiveConfirmation = true
+                                    } else {
+                                        viewModel.process(tool.id, context)
+                                    }
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(56.dp),
+                                shape = RoundedCornerShape(16.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = accentColor
+                                )
+                            ) {
+                                Text(
+                                    text = getActionButtonText(tool.id),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+                    }
+                }
+
+                item {
+                    Spacer(modifier = Modifier.height(24.dp))
+                }
             }
+        }
+    }
+}
+
+@Composable
+private fun ShimmerProgressIndicator(
+    progress: Float?,
+    accentColor: Color,
+    containerColor: Color,
+    modifier: Modifier = Modifier
+) {
+    val infiniteTransition = rememberInfiniteTransition(label = "shimmer")
+    val translateAnim by infiniteTransition.animateFloat(
+        initialValue = -300f,
+        targetValue = 600f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1500, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "shimmerTranslate"
+    )
+
+    val shimmerBrush = Brush.linearGradient(
+        colors = listOf(
+            accentColor,
+            MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.4f),
+            accentColor
+        ),
+        start = Offset(translateAnim, 0f),
+        end = Offset(translateAnim + 150f, 150f)
+    )
+
+    Canvas(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(8.dp)
+            .clip(RoundedCornerShape(4.dp))
+    ) {
+        // Track
+        drawRoundRect(
+            color = containerColor,
+            cornerRadius = CornerRadius(4.dp.toPx(), 4.dp.toPx())
+        )
+        // Progress / Shimmer
+        if (progress != null) {
+            val progressWidth = size.width * progress
+            drawRoundRect(
+                brush = shimmerBrush,
+                size = Size(progressWidth, size.height),
+                cornerRadius = CornerRadius(4.dp.toPx(), 4.dp.toPx())
+            )
+        } else {
+            // Indeterminate
+            drawRoundRect(
+                brush = shimmerBrush,
+                cornerRadius = CornerRadius(4.dp.toPx(), 4.dp.toPx())
+            )
         }
     }
 }
