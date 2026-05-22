@@ -39,7 +39,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.example.pdftools.data.FavoritesRepository
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.pdftools.ui.viewmodels.FavoritesViewModel
 import com.example.pdftools.data.PdfTool
 import com.example.pdftools.data.ToolRepository
 import com.example.pdftools.ui.components.ToolCard
@@ -48,9 +49,10 @@ import com.example.pdftools.ui.components.ToolCard
 @Composable
 fun FavoritesScreen(
     onToolClick: (PdfTool) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    viewModel: FavoritesViewModel = hiltViewModel()
 ) {
-    val favoriteIds = FavoritesRepository.getFavorites()
+    val favoriteIds = viewModel.favorites
     
     val favoriteTools by remember(favoriteIds) {
         derivedStateOf {

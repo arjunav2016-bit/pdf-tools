@@ -3,6 +3,9 @@ package com.example.pdftools.data
 import android.content.Context
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.snapshots.SnapshotStateList
+import dagger.hilt.android.qualifiers.ApplicationContext
+import javax.inject.Inject
+import javax.inject.Singleton
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -14,14 +17,19 @@ data class RecentFile(
     val timestamp: Long
 )
 
-object RecentFilesRepository {
-    private const val PREFS_NAME = "pdf_tools_recents"
-    private const val KEY_RECENTS = "recents"
-    private const val MAX_ITEMS = 30
+@Singleton
+class RecentFilesRepository @Inject constructor(
+    @ApplicationContext private val context: Context
+) {
+    companion object {
+        private const val PREFS_NAME = "pdf_tools_recents"
+        private const val KEY_RECENTS = "recents"
+        private const val MAX_ITEMS = 30
+    }
     
     private val recents = mutableStateListOf<RecentFile>()
 
-    fun init(context: Context) {
+    init {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val jsonStr = prefs.getString(KEY_RECENTS, null)
         recents.clear()
@@ -50,7 +58,7 @@ object RecentFilesRepository {
 
     fun getRecents(): SnapshotStateList<RecentFile> = recents
 
-    fun addRecent(context: Context, fileName: String, toolId: String, filePath: String) {
+    fun addRecent(fileName: String, toolId: String, filePath: String) {
         // Remove existing item with same path if any
         recents.removeAll { it.filePath == filePath }
         
@@ -69,15 +77,15 @@ object RecentFilesRepository {
             recents.removeRange(MAX_ITEMS, recents.size)
         }
         
-        save(context)
+        save()
     }
 
-    fun clear(context: Context) {
+    fun clear() {
         recents.clear()
-        save(context)
+        save()
     }
 
-    private fun save(context: Context) {
+    private fun save() {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         try {
             val array = JSONArray()

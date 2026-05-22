@@ -53,8 +53,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.pdftools.ui.viewmodels.RecentViewModel
 import com.example.pdftools.data.RecentFile
-import com.example.pdftools.data.RecentFilesRepository
 import com.example.pdftools.data.ToolRepository
 import java.io.File
 import java.text.SimpleDateFormat
@@ -64,9 +65,10 @@ import java.util.Locale
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RecentScreen(
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    viewModel: RecentViewModel = hiltViewModel()
 ) {
-    val recents = RecentFilesRepository.getRecents()
+    val recents = viewModel.recents
     val context = LocalContext.current
 
     Scaffold(
@@ -97,7 +99,7 @@ fun RecentScreen(
                 },
                 actions = {
                     if (recents.isNotEmpty()) {
-                        IconButton(onClick = { RecentFilesRepository.clear(context) }) {
+                        IconButton(onClick = { viewModel.clear() }) {
                             Icon(
                                 imageVector = Icons.Filled.DeleteSweep,
                                 contentDescription = "Clear all history",

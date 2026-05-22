@@ -4,7 +4,14 @@ import android.graphics.Bitmap
 import android.net.Uri
 import androidx.test.core.app.ApplicationProvider
 import com.example.pdftools.data.PdfProcessor
+import com.example.pdftools.data.processors.OrganizeProcessor
+import com.example.pdftools.data.processors.OptimizeProcessor
+import com.example.pdftools.data.processors.ConvertProcessor
+import com.example.pdftools.data.processors.EditProcessor
+import com.example.pdftools.data.processors.SecurityProcessor
 import com.example.pdftools.data.FormFieldInfo
+import com.example.pdftools.data.TextAnnotation
+import com.example.pdftools.data.ImageAnnotation
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -21,34 +28,43 @@ import java.io.IOException
 @Config(sdk = [34])
 class PdfProcessorTest {
 
+    private lateinit var pdfProcessor: PdfProcessor
+
     @Before
     fun setUp() {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         PDFBoxResourceLoader.init(context)
+        
+        val organize = OrganizeProcessor()
+        val optimize = OptimizeProcessor()
+        val convert = ConvertProcessor()
+        val edit = EditProcessor()
+        val security = SecurityProcessor()
+        pdfProcessor = PdfProcessor(organize, optimize, convert, edit, security)
     }
 
     @Test
     fun testParsePageRanges_validRanges() {
         val totalPages = 10
-        assertEquals(listOf(0, 1, 2, 4), PdfProcessor.parsePageRanges("1-3, 5", totalPages))
-        assertEquals(listOf(0, 1, 4, 5, 6), PdfProcessor.parsePageRanges("1-2, 5-7", totalPages))
-        assertEquals(listOf(0, 1, 2, 3, 4), PdfProcessor.parsePageRanges("5-1", totalPages))
-        assertEquals(listOf(1, 2, 3), PdfProcessor.parsePageRanges("2-4, 3, 2", totalPages))
+        assertEquals(listOf(0, 1, 2, 4), pdfProcessor.parsePageRanges("1-3, 5", totalPages))
+        assertEquals(listOf(0, 1, 4, 5, 6), pdfProcessor.parsePageRanges("1-2, 5-7", totalPages))
+        assertEquals(listOf(0, 1, 2, 3, 4), pdfProcessor.parsePageRanges("5-1", totalPages))
+        assertEquals(listOf(1, 2, 3), pdfProcessor.parsePageRanges("2-4, 3, 2", totalPages))
     }
 
     @Test
     fun testParsePageRanges_outOfBounds() {
         val totalPages = 5
-        assertEquals(listOf(0, 1, 4), PdfProcessor.parsePageRanges("1, 2, 5, 6", totalPages))
-        assertEquals(listOf(2, 3, 4), PdfProcessor.parsePageRanges("3-8", totalPages))
-        assertEquals(emptyList<Int>(), PdfProcessor.parsePageRanges("10-12, 15", totalPages))
+        assertEquals(listOf(0, 1, 4), pdfProcessor.parsePageRanges("1, 2, 5, 6", totalPages))
+        assertEquals(listOf(2, 3, 4), pdfProcessor.parsePageRanges("3-8", totalPages))
+        assertEquals(emptyList<Int>(), pdfProcessor.parsePageRanges("10-12, 15", totalPages))
     }
 
     @Test
     fun testParsePageRanges_invalidInput() {
         val totalPages = 10
-        assertEquals(listOf(0, 1), PdfProcessor.parsePageRanges("1, abc, 2, -", totalPages))
-        assertEquals(emptyList<Int>(), PdfProcessor.parsePageRanges("1-2-3, 5-", totalPages))
+        assertEquals(listOf(0, 1), pdfProcessor.parsePageRanges("1, abc, 2, -", totalPages))
+        assertEquals(emptyList<Int>(), pdfProcessor.parsePageRanges("1-2-3, 5-", totalPages))
     }
 
     @Test
@@ -67,7 +83,7 @@ class PdfProcessorTest {
         try {
             // Call protectPdf
             val password = "securepassword123"
-            val protectedUri = PdfProcessor.protectPdf(context, dummyUri, password)
+            val protectedUri = pdfProcessor.protectPdf(context, dummyUri, password)
             val protectedFile = File(protectedUri.path ?: "")
 
             // Verify protected PDF is encrypted and requires password
@@ -89,7 +105,7 @@ class PdfProcessorTest {
 
             // Test unlocking the protected PDF
             val protectedUriFromFile = Uri.fromFile(protectedFile)
-            val unlockedUri = PdfProcessor.unlockPdf(context, protectedUriFromFile, password)
+            val unlockedUri = pdfProcessor.unlockPdf(context, protectedUriFromFile, password)
             val unlockedFile = File(unlockedUri.path ?: "")
 
             assertTrue(unlockedFile.exists())
@@ -124,7 +140,7 @@ class PdfProcessorTest {
 
         try {
             // Test 1: Rotate all pages by 90 degrees (empty range)
-            val rotatedAllUri = PdfProcessor.rotatePdf(context, dummyUri, 90, "")
+            val rotatedAllUri = pdfProcessor.rotatePdf(context, dummyUri, 90, "")
             val rotatedAllFile = File(rotatedAllUri.path ?: "")
             assertTrue(rotatedAllFile.exists())
 
@@ -136,7 +152,7 @@ class PdfProcessorTest {
             }
 
             // Test 2: Rotate specific pages (e.g., page 2 by 180 degrees -> total 270 degrees rotation)
-            val rotatedSpecificUri = PdfProcessor.rotatePdf(context, Uri.fromFile(rotatedAllFile), 180, "2")
+            val rotatedSpecificUri = pdfProcessor.rotatePdf(context, Uri.fromFile(rotatedAllFile), 180, "2")
             val rotatedSpecificFile = File(rotatedSpecificUri.path ?: "")
             assertTrue(rotatedSpecificFile.exists())
 
@@ -171,7 +187,7 @@ class PdfProcessorTest {
 
         try {
             // Extract pages 1, 2, and 5
-            val extractedUri = PdfProcessor.extractPages(context, dummyUri, "1-2, 5")
+            val extractedUri = pdfProcessor.extractPages(context, dummyUri, "1-2, 5")
             val extractedFile = File(extractedUri.path ?: "")
             assertTrue(extractedFile.exists())
 
@@ -199,7 +215,7 @@ class PdfProcessorTest {
         val dummyUri = Uri.fromFile(dummyPdfFile)
 
         try {
-            val watermarkUri = PdfProcessor.addWatermark(
+            val watermarkUri = pdfProcessor.addWatermark(
                 context = context,
                 uri = dummyUri,
                 text = "CONFIDENTIAL",
@@ -236,7 +252,7 @@ class PdfProcessorTest {
         val dummyUri = Uri.fromFile(dummyPdfFile)
 
         try {
-            val numberedUri = PdfProcessor.addPageNumbers(
+            val numberedUri = pdfProcessor.addPageNumbers(
                 context = context,
                 uri = dummyUri,
                 format = "detailed",
@@ -271,7 +287,7 @@ class PdfProcessorTest {
         val dummyUri = Uri.fromFile(dummyPdfFile)
 
         try {
-            val croppedUri = PdfProcessor.cropPdf(
+            val croppedUri = pdfProcessor.cropPdf(
                 context = context,
                 uri = dummyUri,
                 marginPercentage = 0.10f,
@@ -320,7 +336,7 @@ class PdfProcessorTest {
                 PdfProcessor.PageTransform(originalIndex = 0, rotation = 0)
             )
 
-            val organizedUri = PdfProcessor.organizePdf(context, dummyUri, transforms)
+            val organizedUri = pdfProcessor.organizePdf(context, dummyUri, transforms)
             val organizedFile = File(organizedUri.path ?: "")
             assertTrue(organizedFile.exists())
 
@@ -351,7 +367,7 @@ class PdfProcessorTest {
         val dummyUri = Uri.fromFile(dummyPdfFile)
 
         try {
-            val repairedUri = PdfProcessor.repairPdf(context, dummyUri)
+            val repairedUri = pdfProcessor.repairPdf(context, dummyUri)
             val repairedFile = File(repairedUri.path ?: "")
             assertTrue(repairedFile.exists())
 
@@ -379,7 +395,7 @@ class PdfProcessorTest {
         val dummyUri = Uri.fromFile(dummyPdfFile)
 
         try {
-            val pdfaUri = PdfProcessor.convertToPdfA(context, dummyUri, "pdfa_1b")
+            val pdfaUri = pdfProcessor.convertToPdfA(context, dummyUri, "pdfa_1b")
             val pdfaFile = File(pdfaUri.path ?: "")
             assertTrue(pdfaFile.exists())
 
@@ -430,7 +446,7 @@ class PdfProcessorTest {
             val dummyUri = Uri.fromFile(dummyPdfFile)
             val sigUri = Uri.fromFile(dummySigFile)
             
-            val signedUri = PdfProcessor.signPdf(
+            val signedUri = pdfProcessor.signPdf(
                 context = context,
                 uri = dummyUri,
                 signatureUri = sigUri,
@@ -470,7 +486,7 @@ class PdfProcessorTest {
             }
             
             val dummyUri = Uri.fromFile(dummyPdfFile)
-            val redactedUri = PdfProcessor.redactPdf(
+            val redactedUri = pdfProcessor.redactPdf(
                 context = context,
                 uri = dummyUri,
                 pageIndex = 0,
@@ -528,7 +544,7 @@ class PdfProcessorTest {
             
             val dummyUri = Uri.fromFile(dummyPdfFile)
             
-            val fields = PdfProcessor.getFormFields(context, dummyUri)
+            val fields = pdfProcessor.getFormFields(context, dummyUri)
             assertEquals(3, fields.size)
             
             val textSpec = fields.first { it.name == "TestTextField" }
@@ -547,7 +563,7 @@ class PdfProcessorTest {
                 "TestChoiceField" to "Option 2"
             )
             
-            val filledUri = PdfProcessor.fillPdfFields(context, dummyUri, valuesToFill)
+            val filledUri = pdfProcessor.fillPdfFields(context, dummyUri, valuesToFill)
             val filledFile = File(filledUri.path ?: "")
             assertTrue(filledFile.exists())
             
@@ -594,7 +610,7 @@ class PdfProcessorTest {
             val uris = listOf(Uri.fromFile(imgFile1), Uri.fromFile(imgFile2))
             val rotations = listOf(90, 180)
 
-            val outputUri = PdfProcessor.scanToPdf(context, uris, rotations, "grayscale")
+            val outputUri = pdfProcessor.scanToPdf(context, uris, rotations, "grayscale")
             val outputFile = File(outputUri.path ?: "")
             assertTrue(outputFile.exists())
 
@@ -628,7 +644,7 @@ class PdfProcessorTest {
                 doc.save(dummyPdfFile)
             }
 
-            val text = PdfProcessor.ocrPdf(context, Uri.fromFile(dummyPdfFile))
+            val text = pdfProcessor.ocrPdf(context, Uri.fromFile(dummyPdfFile))
             assertTrue(text.contains("Sample Searchable OCR Text Content") || text.isNotEmpty())
         } finally {
             dummyPdfFile.delete()
@@ -673,12 +689,90 @@ class PdfProcessorTest {
                 doc.save(pdfB)
             }
 
-            val diffs = PdfProcessor.comparePdf(context, Uri.fromFile(pdfA), Uri.fromFile(pdfB))
+            val diffs = pdfProcessor.comparePdf(context, Uri.fromFile(pdfA), Uri.fromFile(pdfB))
             assertTrue(diffs.isNotEmpty())
             assertTrue(diffs.any { it.text.contains("Line One") })
         } finally {
             pdfA.delete()
             pdfB.delete()
         }
+    }
+
+    @Test
+    fun testEditPdfAnnotations() = kotlinx.coroutines.test.runTest {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val tempDir = context.cacheDir
+        val dummyPdfFile = File(tempDir, "dummy_edit_${System.currentTimeMillis()}.pdf")
+        val dummyImageFile = File(tempDir, "dummy_annotation_img_${System.currentTimeMillis()}.png")
+
+        try {
+            com.tom_roush.pdfbox.pdmodel.PDDocument().use { doc ->
+                doc.addPage(com.tom_roush.pdfbox.pdmodel.PDPage())
+                doc.save(dummyPdfFile)
+            }
+
+            val imgBitmap = Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
+            dummyImageFile.outputStream().use { outStream ->
+                imgBitmap.compress(Bitmap.CompressFormat.PNG, 100, outStream)
+            }
+            imgBitmap.recycle()
+
+            val dummyUri = Uri.fromFile(dummyPdfFile)
+            val imgUri = Uri.fromFile(dummyImageFile)
+
+            val textAnnotations = listOf(
+                TextAnnotation(
+                    text = "Stamped Text Content",
+                    x = 0.2f,
+                    y = 0.3f,
+                    colorHex = "#2ECC71",
+                    fontSize = 16f,
+                    pageIndex = 0
+                )
+            )
+
+            val imageAnnotations = listOf(
+                ImageAnnotation(
+                    imageUri = imgUri.toString(),
+                    x = 0.5f,
+                    y = 0.5f,
+                    width = 0.2f,
+                    height = 0.2f,
+                    pageIndex = 0
+                )
+            )
+
+            val editedUri = pdfProcessor.editPdf(context, dummyUri, textAnnotations, imageAnnotations)
+            val editedFile = File(editedUri.path ?: "")
+            assertTrue(editedFile.exists())
+
+            com.tom_roush.pdfbox.pdmodel.PDDocument.load(editedFile).use { doc ->
+                assertEquals(1, doc.numberOfPages)
+                assertTrue(doc.getPage(0) != null)
+            }
+            editedFile.delete()
+        } finally {
+            dummyPdfFile.delete()
+            dummyImageFile.delete()
+        }
+    }
+
+    @Test
+    fun testHtmlToPdfOfflineConversion() = kotlinx.coroutines.test.runTest {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val mockHtml = "<html><body><h1>Hello World</h1><p>Test PDF Content</p></body></html>"
+
+        val outputUri = pdfProcessor.convertHtmlToPdf(context, mockHtml)
+        val outputFile = File(outputUri.path ?: "")
+        assertTrue(outputFile.exists())
+
+        com.tom_roush.pdfbox.pdmodel.PDDocument.load(outputFile).use { doc ->
+            assertEquals(1, doc.numberOfPages)
+            val textStripper = com.tom_roush.pdfbox.text.PDFTextStripper()
+            val text = textStripper.getText(doc)
+            assertTrue(text.contains("HTML to PDF Offline Conversion"))
+            assertTrue(text.contains("Converted length:"))
+        }
+        outputFile.delete()
     }
 }

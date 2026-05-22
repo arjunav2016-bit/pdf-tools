@@ -129,28 +129,32 @@ object ToolRepository {
             name = "WORD to PDF",
             icon = Icons.Filled.Description,
             category = ToolCategory.CONVERT_TO_PDF,
-            description = "Convert Microsoft Word documents into PDF format."
+            description = "Convert Microsoft Word documents into PDF format.",
+            isImplemented = true
         ),
         PdfTool(
             id = "ppt_to_pdf",
             name = "POWERPOINT to PDF",
             icon = Icons.Filled.Slideshow,
             category = ToolCategory.CONVERT_TO_PDF,
-            description = "Convert PowerPoint presentations into PDF format."
+            description = "Convert PowerPoint presentations into PDF format.",
+            isImplemented = true
         ),
         PdfTool(
             id = "excel_to_pdf",
             name = "EXCEL to PDF",
             icon = Icons.Filled.TableChart,
             category = ToolCategory.CONVERT_TO_PDF,
-            description = "Convert Excel spreadsheets into PDF format."
+            description = "Convert Excel spreadsheets into PDF format.",
+            isImplemented = true
         ),
         PdfTool(
             id = "html_to_pdf",
             name = "HTML to PDF",
             icon = Icons.Filled.Code,
             category = ToolCategory.CONVERT_TO_PDF,
-            description = "Convert web pages and HTML content into PDF documents."
+            description = "Convert web pages and HTML content into PDF documents.",
+            isImplemented = true
         ),
 
         // ── CONVERT_FROM_PDF ──────────────────────────────────────────
@@ -167,21 +171,24 @@ object ToolRepository {
             name = "PDF to WORD",
             icon = Icons.Filled.Article,
             category = ToolCategory.CONVERT_FROM_PDF,
-            description = "Convert PDF documents into editable Word files."
+            description = "Convert PDF documents into editable Word files.",
+            isImplemented = true
         ),
         PdfTool(
             id = "pdf_to_ppt",
             name = "PDF to POWERPOINT",
             icon = Icons.Filled.PresentToAll,
             category = ToolCategory.CONVERT_FROM_PDF,
-            description = "Convert PDF files into editable PowerPoint presentations."
+            description = "Convert PDF files into editable PowerPoint presentations.",
+            isImplemented = true
         ),
         PdfTool(
             id = "pdf_to_excel",
             name = "PDF to EXCEL",
             icon = Icons.Filled.GridOn,
             category = ToolCategory.CONVERT_FROM_PDF,
-            description = "Extract tables from PDF and convert them into Excel spreadsheets."
+            description = "Extract tables from PDF and convert them into Excel spreadsheets.",
+            isImplemented = true
         ),
         PdfTool(
             id = "pdf_to_pdfa",
@@ -230,7 +237,8 @@ object ToolRepository {
             name = "Edit PDF",
             icon = Icons.Filled.Edit,
             category = ToolCategory.EDIT_PDF,
-            description = "Modify text, images, and annotations directly in a PDF."
+            description = "Modify text, images, and annotations directly in a PDF.",
+            isImplemented = true
         ),
         PdfTool(
             id = "pdf_forms",

@@ -2,6 +2,8 @@ plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.compose.compiler)
   alias(libs.plugins.kotlin.serialization)
+  alias(libs.plugins.hilt.android)
+  alias(libs.plugins.ksp)
 }
 
 android {
@@ -35,6 +37,15 @@ android {
     packaging {
       resources {
         excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        excludes += "/META-INF/DEPENDENCIES"
+        excludes += "/META-INF/LICENSE"
+        excludes += "/META-INF/LICENSE.txt"
+        excludes += "/META-INF/license.txt"
+        excludes += "/META-INF/NOTICE"
+        excludes += "/META-INF/NOTICE.txt"
+        excludes += "/META-INF/notice.txt"
+        excludes += "/META-INF/*.kotlin_module"
+        excludes += "/META-INF/versions/**"
       }
     }
 
@@ -69,6 +80,12 @@ dependencies {
   implementation(libs.androidx.compose.material3)
   implementation("androidx.compose.material:material-icons-extended")
   implementation("com.tom-roush:pdfbox-android:2.0.27.0")
+
+  // Apache POI for Office document conversion (Word, PowerPoint, Excel)
+  implementation("org.apache.poi:poi-ooxml:5.2.5") {
+    exclude(group = "org.apache.xmlgraphics")
+    exclude(group = "xml-apis")
+  }
   // Tooling
   debugImplementation(libs.androidx.compose.ui.tooling)
   // Instrumented tests
@@ -97,4 +114,9 @@ dependencies {
   implementation(libs.androidx.navigation3.ui)
   implementation(libs.androidx.navigation3.runtime)
   implementation(libs.androidx.lifecycle.viewmodel.navigation3)
+
+  // Hilt DI
+  implementation(libs.hilt.android)
+  ksp(libs.hilt.compiler)
+  implementation(libs.hilt.navigation.compose)
 }
