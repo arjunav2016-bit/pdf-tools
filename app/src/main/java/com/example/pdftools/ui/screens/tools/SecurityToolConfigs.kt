@@ -11,10 +11,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import com.example.pdftools.R
 import com.example.pdftools.data.PdfTool
 import com.example.pdftools.ui.screens.PositionPreviewCard
 import com.example.pdftools.ui.viewmodels.ToolViewModel
@@ -37,7 +39,11 @@ fun PasswordToolConfig(
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Text(
-            text = if (tool.id == "protect_pdf") "Set Password" else "Enter Password",
+            text = if (tool.id == "protect_pdf") {
+                stringResource(R.string.tool_set_password)
+            } else {
+                stringResource(R.string.tool_enter_password)
+            },
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface
@@ -47,7 +53,11 @@ fun PasswordToolConfig(
             onValueChange = { viewModel.passwordConfig.value = config.copy(password = it) },
             placeholder = {
                 Text(
-                    text = if (tool.id == "protect_pdf") "Choose a strong password" else "Enter document password",
+                    text = if (tool.id == "protect_pdf") {
+                        stringResource(R.string.tool_choose_strong_password)
+                    } else {
+                        stringResource(R.string.tool_enter_document_password)
+                    },
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                 )
             },
@@ -55,7 +65,11 @@ fun PasswordToolConfig(
             visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
             trailingIcon = {
                 val image = if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff
-                val description = if (passwordVisible) "Hide password" else "Show password"
+                val description = if (passwordVisible) {
+                    stringResource(R.string.tool_hide_password)
+                } else {
+                    stringResource(R.string.tool_show_password)
+                }
                 IconButton(onClick = { passwordVisible = !passwordVisible }) {
                     Icon(imageVector = image, contentDescription = description)
                 }
@@ -71,9 +85,11 @@ fun PasswordToolConfig(
             modifier = Modifier.fillMaxWidth()
         )
         Text(
-            text = if (tool.id == "protect_pdf") 
-                "This will encrypt the PDF with standard 128-bit security. Keep this password safe as it cannot be recovered." 
-                else "Provide the correct password to decrypt the document and remove its security lock.",
+            text = if (tool.id == "protect_pdf") {
+                stringResource(R.string.tool_protect_pdf_help)
+            } else {
+                stringResource(R.string.tool_unlock_pdf_help)
+            },
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 4.dp)
@@ -125,7 +141,7 @@ fun RedactToolConfig(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text(
-            text = "Redaction Parameters",
+            text = stringResource(R.string.tool_redaction_parameters),
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface
@@ -134,7 +150,11 @@ fun RedactToolConfig(
         if (totalPages > 1) {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
-                    text = "Target Page: ${config.pageIndex + 1} of $totalPages",
+                    text = stringResource(
+                        R.string.tool_target_page_count,
+                        config.pageIndex + 1,
+                        totalPages
+                    ),
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Medium
                 )
@@ -154,7 +174,7 @@ fun RedactToolConfig(
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
-                    text = "Horizontal Offset (X): ${config.x.toInt()} pt",
+                    text = stringResource(R.string.tool_redaction_x, config.x.toInt()),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -171,7 +191,7 @@ fun RedactToolConfig(
 
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
-                    text = "Vertical Offset (Y): ${config.y.toInt()} pt",
+                    text = stringResource(R.string.tool_redaction_y, config.y.toInt()),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -188,7 +208,7 @@ fun RedactToolConfig(
 
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
-                    text = "Redaction Box Width: ${config.width.toInt()} pt",
+                    text = stringResource(R.string.tool_redaction_width, config.width.toInt()),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -205,7 +225,7 @@ fun RedactToolConfig(
 
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
-                    text = "Redaction Box Height: ${config.height.toInt()} pt",
+                    text = stringResource(R.string.tool_redaction_height, config.height.toInt()),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -224,8 +244,8 @@ fun RedactToolConfig(
         OutlinedTextField(
             value = config.textToRedact,
             onValueChange = { viewModel.redactConfig.value = config.copy(textToRedact = it) },
-            label = { Text("Reason or Text Reference (Optional)") },
-            placeholder = { Text("e.g. SSN Redaction") },
+            label = { Text(stringResource(R.string.tool_redaction_text_label)) },
+            placeholder = { Text(stringResource(R.string.tool_redaction_text_placeholder)) },
             singleLine = true,
             shape = RoundedCornerShape(16.dp),
             colors = OutlinedTextFieldDefaults.colors(

@@ -20,13 +20,16 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.pdftools.R
 import com.example.pdftools.data.PdfTool
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 enum class AppTab(val title: String) {
     HOME("Home"),
@@ -34,13 +37,23 @@ enum class AppTab(val title: String) {
     FAVORITES("Favorites")
 }
 
+class MainScreenViewModel : ViewModel() {
+    private val _currentTab = MutableStateFlow(AppTab.HOME)
+    val currentTab: StateFlow<AppTab> = _currentTab.asStateFlow()
+
+    fun selectTab(tab: AppTab) {
+        _currentTab.value = tab
+    }
+}
+
 @Composable
 fun MainScreen(
     onToolClick: (PdfTool) -> Unit,
     onSettingsClick: () -> Unit = {},
+    viewModel: MainScreenViewModel = viewModel(),
     modifier: Modifier = Modifier
 ) {
-    var currentTab by rememberSaveable { mutableStateOf(AppTab.HOME) }
+    val currentTab by viewModel.currentTab.collectAsState()
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -48,7 +61,7 @@ fun MainScreen(
             NavigationBar {
                 NavigationBarItem(
                     selected = currentTab == AppTab.HOME,
-                    onClick = { currentTab = AppTab.HOME },
+                    onClick = { viewModel.selectTab(AppTab.HOME) },
                     label = { Text(stringResource(R.string.home)) },
                     icon = {
                         Icon(
@@ -59,7 +72,7 @@ fun MainScreen(
                 )
                 NavigationBarItem(
                     selected = currentTab == AppTab.RECENT,
-                    onClick = { currentTab = AppTab.RECENT },
+                    onClick = { viewModel.selectTab(AppTab.RECENT) },
                     label = { Text(stringResource(R.string.recent)) },
                     icon = {
                         Icon(
@@ -70,7 +83,7 @@ fun MainScreen(
                 )
                 NavigationBarItem(
                     selected = currentTab == AppTab.FAVORITES,
-                    onClick = { currentTab = AppTab.FAVORITES },
+                    onClick = { viewModel.selectTab(AppTab.FAVORITES) },
                     label = { Text(stringResource(R.string.favorites)) },
                     icon = {
                         Icon(

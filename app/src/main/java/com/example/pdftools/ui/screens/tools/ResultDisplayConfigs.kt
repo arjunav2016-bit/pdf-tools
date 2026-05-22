@@ -26,10 +26,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.example.pdftools.R
 import com.example.pdftools.ui.viewmodels.CompareConfig
 import com.example.pdftools.ui.viewmodels.OcrConfig
 import com.example.pdftools.ui.viewmodels.ToolViewModel
@@ -69,13 +71,13 @@ fun OcrResultDisplayConfig(
                 ) {
                     Column {
                         Text(
-                            text = "Extracted Text Results",
+                            text = stringResource(R.string.tool_ocr_extracted_text),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = "${ocrResultText.length} characters recognized",
+                            text = stringResource(R.string.tool_ocr_characters, ocrResultText.length),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -87,9 +89,16 @@ fun OcrResultDisplayConfig(
                         IconButton(
                             onClick = {
                                 val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                val clip = ClipData.newPlainText("Recognized Text", ocrResultText)
+                                val clip = ClipData.newPlainText(
+                                    context.getString(R.string.tool_recognized_text),
+                                    ocrResultText
+                                )
                                 clipboard.setPrimaryClip(clip)
-                                Toast.makeText(context, "Text copied to clipboard", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(
+                                    context,
+                                    context.getString(R.string.tool_text_copied),
+                                    Toast.LENGTH_SHORT
+                                ).show()
                             },
                             modifier = Modifier
                                 .clip(CircleShape)
@@ -97,7 +106,7 @@ fun OcrResultDisplayConfig(
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.InsertDriveFile,
-                                contentDescription = "Copy text",
+                                contentDescription = stringResource(R.string.tool_copy_text),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -107,7 +116,12 @@ fun OcrResultDisplayConfig(
                                     type = "text/plain"
                                     putExtra(Intent.EXTRA_TEXT, ocrResultText)
                                 }
-                                context.startActivity(Intent.createChooser(shareIntent, "Share Extracted Text"))
+                                context.startActivity(
+                                    Intent.createChooser(
+                                        shareIntent,
+                                        context.getString(R.string.tool_share_extracted_text)
+                                    )
+                                )
                             },
                             modifier = Modifier
                                 .clip(CircleShape)
@@ -115,7 +129,7 @@ fun OcrResultDisplayConfig(
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.Share,
-                                contentDescription = "Share text",
+                                contentDescription = stringResource(R.string.tool_share_text),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -187,13 +201,13 @@ fun CompareResultDisplayConfig(
             ) {
                 Column {
                     Text(
-                        text = "Side-by-Side Comparison",
+                        text = stringResource(R.string.tool_compare_side_by_side),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = "Calculated using LCS line-by-line diff",
+                        text = stringResource(R.string.tool_compare_lcs_help),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -259,7 +273,7 @@ fun CompareResultDisplayConfig(
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     Text(
-                        text = "$addedCount additions (+)",
+                        text = stringResource(R.string.tool_compare_additions, addedCount),
                         color = Color(0xFF2E7D32),
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Bold,
@@ -268,7 +282,7 @@ fun CompareResultDisplayConfig(
                             .padding(horizontal = 12.dp, vertical = 6.dp)
                     )
                     Text(
-                        text = "$deletedCount deletions (-)",
+                        text = stringResource(R.string.tool_compare_deletions, deletedCount),
                         color = Color(0xFFC62828),
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Bold,
@@ -288,7 +302,7 @@ fun CompareResultDisplayConfig(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(
-                text = "Documents to Compare",
+                text = stringResource(R.string.tool_documents_compare),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface
@@ -322,12 +336,13 @@ fun CompareResultDisplayConfig(
                     }
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "Primary Document (PDF A)",
+                            text = stringResource(R.string.tool_primary_pdf),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
-                            text = selectedFiles.firstOrNull()?.lastPathSegment ?: "No file chosen",
+                            text = selectedFiles.firstOrNull()?.lastPathSegment
+                                ?: stringResource(R.string.tool_no_file_chosen),
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.SemiBold,
                             maxLines = 1,
@@ -372,12 +387,13 @@ fun CompareResultDisplayConfig(
                     }
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "Secondary Document (PDF B)",
+                            text = stringResource(R.string.tool_secondary_pdf),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
-                            text = comparePdfFileB?.lastPathSegment ?: "Tap to choose PDF B",
+                            text = comparePdfFileB?.lastPathSegment
+                                ?: stringResource(R.string.tool_choose_pdf_b),
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.SemiBold,
                             maxLines = 1,
@@ -387,7 +403,7 @@ fun CompareResultDisplayConfig(
                     if (comparePdfFileB == null) {
                         Icon(
                             imageVector = Icons.Filled.Add,
-                            contentDescription = "Choose file",
+                            contentDescription = stringResource(R.string.tool_choose_file),
                             tint = accentColor
                         )
                     }

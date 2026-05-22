@@ -416,6 +416,9 @@ class PdfProcessorTest {
                 }
                 assertTrue(xmpText.contains("<pdfaid:part>1</pdfaid:part>"))
                 assertTrue(xmpText.contains("<pdfaid:conformance>B</pdfaid:conformance>"))
+                assertEquals("Archived PDF", doc.documentInformation.title)
+                assertEquals("PDF Tools", doc.documentInformation.creator)
+                assertTrue(doc.documentInformation.creationDate != null)
             }
 
             pdfaFile.delete()
@@ -433,7 +436,15 @@ class PdfProcessorTest {
         
         try {
             com.tom_roush.pdfbox.pdmodel.PDDocument().use { doc ->
-                doc.addPage(com.tom_roush.pdfbox.pdmodel.PDPage())
+                val page = com.tom_roush.pdfbox.pdmodel.PDPage()
+                doc.addPage(page)
+                com.tom_roush.pdfbox.pdmodel.PDPageContentStream(doc, page).use { content ->
+                    content.beginText()
+                    content.setFont(com.tom_roush.pdfbox.pdmodel.font.PDType1Font.HELVETICA, 16f)
+                    content.newLineAtOffset(80f, 650f)
+                    content.showText("Public note and CONFIDENTIAL token")
+                    content.endText()
+                }
                 doc.save(dummyPdfFile)
             }
             
@@ -504,6 +515,8 @@ class PdfProcessorTest {
                 assertEquals(1, doc.numberOfPages)
                 val page = doc.getPage(0)
                 assertTrue(page != null)
+                val extractedText = com.tom_roush.pdfbox.text.PDFTextStripper().getText(doc)
+                assertFalse(extractedText.contains("CONFIDENTIAL"))
             }
             
             redactedFile.delete()

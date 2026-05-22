@@ -20,10 +20,12 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.pdftools.R
 import com.example.pdftools.ui.screens.rememberThumbnailBitmap
 import com.example.pdftools.ui.viewmodels.HtmlConfig
 import com.example.pdftools.ui.viewmodels.ScanConfig
@@ -58,7 +60,7 @@ fun ScanToolConfig(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text(
-            text = "Captured Images",
+            text = stringResource(R.string.tool_captured_images),
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface
@@ -92,7 +94,7 @@ fun ScanToolConfig(
                             if (thumbnail != null) {
                                 Image(
                                     bitmap = thumbnail.asImageBitmap(),
-                                    contentDescription = "Image thumbnail",
+                                    contentDescription = stringResource(R.string.tool_image_thumbnail),
                                     contentScale = ContentScale.Crop,
                                     modifier = Modifier
                                         .fillMaxSize()
@@ -145,7 +147,7 @@ fun ScanToolConfig(
                                 ) {
                                     Icon(
                                         imageVector = Icons.Filled.RotateRight,
-                                        contentDescription = "Rotate",
+                                        contentDescription = stringResource(R.string.tool_rotate),
                                         tint = Color.White,
                                         modifier = Modifier.size(18.dp)
                                     )
@@ -158,7 +160,7 @@ fun ScanToolConfig(
                                 ) {
                                     Icon(
                                         imageVector = Icons.Filled.Delete,
-                                        contentDescription = "Remove",
+                                        contentDescription = stringResource(R.string.tool_remove),
                                         tint = Color.White,
                                         modifier = Modifier.size(18.dp)
                                     )
@@ -177,7 +179,7 @@ fun ScanToolConfig(
         Spacer(modifier = Modifier.height(8.dp))
 
         Text(
-            text = "Visual Enhancement Filter",
+            text = stringResource(R.string.tool_visual_enhancement_filter),
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface
@@ -187,19 +189,23 @@ fun ScanToolConfig(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            val filters = listOf("Original", "Grayscale", "B&W Binarization")
-            filters.forEach { f ->
-                val isSelected = if (f == "Original") {
+            val filters = listOf(
+                "Original" to stringResource(R.string.tool_filter_original),
+                "Grayscale" to stringResource(R.string.tool_filter_grayscale),
+                "B&W Binarization" to stringResource(R.string.tool_filter_bw)
+            )
+            filters.forEach { (filterValue, label) ->
+                val isSelected = if (filterValue == "Original") {
                     config.filter == "color" || config.filter == "Original"
                 } else {
-                    config.filter.contains(f, ignoreCase = true) || f == config.filter
+                    config.filter.contains(filterValue, ignoreCase = true) || filterValue == config.filter
                 }
                 val bg = if (isSelected) accentColor else MaterialTheme.colorScheme.surfaceContainerLow
                 val tc = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
 
                 Card(
                     onClick = {
-                        val newFilter = if (f == "Original") "color" else f
+                        val newFilter = if (filterValue == "Original") "color" else filterValue
                         viewModel.scanConfig.value = config.copy(filter = newFilter)
                     },
                     modifier = Modifier
@@ -216,7 +222,7 @@ fun ScanToolConfig(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = f,
+                            text = label,
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Bold,
                             textAlign = TextAlign.Center
@@ -256,14 +262,14 @@ fun HtmlToolConfig(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text(
-            text = "HTML Content Designer & PDF Converter",
+            text = stringResource(R.string.tool_html_designer_title),
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface
         )
 
         Text(
-            text = "Select a Premium Document Template",
+            text = stringResource(R.string.tool_html_template_title),
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface
@@ -274,9 +280,9 @@ fun HtmlToolConfig(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             val templates = listOf(
-                "invoice" to "Invoice",
-                "cv" to "CV / Resume",
-                "report" to "Business Report"
+                "invoice" to stringResource(R.string.tool_html_template_invoice),
+                "cv" to stringResource(R.string.tool_html_template_cv),
+                "report" to stringResource(R.string.tool_html_template_report)
             )
 
             templates.forEach { (template, label) ->
@@ -500,7 +506,7 @@ fun HtmlToolConfig(
         Spacer(modifier = Modifier.height(4.dp))
 
         Text(
-            text = "Or Customise HTML Source Code",
+            text = stringResource(R.string.tool_html_custom_source),
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface
@@ -509,7 +515,7 @@ fun HtmlToolConfig(
         OutlinedTextField(
             value = config.htmlContent,
             onValueChange = { viewModel.htmlConfig.value = config.copy(htmlContent = it) },
-            placeholder = { Text("Enter HTML markup code here...") },
+            placeholder = { Text(stringResource(R.string.tool_html_placeholder)) },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(220.dp),
@@ -526,7 +532,7 @@ fun HtmlToolConfig(
         )
 
         Text(
-            text = "Write vanilla HTML markup with inline <style> tags. It renders 100% locally and builds a vector A4 document layout.",
+            text = stringResource(R.string.tool_html_help),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )

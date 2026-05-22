@@ -1,6 +1,7 @@
 package com.example.pdftools.data
 
 import android.content.Context
+import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
@@ -36,9 +37,12 @@ data class UserPreferences(
 )
 
 @Singleton
-class UserPreferencesRepository @Inject constructor(
-    @ApplicationContext private val context: Context
+class UserPreferencesRepository internal constructor(
+    private val dataStore: DataStore<Preferences>
 ) {
+    @Inject
+    constructor(@ApplicationContext context: Context) : this(context.userPreferencesStore)
+
     private object Keys {
         val themeMode = stringPreferencesKey("theme_mode")
         val compressionQuality = intPreferencesKey("compression_quality")
@@ -46,7 +50,7 @@ class UserPreferencesRepository @Inject constructor(
         val defaultSaveLocation = stringPreferencesKey("default_save_location")
     }
 
-    val preferences: Flow<UserPreferences> = context.userPreferencesStore.data
+    val preferences: Flow<UserPreferences> = dataStore.data
         .catch { error ->
             if (error is IOException) {
                 emit(emptyPreferences())
@@ -57,25 +61,25 @@ class UserPreferencesRepository @Inject constructor(
         .map(::mapPreferences)
 
     suspend fun updateThemeMode(themeMode: ThemeMode) {
-        context.userPreferencesStore.edit { preferences ->
+        dataStore.edit { preferences ->
             preferences[Keys.themeMode] = themeMode.name
         }
     }
 
     suspend fun updateCompressionQuality(quality: Int) {
-        context.userPreferencesStore.edit { preferences ->
+        dataStore.edit { preferences ->
             preferences[Keys.compressionQuality] = quality.coerceIn(30, 100)
         }
     }
 
     suspend fun updateExportDpi(dpi: Int) {
-        context.userPreferencesStore.edit { preferences ->
+        dataStore.edit { preferences ->
             preferences[Keys.exportDpi] = dpi.coerceIn(72, 300)
         }
     }
 
     suspend fun updateDefaultSaveLocation(saveLocation: SaveLocation) {
-        context.userPreferencesStore.edit { preferences ->
+        dataStore.edit { preferences ->
             preferences[Keys.defaultSaveLocation] = saveLocation.name
         }
     }

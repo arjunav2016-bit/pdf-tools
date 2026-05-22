@@ -12,9 +12,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.example.pdftools.R
 import com.example.pdftools.data.PdfTool
 import com.example.pdftools.ui.components.PageThumbnailGrid
 import com.example.pdftools.ui.viewmodels.ToolViewModel
@@ -43,7 +45,7 @@ fun CropToolConfig(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text(
-            text = "Crop Margins",
+            text = stringResource(R.string.tool_crop_margins),
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface
@@ -53,9 +55,9 @@ fun CropToolConfig(
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             val options = listOf(
-                0.05f to "Slim (5%)",
-                0.10f to "Normal (10%)",
-                0.20f to "Wide (20%)"
+                0.05f to stringResource(R.string.tool_crop_slim),
+                0.10f to stringResource(R.string.tool_crop_normal),
+                0.20f to stringResource(R.string.tool_crop_wide)
             )
             options.forEach { (pct, label) ->
                 val isSelected = config.marginPercentage == pct
@@ -92,7 +94,7 @@ fun CropToolConfig(
         Spacer(modifier = Modifier.height(4.dp))
         
         Text(
-            text = "Pages to Crop (Optional)",
+            text = stringResource(R.string.tool_pages_crop_optional),
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface
@@ -129,7 +131,7 @@ fun CropToolConfig(
                     } ?: emptySet()
                 )
             },
-            placeholder = { Text("e.g., 1-3, 5 (leave empty for all)") },
+            placeholder = { Text(stringResource(R.string.tool_page_range_all_placeholder)) },
             singleLine = true,
             shape = RoundedCornerShape(16.dp),
             colors = OutlinedTextFieldDefaults.colors(
@@ -142,7 +144,7 @@ fun CropToolConfig(
             modifier = Modifier.fillMaxWidth()
         )
         Text(
-            text = "Crop will trim off the selected margin percentage from all four edges of the pages. Leave blank to crop all pages.",
+            text = stringResource(R.string.tool_crop_help),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 4.dp)
@@ -189,14 +191,14 @@ fun RepairToolConfig(
             }
             
             Text(
-                text = "Self-Healing Diagnostic System",
+                text = stringResource(R.string.tool_repair_title),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
             )
             
             Text(
-                text = "If your PDF file is corrupted, fails to open, or shows blank pages, our diagnostic recovery parses sequential indirect objects and reconstructs broken XREF cross-reference tables locally.",
+                text = stringResource(R.string.tool_repair_help),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
@@ -213,10 +215,10 @@ fun RepairToolConfig(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 val diagnosticSteps = listOf(
-                    "Sequential parser: Scanning indirect PDF objects...",
-                    "XREF analyzer: Checking cross-reference markers...",
-                    "Trailer recovery: Parsing root catalog structures...",
-                    "File integrity: Repairing byte stream offsets..."
+                    stringResource(R.string.tool_repair_step_parser),
+                    stringResource(R.string.tool_repair_step_xref),
+                    stringResource(R.string.tool_repair_step_trailer),
+                    stringResource(R.string.tool_repair_step_integrity)
                 )
                 diagnosticSteps.forEach { step ->
                     Row(
@@ -256,7 +258,7 @@ fun PdfaToolConfig(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text(
-            text = "Archive Conformance Standards",
+            text = stringResource(R.string.tool_pdfa_standards),
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface
@@ -266,8 +268,8 @@ fun PdfaToolConfig(
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             val formats = listOf(
-                "pdfa_1b" to "PDF/A-1b (ISO 19005-1)",
-                "pdfa_2b" to "PDF/A-2b (ISO 19005-2)"
+                "pdfa_1b" to stringResource(R.string.tool_pdfa_1b_label),
+                "pdfa_2b" to stringResource(R.string.tool_pdfa_2b_label)
             )
             formats.forEach { (id, label) ->
                 val isSelected = config.conformanceLevel == id
@@ -313,14 +315,17 @@ fun PdfaToolConfig(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
-                    text = "Archival Injection Details",
+                    text = stringResource(R.string.tool_pdfa_details),
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Bold
                 )
                 val injectionDetails = listOf(
-                    "Color Preservation" to "Links sRGB Output Intent to establish device-independent color rendering.",
-                    "Archival Standards metadata" to "Injects XML metadata schemas declaring ISO 19005 compliance.",
-                    "Font embedding protection" to "Standardizes structure ensuring long-term digital preservation."
+                    stringResource(R.string.tool_pdfa_color_title) to
+                        stringResource(R.string.tool_pdfa_color_help),
+                    stringResource(R.string.tool_pdfa_metadata_title) to
+                        stringResource(R.string.tool_pdfa_metadata_help),
+                    stringResource(R.string.tool_pdfa_font_title) to
+                        stringResource(R.string.tool_pdfa_font_help)
                 )
                 injectionDetails.forEach { (title, desc) ->
                     Column {

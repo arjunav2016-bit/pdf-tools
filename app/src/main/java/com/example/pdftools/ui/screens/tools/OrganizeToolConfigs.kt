@@ -22,10 +22,12 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.example.pdftools.R
 import com.example.pdftools.data.PdfProcessor
 import com.example.pdftools.data.PdfTool
 import com.example.pdftools.ui.components.PageThumbnailGrid
@@ -71,9 +73,9 @@ fun PageRangeToolConfig(
     ) {
         Text(
             text = when (tool.id) {
-                "split_pdf" -> "Page Range to Keep"
-                "extract_pages" -> "Pages to Extract"
-                else -> "Pages to Remove"
+                "split_pdf" -> stringResource(R.string.tool_page_range_keep)
+                "extract_pages" -> stringResource(R.string.tool_pages_extract)
+                else -> stringResource(R.string.tool_pages_remove)
             },
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.SemiBold,
@@ -101,7 +103,13 @@ fun PageRangeToolConfig(
                 }
             )
             TextButton(onClick = { showAdvancedRange = !showAdvancedRange }) {
-                Text(if (showAdvancedRange) "Hide advanced page range" else "Advanced page range")
+                Text(
+                    if (showAdvancedRange) {
+                        stringResource(R.string.tool_hide_advanced_page_range)
+                    } else {
+                        stringResource(R.string.tool_advanced_page_range)
+                    }
+                )
             }
         }
 
@@ -118,7 +126,11 @@ fun PageRangeToolConfig(
                 },
                 placeholder = {
                     Text(
-                        text = if (tool.id == "split_pdf" || tool.id == "extract_pages") "e.g., 1-3, 5" else "e.g., 2, 4",
+                        text = if (tool.id == "split_pdf" || tool.id == "extract_pages") {
+                            stringResource(R.string.tool_page_range_keep_placeholder)
+                        } else {
+                            stringResource(R.string.tool_page_range_remove_placeholder)
+                        },
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                     )
                 },
@@ -136,9 +148,9 @@ fun PageRangeToolConfig(
         }
         Text(
             text = when (tool.id) {
-                "split_pdf" -> "Enter comma-separated ranges/numbers (e.g. 1-3, 5 to keep pages 1, 2, 3, and 5)."
-                "extract_pages" -> "Enter page numbers or ranges to extract into a new PDF (e.g. 1-3, 5)."
-                else -> "Enter page numbers or ranges to remove (e.g. 2, 4 to delete pages 2 and 4)."
+                "split_pdf" -> stringResource(R.string.tool_page_range_keep_help)
+                "extract_pages" -> stringResource(R.string.tool_page_range_extract_help)
+                else -> stringResource(R.string.tool_page_range_remove_help)
             },
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -170,7 +182,7 @@ fun RotateToolConfig(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text(
-            text = "Select Rotation Angle",
+            text = stringResource(R.string.tool_select_rotation_angle),
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface
@@ -209,9 +221,9 @@ fun RotateToolConfig(
                             )
                             Text(
                                 text = when (angle) {
-                                    90 -> "Right"
-                                    180 -> "Upside Down"
-                                    270 -> "Left"
+                                    90 -> stringResource(R.string.tool_rotation_right)
+                                    180 -> stringResource(R.string.tool_rotation_upside_down)
+                                    270 -> stringResource(R.string.tool_rotation_left)
                                     else -> ""
                                 },
                                 style = MaterialTheme.typography.bodySmall,
@@ -226,7 +238,7 @@ fun RotateToolConfig(
         Spacer(modifier = Modifier.height(8.dp))
         
         Text(
-            text = "Pages to Rotate (Optional)",
+            text = stringResource(R.string.tool_pages_rotate_optional),
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface
@@ -265,7 +277,7 @@ fun RotateToolConfig(
             },
             placeholder = {
                 Text(
-                    text = "e.g., 1-3, 5 (leave empty for all)",
+                    text = stringResource(R.string.tool_page_range_all_placeholder),
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                 )
             },
@@ -281,7 +293,7 @@ fun RotateToolConfig(
             modifier = Modifier.fillMaxWidth()
         )
         Text(
-            text = "Enter page numbers or ranges to rotate. If left blank, all pages will be rotated.",
+            text = stringResource(R.string.tool_rotate_page_range_help),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 4.dp)
@@ -338,13 +350,13 @@ fun OrganizeToolConfig(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text(
-            text = "Arrange & Transform Pages",
+            text = stringResource(R.string.tool_arrange_transform_pages),
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface
         )
         Text(
-            text = "You can reorder, rotate, duplicate, or delete individual pages below.",
+            text = stringResource(R.string.tool_arrange_transform_help),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -464,12 +476,12 @@ fun OrganizeToolConfig(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = "Page ${globalIndex + 1}",
+                                    text = stringResource(R.string.tool_organized_page, globalIndex + 1),
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.Bold
                                 )
                                 Text(
-                                    text = "(Orig. ${pageItem.originalIndex + 1})",
+                                    text = stringResource(R.string.tool_original_page, pageItem.originalIndex + 1),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -495,7 +507,7 @@ fun OrganizeToolConfig(
                                 ) {
                                     Icon(
                                         imageVector = Icons.Filled.RotateRight,
-                                        contentDescription = "Rotate 90 degrees",
+                                        contentDescription = stringResource(R.string.tool_rotate_90_degrees),
                                         modifier = Modifier.size(18.dp),
                                         tint = accentColor
                                     )
@@ -517,7 +529,7 @@ fun OrganizeToolConfig(
                                 ) {
                                     Icon(
                                         imageVector = Icons.Filled.Add,
-                                        contentDescription = "Duplicate page",
+                                        contentDescription = stringResource(R.string.tool_duplicate_page),
                                         modifier = Modifier.size(18.dp),
                                         tint = accentColor
                                     )
@@ -530,14 +542,18 @@ fun OrganizeToolConfig(
                                                 organizePages.map { PdfProcessor.PageTransform(it.originalIndex, it.rotation) }
                                             )
                                         } else {
-                                            Toast.makeText(context, "Cannot delete all pages", Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(
+                                                context,
+                                                context.getString(R.string.tool_cannot_delete_all_pages),
+                                                Toast.LENGTH_SHORT
+                                            ).show()
                                         }
                                     },
                                     modifier = Modifier.size(32.dp)
                                 ) {
                                     Icon(
                                         imageVector = Icons.Filled.Delete,
-                                        contentDescription = "Delete page",
+                                        contentDescription = stringResource(R.string.tool_delete_page),
                                         modifier = Modifier.size(18.dp),
                                         tint = MaterialTheme.colorScheme.error
                                     )
@@ -562,7 +578,10 @@ fun OrganizeToolConfig(
                                     enabled = globalIndex > 0,
                                     modifier = Modifier.height(28.dp)
                                 ) {
-                                    Text("← Move", style = MaterialTheme.typography.bodySmall)
+                                    Text(
+                                        stringResource(R.string.tool_move_previous),
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
                                 }
                                 
                                 TextButton(
@@ -579,7 +598,10 @@ fun OrganizeToolConfig(
                                     enabled = globalIndex < organizePages.size - 1,
                                     modifier = Modifier.height(28.dp)
                                 ) {
-                                    Text("Move →", style = MaterialTheme.typography.bodySmall)
+                                    Text(
+                                        stringResource(R.string.tool_move_next),
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
                                 }
                             }
                         }

@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import com.example.pdftools.R
 import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.pdmodel.PDPage
 import com.tom_roush.pdfbox.pdmodel.PDPageContentStream
@@ -17,6 +18,7 @@ import com.tom_roush.pdfbox.text.PDFTextStripper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.util.GregorianCalendar
 
 import com.example.pdftools.utils.PageRangeUtils
 import javax.inject.Inject
@@ -195,13 +197,25 @@ class OptimizeProcessor @Inject constructor() {
                 val catalog = doc.documentCatalog
                 
                 // 1. Inject sRGB Output Intent
-                val dummyProfile = java.io.ByteArrayInputStream(ByteArray(0))
-                val outputIntent = com.tom_roush.pdfbox.pdmodel.graphics.color.PDOutputIntent(doc, dummyProfile)
+                val outputIntent = context.resources.openRawResource(R.raw.srgb).use { srgbProfile ->
+                    com.tom_roush.pdfbox.pdmodel.graphics.color.PDOutputIntent(doc, srgbProfile)
+                }
                 outputIntent.info = "sRGB IEC61966-2.1"
                 outputIntent.outputCondition = "sRGB IEC61966-2.1"
                 outputIntent.outputConditionIdentifier = "sRGB IEC61966-2.1"
                 outputIntent.registryName = "http://www.color.org"
                 catalog.addOutputIntent(outputIntent)
+
+                val documentInfo = doc.documentInformation
+                if (documentInfo.title.isNullOrBlank()) {
+                    documentInfo.title = "Archived PDF"
+                }
+                if (documentInfo.creator.isNullOrBlank()) {
+                    documentInfo.creator = context.getString(R.string.app_name)
+                }
+                if (documentInfo.creationDate == null) {
+                    documentInfo.creationDate = GregorianCalendar()
+                }
                 
                 // 2. Inject XMP Metadata
                 val metadata = com.tom_roush.pdfbox.pdmodel.common.PDMetadata(doc)

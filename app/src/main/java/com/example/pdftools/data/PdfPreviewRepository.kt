@@ -2,10 +2,11 @@ package com.example.pdftools.data
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.Color
-import android.graphics.pdf.PdfRenderer
 import android.net.Uri
 import android.util.LruCache
+import com.tom_roush.pdfbox.pdmodel.PDDocument
+import com.tom_roush.pdfbox.rendering.ImageType
+import com.tom_roush.pdfbox.rendering.PDFRenderer
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
@@ -20,8 +21,8 @@ class PdfPreviewRepository @Inject constructor() {
     }
 
     suspend fun getPageCount(context: Context, uri: Uri): Int = withContext(Dispatchers.IO) {
-        context.contentResolver.openFileDescriptor(uri, "r")?.use { descriptor ->
-            PdfRenderer(descriptor).use { renderer -> renderer.pageCount }
+        context.contentResolver.openInputStream(uri)?.use { input ->
+            PDDocument.load(input).use { doc -> doc.numberOfPages }
         } ?: throw IllegalArgumentException("Unable to open PDF preview.")
     }
 
@@ -33,27 +34,18 @@ class PdfPreviewRepository @Inject constructor() {
         }
 
         return withContext(Dispatchers.IO) {
-            context.contentResolver.openFileDescriptor(uri, "r")?.use { descriptor ->
-                PdfRenderer(descriptor).use { renderer ->
-                    require(pageIndex in 0 until renderer.pageCount) {
+            context.contentResolver.openInputStream(uri)?.use { input ->
+                PDDocument.load(input).use { doc ->
+                    require(pageIndex in 0 until doc.numberOfPages) {
                         "Page ${pageIndex + 1} is outside this PDF."
                     }
-                    renderer.openPage(pageIndex).use { page ->
-                        val height = (targetWidth * (page.height.toFloat() / page.width))
-                            .toInt()
-                            .coerceAtLeast(1)
-                        val bitmap = Bitmap.createBitmap(
-                            targetWidth,
-                            height,
-                            Bitmap.Config.ARGB_8888
-                        )
-                        bitmap.eraseColor(Color.WHITE)
-                        page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-                        synchronized(bitmapCache) {
-                            bitmapCache.put(cacheKey, bitmap)
-                        }
-                        bitmap
+                    val pageWidth = doc.getPage(pageIndex).cropBox.width.coerceAtLeast(1f)
+                    val scale = targetWidth / pageWidth
+                    val bitmap = PDFRenderer(doc).renderImage(pageIndex, scale, ImageType.ARGB)
+                    synchronized(bitmapCache) {
+                        bitmapCache.put(cacheKey, bitmap)
                     }
+                    bitmap
                 }
             } ?: throw IllegalArgumentException("Unable to render PDF preview.")
         }

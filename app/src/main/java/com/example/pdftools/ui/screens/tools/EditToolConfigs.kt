@@ -71,7 +71,7 @@ fun WatermarkToolConfig(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text(
-            text = "Watermark Text",
+            text = stringResource(R.string.tool_watermark_text),
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface
@@ -79,7 +79,7 @@ fun WatermarkToolConfig(
         OutlinedTextField(
             value = config.text,
             onValueChange = { viewModel.watermarkConfig.value = config.copy(text = it) },
-            placeholder = { Text("CONFIDENTIAL") },
+            placeholder = { Text(stringResource(R.string.tool_watermark_confidential)) },
             singleLine = true,
             shape = RoundedCornerShape(16.dp),
             colors = OutlinedTextFieldDefaults.colors(
@@ -96,7 +96,12 @@ fun WatermarkToolConfig(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            val presets = listOf("CONFIDENTIAL", "DRAFT", "COPY", "FINAL")
+            val presets = listOf(
+                stringResource(R.string.tool_watermark_confidential),
+                stringResource(R.string.tool_watermark_draft),
+                stringResource(R.string.tool_watermark_copy),
+                stringResource(R.string.tool_watermark_final)
+            )
             presets.forEach { preset ->
                 val isSelected = config.text == preset
                 FilledTonalButton(
@@ -122,7 +127,7 @@ fun WatermarkToolConfig(
         Spacer(modifier = Modifier.height(4.dp))
         
         Text(
-            text = "Watermark Color",
+            text = stringResource(R.string.tool_watermark_color),
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface
@@ -133,10 +138,10 @@ fun WatermarkToolConfig(
             verticalAlignment = Alignment.CenterVertically
         ) {
             val colors = listOf(
-                "#7F8C8D" to "Gray",
-                "#E74C3C" to "Red",
-                "#2980B9" to "Blue",
-                "#27AE60" to "Green"
+                "#7F8C8D" to stringResource(R.string.tool_color_gray),
+                "#E74C3C" to stringResource(R.string.tool_color_red),
+                "#2980B9" to stringResource(R.string.tool_color_blue),
+                "#27AE60" to stringResource(R.string.tool_color_green)
             )
             colors.forEach { (hex, label) ->
                 val isSelected = config.colorHex.lowercase() == hex.lowercase()
@@ -180,7 +185,7 @@ fun WatermarkToolConfig(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Font Size: ${config.fontSize.toInt()} pt",
+                    text = stringResource(R.string.tool_font_size_points, config.fontSize.toInt()),
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold
                 )
@@ -197,7 +202,7 @@ fun WatermarkToolConfig(
             }
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Opacity: ${(config.opacity * 100).toInt()}%",
+                    text = stringResource(R.string.tool_opacity_percent, (config.opacity * 100).toInt()),
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold
                 )
@@ -220,7 +225,7 @@ fun WatermarkToolConfig(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Rotation Angle: ${config.rotation.toInt()}°",
+                    text = stringResource(R.string.tool_rotation_degrees, config.rotation.toInt()),
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold
                 )
@@ -240,7 +245,7 @@ fun WatermarkToolConfig(
         Spacer(modifier = Modifier.height(4.dp))
         
         Text(
-            text = "Pages to Watermark (Optional)",
+            text = stringResource(R.string.tool_pages_watermark_optional),
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface
@@ -248,7 +253,7 @@ fun WatermarkToolConfig(
         OutlinedTextField(
             value = config.pageRange,
             onValueChange = { viewModel.watermarkConfig.value = config.copy(pageRange = it) },
-            placeholder = { Text("e.g., 1-3, 5 (leave empty for all)") },
+            placeholder = { Text(stringResource(R.string.tool_page_range_all_placeholder)) },
             singleLine = true,
             shape = RoundedCornerShape(16.dp),
             colors = OutlinedTextFieldDefaults.colors(
@@ -261,7 +266,7 @@ fun WatermarkToolConfig(
             modifier = Modifier.fillMaxWidth()
         )
         Text(
-            text = "Leave blank to apply the watermark on all pages in the PDF document.",
+            text = stringResource(R.string.tool_watermark_all_help),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 4.dp)
@@ -284,7 +289,7 @@ fun PageNumberToolConfig(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text(
-            text = "Numbering Style / Format",
+            text = stringResource(R.string.tool_numbering_style),
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface
@@ -294,9 +299,9 @@ fun PageNumberToolConfig(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             val formats = listOf(
-                "simple" to "1, 2, 3...",
-                "prefixed" to "Page X",
-                "detailed" to "Page X of N"
+                "simple" to stringResource(R.string.tool_numbering_simple),
+                "prefixed" to stringResource(R.string.tool_numbering_prefixed),
+                "detailed" to stringResource(R.string.tool_numbering_detailed)
             )
             formats.forEach { (id, label) ->
                 val isSelected = config.format == id
@@ -323,7 +328,7 @@ fun PageNumberToolConfig(
         Spacer(modifier = Modifier.height(4.dp))
         
         Text(
-            text = "Alignment & Position",
+            text = stringResource(R.string.tool_alignment_position),
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface
@@ -333,9 +338,9 @@ fun PageNumberToolConfig(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             val positions = listOf(
-                "top_right" to "Top Right",
-                "bottom_center" to "Bottom Center",
-                "bottom_right" to "Bottom Right"
+                "top_right" to stringResource(R.string.tool_position_top_right),
+                "bottom_center" to stringResource(R.string.tool_position_bottom_center),
+                "bottom_right" to stringResource(R.string.tool_position_bottom_right)
             )
             positions.forEach { (id, label) ->
                 val isSelected = config.position == id
@@ -362,7 +367,7 @@ fun PageNumberToolConfig(
         Spacer(modifier = Modifier.height(4.dp))
         
         Text(
-            text = "Font Size: ${config.fontSize.toInt()} pt",
+            text = stringResource(R.string.tool_font_size_points, config.fontSize.toInt()),
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.SemiBold
         )
@@ -381,7 +386,7 @@ fun PageNumberToolConfig(
         Spacer(modifier = Modifier.height(4.dp))
         
         Text(
-            text = "Pages to Number (Optional)",
+            text = stringResource(R.string.tool_pages_number_optional),
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface
@@ -389,7 +394,7 @@ fun PageNumberToolConfig(
         OutlinedTextField(
             value = config.pageRange,
             onValueChange = { viewModel.pageNumberConfig.value = config.copy(pageRange = it) },
-            placeholder = { Text("e.g., 1-3, 5 (leave empty for all)") },
+            placeholder = { Text(stringResource(R.string.tool_page_range_all_placeholder)) },
             singleLine = true,
             shape = RoundedCornerShape(16.dp),
             colors = OutlinedTextFieldDefaults.colors(
@@ -402,7 +407,7 @@ fun PageNumberToolConfig(
             modifier = Modifier.fillMaxWidth()
         )
         Text(
-            text = "Leave blank to number all pages in the PDF document.",
+            text = stringResource(R.string.tool_number_all_help),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 4.dp)
@@ -455,10 +460,18 @@ fun SignToolConfig(
                     }
                     viewModel.signConfig.value = config.copy(signatureUri = Uri.fromFile(tempFile))
                     bitmap.recycle()
-                    Toast.makeText(context, "Signature saved successfully!", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(
+                        context,
+                        context.getString(R.string.tool_signature_saved),
+                        Toast.LENGTH_SHORT
+                    ).show()
                 } catch (e: Exception) {
                     e.printStackTrace()
-                    Toast.makeText(context, "Failed to save signature: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(
+                        context,
+                        context.getString(R.string.tool_signature_save_failed, e.localizedMessage),
+                        Toast.LENGTH_SHORT
+                    ).show()
                 }
             },
             onClearSignature = {
@@ -469,7 +482,7 @@ fun SignToolConfig(
 
         if (config.signatureUri != null) {
             Text(
-                text = "Signature Parameters",
+                text = stringResource(R.string.tool_signature_parameters),
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface
@@ -479,7 +492,11 @@ fun SignToolConfig(
             if (totalPages > 1) {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
-                        text = "Target Page: ${config.pageIndex + 1} of $totalPages",
+                        text = stringResource(
+                            R.string.tool_target_page_count,
+                            config.pageIndex + 1,
+                            totalPages
+                        ),
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Medium
                     )
@@ -500,7 +517,7 @@ fun SignToolConfig(
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
-                        text = "Horizontal Offset (X): ${config.x.toInt()} pt",
+                        text = stringResource(R.string.tool_signature_x, config.x.toInt()),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -517,7 +534,7 @@ fun SignToolConfig(
 
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
-                        text = "Vertical Offset (Y): ${config.y.toInt()} pt",
+                        text = stringResource(R.string.tool_signature_y, config.y.toInt()),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -534,7 +551,7 @@ fun SignToolConfig(
 
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
-                        text = "Signature Width: ${config.width.toInt()} pt",
+                        text = stringResource(R.string.tool_signature_width, config.width.toInt()),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -551,7 +568,7 @@ fun SignToolConfig(
 
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
-                        text = "Signature Height: ${config.height.toInt()} pt",
+                        text = stringResource(R.string.tool_signature_height, config.height.toInt()),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -590,7 +607,7 @@ fun SignToolConfig(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "Please write a signature and tap 'Confirm Signature' to unlock coordinate positioning and signing options.",
+                        text = stringResource(R.string.tool_signature_unlock_help),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center
@@ -663,7 +680,7 @@ fun EditToolConfig(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            text = "Interactive PDF Page Editor",
+            text = stringResource(R.string.tool_editor_title),
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface,
@@ -682,11 +699,11 @@ fun EditToolConfig(
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = containerColor, contentColor = accentColor)
             ) {
-                Text("< Prev")
+                Text(stringResource(R.string.tool_previous))
             }
 
             Text(
-                text = "Page ${editPageIndex + 1} of $editTotalPages",
+                text = stringResource(R.string.tool_page_of_count, editPageIndex + 1, editTotalPages),
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.weight(1f),
@@ -699,7 +716,7 @@ fun EditToolConfig(
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = containerColor, contentColor = accentColor)
             ) {
-                Text("Next >")
+                Text(stringResource(R.string.tool_next))
             }
         }
 
@@ -796,7 +813,7 @@ fun EditToolConfig(
                                 )
                             } else {
                                 Text(
-                                    text = "Stamp",
+                                    text = stringResource(R.string.tool_stamp),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = accentColor,
                                     fontWeight = FontWeight.Bold
@@ -823,7 +840,11 @@ fun EditToolConfig(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = if (editTextAnnotationInput.isEmpty()) "Text Tap" else editTextAnnotationInput,
+                            text = if (editTextAnnotationInput.isEmpty()) {
+                                stringResource(R.string.tool_text_tap)
+                            } else {
+                                editTextAnnotationInput
+                            },
                             style = MaterialTheme.typography.labelSmall,
                             color = accentColor,
                             fontWeight = FontWeight.Bold,
@@ -847,7 +868,7 @@ fun EditToolConfig(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "Image Stamp",
+                            text = stringResource(R.string.tool_image_stamp),
                             style = MaterialTheme.typography.bodySmall,
                             fontWeight = FontWeight.Bold,
                             color = accentColor
@@ -858,7 +879,11 @@ fun EditToolConfig(
         }
 
         Text(
-            text = "Tap the preview above to change position (X: ${(editX * 100).toInt()}%, Y: ${(editY * 100).toInt()}%)",
+            text = stringResource(
+                R.string.tool_editor_position_help,
+                (editX * 100).toInt(),
+                (editY * 100).toInt()
+            ),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -868,7 +893,10 @@ fun EditToolConfig(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            listOf("text" to "Text Annotation", "image" to "Image Stamp").forEach { (type, label) ->
+            listOf(
+                "text" to stringResource(R.string.tool_text_annotation),
+                "image" to stringResource(R.string.tool_image_stamp)
+            ).forEach { (type, label) ->
                 val isSel = editAnnotationType == type
                 Card(
                     onClick = { editAnnotationType = type },
@@ -894,17 +922,24 @@ fun EditToolConfig(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
             ) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("Text Stamp Options", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    Text(
+                        stringResource(R.string.tool_text_stamp_options),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
+                    )
 
                     OutlinedTextField(
                         value = editTextAnnotationInput,
                         onValueChange = { editTextAnnotationInput = it },
-                        label = { Text("Text content") },
+                        label = { Text(stringResource(R.string.tool_text_content)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
 
-                    Text("Font Size: ${editTextSize.toInt()} pt", style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        stringResource(R.string.tool_font_size_points, editTextSize.toInt()),
+                        style = MaterialTheme.typography.bodySmall
+                    )
                     Slider(
                         value = editTextSize,
                         onValueChange = { editTextSize = it },
@@ -912,7 +947,7 @@ fun EditToolConfig(
                         colors = SliderDefaults.colors(thumbColor = accentColor, activeTrackColor = accentColor)
                     )
 
-                    Text("Preset Colors", style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.tool_preset_colors), style = MaterialTheme.typography.bodySmall)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         listOf("#E74C3C" to Color(0xFFE74C3C), "#2980B9" to Color(0xFF2980B9), "#27AE60" to Color(0xFF27AE60), "#2C3E50" to Color(0xFF2C3E50), "#F39C12" to Color(0xFFF39C12)).forEach { (hex, cl) ->
                             Box(
@@ -938,14 +973,18 @@ fun EditToolConfig(
                                     pageIndex = editPageIndex
                                 )
                                 viewModel.editConfig.value = config.copy(textAnnotations = updated)
-                                Toast.makeText(context, "Text annotation staged!", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(
+                                    context,
+                                    context.getString(R.string.tool_text_annotation_staged),
+                                    Toast.LENGTH_SHORT
+                                ).show()
                             }
                         },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = accentColor)
                     ) {
-                        Text("Stage Text Annotation")
+                        Text(stringResource(R.string.tool_stage_text_annotation))
                     }
                 }
             }
@@ -956,7 +995,11 @@ fun EditToolConfig(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
             ) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("Image Stamp Options", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    Text(
+                        stringResource(R.string.tool_image_stamp_options),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
+                    )
 
                     Button(
                         onClick = { annotationImagePickerLauncher.launch(arrayOf("image/*")) },
@@ -964,19 +1007,31 @@ fun EditToolConfig(
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = containerColor, contentColor = accentColor)
                     ) {
-                        Text(if (editImageUri != null) "Change Selected Image" else "Select Custom Image Stamp")
+                        Text(
+                            if (editImageUri != null) {
+                                stringResource(R.string.tool_change_selected_image)
+                            } else {
+                                stringResource(R.string.tool_select_custom_image_stamp)
+                            }
+                        )
                     }
 
                     if (editImageUri != null) {
                         Text(
-                            text = "Selected image: ${editImageUri?.lastPathSegment}",
+                            text = stringResource(
+                                R.string.tool_selected_image,
+                                editImageUri?.lastPathSegment.orEmpty()
+                            ),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.primary,
                             fontWeight = FontWeight.SemiBold
                         )
                     }
 
-                    Text("Stamp Width: ${(editWidth * 100).toInt()}%", style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        stringResource(R.string.tool_stamp_width, (editWidth * 100).toInt()),
+                        style = MaterialTheme.typography.bodySmall
+                    )
                     Slider(
                         value = editWidth,
                         onValueChange = { editWidth = it },
@@ -984,7 +1039,10 @@ fun EditToolConfig(
                         colors = SliderDefaults.colors(thumbColor = accentColor, activeTrackColor = accentColor)
                     )
 
-                    Text("Stamp Height: ${(editHeight * 100).toInt()}%", style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        stringResource(R.string.tool_stamp_height, (editHeight * 100).toInt()),
+                        style = MaterialTheme.typography.bodySmall
+                    )
                     Slider(
                         value = editHeight,
                         onValueChange = { editHeight = it },
@@ -1004,9 +1062,17 @@ fun EditToolConfig(
                                     pageIndex = editPageIndex
                                 )
                                 viewModel.editConfig.value = config.copy(imageAnnotations = updated)
-                                Toast.makeText(context, "Image annotation staged!", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(
+                                    context,
+                                    context.getString(R.string.tool_image_annotation_staged),
+                                    Toast.LENGTH_SHORT
+                                ).show()
                             } else {
-                                Toast.makeText(context, "Please select an image first", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(
+                                    context,
+                                    context.getString(R.string.tool_select_image_first),
+                                    Toast.LENGTH_SHORT
+                                ).show()
                             }
                         },
                         enabled = editImageUri != null,
@@ -1014,7 +1080,7 @@ fun EditToolConfig(
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = accentColor)
                     ) {
-                        Text("Stage Image Annotation")
+                        Text(stringResource(R.string.tool_stage_image_annotation))
                     }
                 }
             }
@@ -1028,7 +1094,7 @@ fun EditToolConfig(
         ) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
-                    text = "Staged Layers on Page ${editPageIndex + 1}",
+                    text = stringResource(R.string.tool_staged_layers_page, editPageIndex + 1),
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold
                 )
@@ -1038,7 +1104,7 @@ fun EditToolConfig(
 
                 if (pageTextAnnots.isEmpty() && pageImgAnnots.isEmpty()) {
                     Text(
-                        text = "No annotations staged on this page yet.",
+                        text = stringResource(R.string.tool_no_annotations_staged),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -1054,8 +1120,22 @@ fun EditToolConfig(
                                     .padding(horizontal = 12.dp, vertical = 6.dp)
                             ) {
                                 Column(modifier = Modifier.weight(1f)) {
-                                    Text("[Text] \"${annot.text}\"", fontWeight = FontWeight.SemiBold, maxLines = 1, style = MaterialTheme.typography.bodySmall)
-                                    Text("Pos: (${(annot.x * 100).toInt()}%, ${(annot.y * 100).toInt()}%), Size: ${annot.fontSize.toInt()}pt", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                                    Text(
+                                        stringResource(R.string.tool_text_layer, annot.text),
+                                        fontWeight = FontWeight.SemiBold,
+                                        maxLines = 1,
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                    Text(
+                                        stringResource(
+                                            R.string.tool_text_layer_position,
+                                            (annot.x * 100).toInt(),
+                                            (annot.y * 100).toInt(),
+                                            annot.fontSize.toInt()
+                                        ),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = Color.Gray
+                                    )
                                 }
                                 IconButton(
                                     onClick = {
@@ -1064,7 +1144,12 @@ fun EditToolConfig(
                                     },
                                     modifier = Modifier.size(24.dp)
                                 ) {
-                                    Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = Color.Red, modifier = Modifier.size(16.dp))
+                                    Icon(
+                                        Icons.Filled.Delete,
+                                        contentDescription = stringResource(R.string.tool_delete),
+                                        tint = Color.Red,
+                                        modifier = Modifier.size(16.dp)
+                                    )
                                 }
                             }
                         }
@@ -1079,8 +1164,22 @@ fun EditToolConfig(
                                     .padding(horizontal = 12.dp, vertical = 6.dp)
                             ) {
                                 Column(modifier = Modifier.weight(1f)) {
-                                    Text("[Image] Stamp", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodySmall)
-                                    Text("Pos: (${(annot.x * 100).toInt()}%, ${(annot.y * 100).toInt()}%), Size: ${(annot.width * 100).toInt()}%x${(annot.height * 100).toInt()}%", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                                    Text(
+                                        stringResource(R.string.tool_image_layer),
+                                        fontWeight = FontWeight.SemiBold,
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                    Text(
+                                        stringResource(
+                                            R.string.tool_image_layer_position,
+                                            (annot.x * 100).toInt(),
+                                            (annot.y * 100).toInt(),
+                                            (annot.width * 100).toInt(),
+                                            (annot.height * 100).toInt()
+                                        ),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = Color.Gray
+                                    )
                                 }
                                 IconButton(
                                     onClick = {
@@ -1089,7 +1188,12 @@ fun EditToolConfig(
                                     },
                                     modifier = Modifier.size(24.dp)
                                 ) {
-                                    Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = Color.Red, modifier = Modifier.size(16.dp))
+                                    Icon(
+                                        Icons.Filled.Delete,
+                                        contentDescription = stringResource(R.string.tool_delete),
+                                        tint = Color.Red,
+                                        modifier = Modifier.size(16.dp)
+                                    )
                                 }
                             }
                         }
@@ -1134,7 +1238,7 @@ fun FormsToolConfig(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text(
-            text = "Interactive PDF Form Fields",
+            text = stringResource(R.string.tool_form_fields_title),
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface
@@ -1164,7 +1268,7 @@ fun FormsToolConfig(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "No interactive AcroForm fields were detected in this PDF file.",
+                        text = stringResource(R.string.tool_no_form_fields),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center
@@ -1215,7 +1319,11 @@ fun FormsToolConfig(
                                             )
                                         )
                                         Text(
-                                            text = if (isChecked) "Checked" else "Unchecked",
+                                            text = if (isChecked) {
+                                                stringResource(R.string.tool_checked)
+                                            } else {
+                                                stringResource(R.string.tool_unchecked)
+                                            },
                                             style = MaterialTheme.typography.bodyMedium
                                         )
                                     }
