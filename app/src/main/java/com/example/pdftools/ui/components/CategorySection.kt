@@ -100,7 +100,7 @@ fun CategorySection(
                 // Category Icon
                 Icon(
                     imageVector = categoryIcon,
-                    contentDescription = null,
+                    contentDescription = category.displayName,
                     tint = accentColor,
                     modifier = Modifier.size(24.dp)
                 )

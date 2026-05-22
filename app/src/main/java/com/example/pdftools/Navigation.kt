@@ -12,8 +12,8 @@ import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
 import com.example.pdftools.data.ToolRepository
 import com.example.pdftools.ui.screens.ComingSoonScreen
-import com.example.pdftools.ui.screens.HomeScreen
 import com.example.pdftools.ui.screens.MainScreen
+import com.example.pdftools.ui.screens.SettingsScreen
 import com.example.pdftools.ui.screens.ToolScreen
 
 @Composable
@@ -29,6 +29,14 @@ fun MainNavigation() {
                     onToolClick = { tool ->
                         backStack.add(ToolDetail(toolId = tool.id))
                     },
+                    onSettingsClick = { backStack.add(Settings) },
+                    modifier = Modifier.safeDrawingPadding()
+                )
+            }
+
+            entry<Settings> {
+                SettingsScreen(
+                    onBack = { backStack.removeLastOrNull() },
                     modifier = Modifier.safeDrawingPadding()
                 )
             }

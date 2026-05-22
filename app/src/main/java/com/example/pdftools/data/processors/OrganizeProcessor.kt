@@ -13,6 +13,8 @@ import java.io.File
 import com.example.pdftools.utils.PageRangeUtils
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 
 /**
  * Handles PDF organization operations: merge, split, remove, extract, organize, rotate.
@@ -26,13 +28,18 @@ class OrganizeProcessor @Inject constructor() {
      * Merges a list of PDF URIs into a single PDF file.
      * Returns the Uri of the merged file in cache.
      */
-    suspend fun mergePdfs(context: Context, uris: List<Uri>): Uri = withContext(Dispatchers.IO) {
+    suspend fun mergePdfs(
+        context: Context,
+        uris: List<Uri>,
+        onProgress: ((Float) -> Unit)? = null
+    ): Uri = withContext(Dispatchers.IO) {
         val merger = PDFMergerUtility()
         val tempFiles = mutableListOf<File>()
         val outputFile = File(context.cacheDir, "Merged_${System.currentTimeMillis()}.pdf")
         
         try {
-            for (uri in uris) {
+            for ((index, uri) in uris.withIndex()) {
+                currentCoroutineContext().ensureActive()
                 val tempFile = File.createTempFile("merge_input_", ".pdf", context.cacheDir)
                 context.contentResolver.openInputStream(uri)?.use { input ->
                     tempFile.outputStream().use { output ->
@@ -41,12 +48,14 @@ class OrganizeProcessor @Inject constructor() {
                 }
                 tempFiles.add(tempFile)
                 merger.addSource(tempFile)
+                onProgress?.invoke((index + 1f) / (uris.size + 1f))
             }
             
             outputFile.outputStream().use { outputStream ->
                 merger.destinationStream = outputStream
                 merger.mergeDocuments(MemoryUsageSetting.setupTempFileOnly())
             }
+            onProgress?.invoke(1f)
             
             Uri.fromFile(outputFile)
         } catch (e: Exception) {

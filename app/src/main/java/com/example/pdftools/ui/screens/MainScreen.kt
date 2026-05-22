@@ -24,6 +24,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import com.example.pdftools.R
 import com.example.pdftools.data.PdfTool
 
 enum class AppTab(val title: String) {
@@ -35,6 +37,7 @@ enum class AppTab(val title: String) {
 @Composable
 fun MainScreen(
     onToolClick: (PdfTool) -> Unit,
+    onSettingsClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var currentTab by rememberSaveable { mutableStateOf(AppTab.HOME) }
@@ -46,33 +49,33 @@ fun MainScreen(
                 NavigationBarItem(
                     selected = currentTab == AppTab.HOME,
                     onClick = { currentTab = AppTab.HOME },
-                    label = { Text("Home") },
+                    label = { Text(stringResource(R.string.home)) },
                     icon = {
                         Icon(
                             imageVector = if (currentTab == AppTab.HOME) Icons.Filled.Home else Icons.Outlined.Home,
-                            contentDescription = "Home"
+                            contentDescription = stringResource(R.string.home)
                         )
                     }
                 )
                 NavigationBarItem(
                     selected = currentTab == AppTab.RECENT,
                     onClick = { currentTab = AppTab.RECENT },
-                    label = { Text("Recent") },
+                    label = { Text(stringResource(R.string.recent)) },
                     icon = {
                         Icon(
                             imageVector = if (currentTab == AppTab.RECENT) Icons.Filled.History else Icons.Outlined.History,
-                            contentDescription = "Recent"
+                            contentDescription = stringResource(R.string.recent)
                         )
                     }
                 )
                 NavigationBarItem(
                     selected = currentTab == AppTab.FAVORITES,
                     onClick = { currentTab = AppTab.FAVORITES },
-                    label = { Text("Favorites") },
+                    label = { Text(stringResource(R.string.favorites)) },
                     icon = {
                         Icon(
                             imageVector = if (currentTab == AppTab.FAVORITES) Icons.Filled.Star else Icons.Outlined.Star,
-                            contentDescription = "Favorites"
+                            contentDescription = stringResource(R.string.favorites)
                         )
                     }
                 )
@@ -90,7 +93,11 @@ fun MainScreen(
             label = "TabTransition"
         ) { tab ->
             when (tab) {
-                AppTab.HOME -> HomeScreen(onToolClick = onToolClick, modifier = Modifier.fillMaxSize())
+                AppTab.HOME -> HomeScreen(
+                    onToolClick = onToolClick,
+                    onSettingsClick = onSettingsClick,
+                    modifier = Modifier.fillMaxSize()
+                )
                 AppTab.FAVORITES -> FavoritesScreen(onToolClick = onToolClick, modifier = Modifier.fillMaxSize())
                 AppTab.RECENT -> RecentScreen(modifier = Modifier.fillMaxSize())
             }

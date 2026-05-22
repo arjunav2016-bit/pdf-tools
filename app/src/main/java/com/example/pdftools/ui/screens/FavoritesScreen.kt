@@ -36,10 +36,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.pdftools.R
 import com.example.pdftools.ui.viewmodels.FavoritesViewModel
 import com.example.pdftools.data.PdfTool
 import com.example.pdftools.data.ToolRepository
@@ -67,12 +69,12 @@ fun FavoritesScreen(
                 title = {
                     Column {
                         Text(
-                            text = "Favorite Tools",
+                            text = stringResource(R.string.favorite_tools),
                             style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "Your personalized shortcuts",
+                            text = stringResource(R.string.favorite_tools_subtitle),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -81,7 +83,7 @@ fun FavoritesScreen(
                 navigationIcon = {
                     Icon(
                         imageVector = Icons.Filled.Star,
-                        contentDescription = null,
+                        contentDescription = stringResource(R.string.favorite_tools),
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(start = 8.dp)
                     )
@@ -142,21 +144,21 @@ private fun EmptyFavoritesState() {
             ) {
                 Icon(
                     imageVector = Icons.Outlined.StarOutline,
-                    contentDescription = null,
+                    contentDescription = stringResource(R.string.no_favorites_yet),
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(48.dp)
                 )
             }
             Spacer(modifier = Modifier.height(24.dp))
             Text(
-                text = "No Favorites Yet",
+                text = stringResource(R.string.no_favorites_yet),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "Bookmark tools by tapping the star icon in their detail screen to access them quickly here.",
+                text = stringResource(R.string.no_favorites_detail),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,

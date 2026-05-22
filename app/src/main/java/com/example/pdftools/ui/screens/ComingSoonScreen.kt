@@ -36,9 +36,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.example.pdftools.R
 import com.example.pdftools.data.PdfTool
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -78,7 +80,7 @@ fun ComingSoonScreen(
                     IconButton(onClick = onBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Go back"
+                            contentDescription = stringResource(R.string.go_back)
                         )
                     }
                 },
@@ -106,7 +108,7 @@ fun ComingSoonScreen(
             ) {
                 Icon(
                     imageVector = tool.icon,
-                    contentDescription = null,
+                    contentDescription = tool.name,
                     tint = accentColor,
                     modifier = Modifier.size(48.dp)
                 )
@@ -131,7 +133,7 @@ fun ComingSoonScreen(
                 elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
             ) {
                 Text(
-                    text = "Coming Soon",
+                    text = stringResource(R.string.coming_soon),
                     style = MaterialTheme.typography.labelLarge,
                     color = accentColor,
                     fontWeight = FontWeight.SemiBold,
@@ -152,7 +154,7 @@ fun ComingSoonScreen(
             Spacer(modifier = Modifier.height(12.dp))
 
             Text(
-                text = "This feature is currently under development.\nStay tuned for updates!",
+                text = stringResource(R.string.coming_soon_detail),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                 textAlign = TextAlign.Center,

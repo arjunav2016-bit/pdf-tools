@@ -8,6 +8,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -22,27 +23,35 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.pdftools.R
 import com.example.pdftools.data.PdfTool
 import com.example.pdftools.ui.screens.tools.CompareResultDisplayConfig
 import com.example.pdftools.ui.screens.tools.CropToolConfig
@@ -79,6 +88,8 @@ fun ToolScreen(
     val selectedFiles by viewModel.selectedFiles.collectAsState()
     val outputUris by viewModel.outputUris.collectAsState()
     val htmlConfig by viewModel.htmlConfig.collectAsState()
+    val progress by viewModel.progress.collectAsState()
+    var showDestructiveConfirmation by rememberSaveable(tool.id) { mutableStateOf(false) }
 
     val context = LocalContext.current
 
@@ -114,6 +125,31 @@ fun ToolScreen(
 
     val isComplete = uiState is ToolUiState.Success
     val isProcessing = uiState is ToolUiState.Processing
+    val processingState = uiState as? ToolUiState.Processing
+    val requiresConfirmation = tool.id in setOf("remove_pages", "redact_pdf", "crop_pdf")
+
+    if (showDestructiveConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showDestructiveConfirmation = false },
+            title = { Text(stringResource(R.string.destructive_tool_confirmation_title)) },
+            text = { Text(stringResource(R.string.destructive_tool_confirmation_body)) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showDestructiveConfirmation = false
+                        viewModel.process(tool.id, context)
+                    }
+                ) {
+                    Text(stringResource(R.string.continue_action))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDestructiveConfirmation = false }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            }
+        )
+    }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -236,23 +272,49 @@ fun ToolScreen(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            LinearProgressIndicator(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(4.dp)),
-                                color = accentColor,
-                                trackColor = containerColor
-                            )
-                            Text(
-                                text = "Processing PDF tools locally...",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            if (progress != null) {
+                                LinearProgressIndicator(
+                                    progress = { progress ?: 0f },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(4.dp)),
+                                    color = accentColor,
+                                    trackColor = containerColor
+                                )
+                            } else {
+                                LinearProgressIndicator(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(4.dp)),
+                                    color = accentColor,
+                                    trackColor = containerColor
+                                )
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = processingState?.statusMessage
+                                        ?: stringResource(R.string.processing_locally),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                OutlinedButton(onClick = viewModel::cancelProcessing) {
+                                    Text(stringResource(R.string.cancel))
+                                }
+                            }
                         }
                     } else {
                         Button(
                             onClick = {
-                                viewModel.process(tool.id, context)
+                                if (requiresConfirmation) {
+                                    showDestructiveConfirmation = true
+                                } else {
+                                    viewModel.process(tool.id, context)
+                                }
                             },
                             modifier = Modifier
                                 .fillMaxWidth()

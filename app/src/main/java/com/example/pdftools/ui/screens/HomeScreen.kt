@@ -39,8 +39,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.pdftools.R
 import com.example.pdftools.data.PdfTool
 import com.example.pdftools.data.ToolCategory
 import com.example.pdftools.data.ToolRepository
@@ -50,6 +52,7 @@ import com.example.pdftools.ui.components.CategorySection
 @Composable
 fun HomeScreen(
     onToolClick: (PdfTool) -> Unit,
+    onSettingsClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var searchQuery by rememberSaveable { mutableStateOf("") }
@@ -71,7 +74,8 @@ fun HomeScreen(
             HomeTopAppBar(
                 onSearchClick = {
                     focusRequester.requestFocus()
-                }
+                },
+                onSettingsClick = onSettingsClick
             )
         }
     ) { innerPadding ->
@@ -93,7 +97,7 @@ fun HomeScreen(
                         .focusRequester(focusRequester),
                     placeholder = {
                         Text(
-                            text = "Search for tools...",
+                            text = stringResource(R.string.search_for_tools),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                         )
@@ -101,7 +105,7 @@ fun HomeScreen(
                     leadingIcon = {
                         Icon(
                             imageVector = Icons.Filled.Search,
-                            contentDescription = null,
+                            contentDescription = stringResource(R.string.search_tools),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                         )
                     },
@@ -110,7 +114,7 @@ fun HomeScreen(
                             IconButton(onClick = { searchQuery = "" }) {
                                 Icon(
                                     imageVector = Icons.Filled.Close,
-                                    contentDescription = "Clear search",
+                                    contentDescription = stringResource(R.string.clear_search),
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
@@ -146,7 +150,8 @@ fun HomeScreen(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun HomeTopAppBar(
-    onSearchClick: () -> Unit
+    onSearchClick: () -> Unit,
+    onSettingsClick: () -> Unit
 ) {
     TopAppBar(
         title = {
@@ -156,12 +161,12 @@ private fun HomeTopAppBar(
             ) {
                 Icon(
                     imageVector = Icons.Filled.PictureAsPdf,
-                    contentDescription = null,
+                    contentDescription = stringResource(R.string.app_icon),
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(28.dp)
                 )
                 Text(
-                    text = "PDF Tools",
+                    text = stringResource(R.string.app_name),
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Black,
                     color = MaterialTheme.colorScheme.onSurface
@@ -172,14 +177,14 @@ private fun HomeTopAppBar(
             IconButton(onClick = onSearchClick) {
                 Icon(
                     imageVector = Icons.Filled.Search,
-                    contentDescription = "Search",
+                    contentDescription = stringResource(R.string.search_tools),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            IconButton(onClick = { /* Settings */ }) {
+            IconButton(onClick = onSettingsClick) {
                 Icon(
                     imageVector = Icons.Filled.Settings,
-                    contentDescription = "Settings",
+                    contentDescription = stringResource(R.string.settings_title),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }

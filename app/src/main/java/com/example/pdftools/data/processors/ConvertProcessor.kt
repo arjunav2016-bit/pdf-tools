@@ -38,6 +38,8 @@ import java.io.File
 
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 
 /**
  * Handles all conversion operations: images↔PDF, Word/PPT/Excel↔PDF, HTML→PDF, scan.
@@ -49,12 +51,17 @@ class ConvertProcessor @Inject constructor() {
      * Converts a list of image URIs (JPEG/PNG) into a single PDF.
      * Returns the Uri of the output PDF in cache.
      */
-    suspend fun convertImagesToPdf(context: Context, uris: List<Uri>): Uri = withContext(Dispatchers.IO) {
+    suspend fun convertImagesToPdf(
+        context: Context,
+        uris: List<Uri>,
+        onProgress: ((Float) -> Unit)? = null
+    ): Uri = withContext(Dispatchers.IO) {
         val outputFile = File(context.cacheDir, "Converted_${System.currentTimeMillis()}.pdf")
         
         try {
             PDDocument().use { doc ->
-                for (uri in uris) {
+                for ((index, uri) in uris.withIndex()) {
+                    currentCoroutineContext().ensureActive()
                     context.contentResolver.openInputStream(uri)?.use { inputStream ->
                         val tempImgFile = File.createTempFile("convert_input_", ".jpg", context.cacheDir)
                         try {
@@ -80,6 +87,7 @@ class ConvertProcessor @Inject constructor() {
                             tempImgFile.delete()
                         }
                     }
+                    onProgress?.invoke((index + 1f) / uris.size.coerceAtLeast(1))
                 }
                 doc.save(outputFile)
             }
@@ -94,7 +102,12 @@ class ConvertProcessor @Inject constructor() {
      * Converts a PDF file into a list of image files (JPEGs) of the pages.
      * Returns a list of image Uris in cache.
      */
-    suspend fun convertPdfToImages(context: Context, uri: Uri): List<Uri> = withContext(Dispatchers.IO) {
+    suspend fun convertPdfToImages(
+        context: Context,
+        uri: Uri,
+        dpi: Int = 150,
+        onProgress: ((Float) -> Unit)? = null
+    ): List<Uri> = withContext(Dispatchers.IO) {
         val tempInputFile = File.createTempFile("pdf_to_jpg_input_", ".pdf", context.cacheDir)
         val outputDir = File(context.cacheDir, "PDF_Pages_${System.currentTimeMillis()}")
         outputDir.mkdirs()
@@ -110,13 +123,19 @@ class ConvertProcessor @Inject constructor() {
             PDDocument.load(tempInputFile).use { doc ->
                 val renderer = PDFRenderer(doc)
                 for (i in 0 until doc.numberOfPages) {
-                    val bitmap = renderer.renderImageWithDPI(i, 150f, ImageType.ARGB)
+                    currentCoroutineContext().ensureActive()
+                    val bitmap = renderer.renderImageWithDPI(
+                        i,
+                        dpi.coerceIn(72, 300).toFloat(),
+                        ImageType.ARGB
+                    )
                     val imgFile = File(outputDir, "Page_${i + 1}.jpg")
                     imgFile.outputStream().use { outStream ->
                         bitmap.compress(Bitmap.CompressFormat.JPEG, 85, outStream)
                     }
                     bitmap.recycle()
                     imageUris.add(Uri.fromFile(imgFile))
+                    onProgress?.invoke((i + 1f) / doc.numberOfPages.coerceAtLeast(1))
                 }
             }
             imageUris

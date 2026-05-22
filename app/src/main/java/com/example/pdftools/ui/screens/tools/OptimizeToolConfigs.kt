@@ -11,11 +11,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.pdftools.data.PdfTool
+import com.example.pdftools.ui.components.PageThumbnailGrid
 import com.example.pdftools.ui.viewmodels.ToolViewModel
+import com.example.pdftools.utils.PageRangeUtils
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -24,6 +27,14 @@ fun CropToolConfig(
     accentColor: Color
 ) {
     val config by viewModel.cropConfig.collectAsState()
+    val selectedFiles by viewModel.selectedFiles.collectAsState()
+    val pageCount by viewModel.pageCount.collectAsState()
+    val selectedFile = selectedFiles.firstOrNull()
+    val context = LocalContext.current
+
+    LaunchedEffect(selectedFile) {
+        selectedFile?.let { viewModel.loadPageCount(context, it) }
+    }
 
     Column(
         modifier = Modifier
@@ -86,9 +97,38 @@ fun CropToolConfig(
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface
         )
+        if (selectedFile != null && (pageCount ?: 0) > 0) {
+            PageThumbnailGrid(
+                uri = selectedFile,
+                pageCount = pageCount ?: 0,
+                selectedPages = config.selectedPages,
+                onTogglePage = { pageIndex ->
+                    val updatedPages = config.selectedPages.toMutableSet().apply {
+                        if (!add(pageIndex)) {
+                            remove(pageIndex)
+                        }
+                    }
+                    viewModel.cropConfig.value = config.copy(
+                        selectedPages = updatedPages,
+                        pageRange = PageRangeUtils.formatPageRanges(updatedPages)
+                    )
+                },
+                accentColor = accentColor,
+                loadThumbnail = { uri, pageIndex, width ->
+                    viewModel.renderPage(context, uri, pageIndex, width)
+                }
+            )
+        }
         OutlinedTextField(
             value = config.pageRange,
-            onValueChange = { viewModel.cropConfig.value = config.copy(pageRange = it) },
+            onValueChange = { pageRange ->
+                viewModel.cropConfig.value = config.copy(
+                    pageRange = pageRange,
+                    selectedPages = pageCount?.let {
+                        PageRangeUtils.parsePageRanges(pageRange, it).toSet()
+                    } ?: emptySet()
+                )
+            },
             placeholder = { Text("e.g., 1-3, 5 (leave empty for all)") },
             singleLine = true,
             shape = RoundedCornerShape(16.dp),
@@ -142,7 +182,7 @@ fun RepairToolConfig(
             ) {
                 Icon(
                     imageVector = tool.icon,
-                    contentDescription = null,
+                    contentDescription = tool.name,
                     tint = accentColor,
                     modifier = Modifier.size(32.dp)
                 )

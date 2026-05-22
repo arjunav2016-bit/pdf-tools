@@ -1,23 +1,32 @@
 package com.example.pdftools.ui.viewmodels
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.pdftools.data.PdfProcessor
+import com.example.pdftools.data.PdfPreviewRepository
 import com.example.pdftools.data.FavoritesRepository
 import com.example.pdftools.data.RecentFilesRepository
 import com.example.pdftools.data.FormFieldInfo
+import com.example.pdftools.data.UserPreferencesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 sealed interface ToolUiState {
     data object Idle : ToolUiState
-    data object Processing : ToolUiState
+    data class Processing(
+        val progress: Float? = null,
+        val statusMessage: String = "Processing locally..."
+    ) : ToolUiState
     data class Success(val outputUris: List<Uri>) : ToolUiState
     data class Error(val message: String) : ToolUiState
 }
@@ -25,6 +34,8 @@ sealed interface ToolUiState {
 @HiltViewModel
 class ToolViewModel @Inject constructor(
     private val pdfProcessor: PdfProcessor,
+    private val pdfPreviewRepository: PdfPreviewRepository,
+    private val userPreferencesRepository: UserPreferencesRepository,
     private val favoritesRepository: FavoritesRepository,
     private val recentFilesRepository: RecentFilesRepository
 ) : ViewModel() {
@@ -38,6 +49,14 @@ class ToolViewModel @Inject constructor(
 
     private val _outputUris = MutableStateFlow<List<Uri>>(emptyList())
     val outputUris: StateFlow<List<Uri>> = _outputUris.asStateFlow()
+
+    private val _pageCount = MutableStateFlow<Int?>(null)
+    val pageCount: StateFlow<Int?> = _pageCount.asStateFlow()
+
+    private val _progress = MutableStateFlow<Float?>(null)
+    val progress: StateFlow<Float?> = _progress.asStateFlow()
+
+    private var processingJob: Job? = null
 
     // Per-tool config state
     val pageRangeConfig = MutableStateFlow(PageRangeConfig())
@@ -67,13 +86,20 @@ class ToolViewModel @Inject constructor(
         if (index in current.indices) {
             current.removeAt(index)
             _selectedFiles.value = current
+            if (current.isEmpty()) {
+                _pageCount.value = null
+            }
         }
     }
 
     fun reset() {
+        processingJob?.cancel()
+        processingJob = null
         _uiState.value = ToolUiState.Idle
         _selectedFiles.value = emptyList()
         _outputUris.value = emptyList()
+        _pageCount.value = null
+        _progress.value = null
         
         // Reset configs to defaults
         pageRangeConfig.value = PageRangeConfig()
@@ -106,6 +132,25 @@ class ToolViewModel @Inject constructor(
         return pdfProcessor.getFormFields(context, uri)
     }
 
+    fun loadPageCount(context: Context, uri: Uri) {
+        viewModelScope.launch {
+            _pageCount.value = runCatching {
+                pdfPreviewRepository.getPageCount(context, uri)
+            }.getOrNull()
+        }
+    }
+
+    suspend fun renderPage(context: Context, uri: Uri, pageIndex: Int, width: Int): Bitmap {
+        return pdfPreviewRepository.renderPage(context, uri, pageIndex, width)
+    }
+
+    fun cancelProcessing() {
+        processingJob?.cancel()
+        processingJob = null
+        _progress.value = null
+        _uiState.value = ToolUiState.Idle
+    }
+
     fun process(toolId: String, context: Context) {
         val files = selectedFiles.value
         if (files.isEmpty() && toolId != "html_to_pdf") {
@@ -113,24 +158,45 @@ class ToolViewModel @Inject constructor(
             return
         }
 
-        _uiState.value = ToolUiState.Processing
-        viewModelScope.launch {
+        _progress.value = null
+        _uiState.value = ToolUiState.Processing(statusMessage = "Preparing files...")
+        processingJob = viewModelScope.launch {
             try {
                 when (toolId) {
                     "merge_pdf" -> {
-                        val result = pdfProcessor.mergePdfs(context, files)
+                        val result = pdfProcessor.mergePdfs(
+                            context = context,
+                            uris = files,
+                            onProgress = progressReporter("Merging PDFs")
+                        )
                         onProcessingSuccess(toolId, context, result)
                     }
                     "compress_pdf" -> {
-                        val result = pdfProcessor.compressPdf(context, files.first())
+                        val preferences = userPreferencesRepository.preferences.first()
+                        val result = pdfProcessor.compressPdf(
+                            context = context,
+                            uri = files.first(),
+                            quality = preferences.compressionQuality,
+                            onProgress = progressReporter("Compressing pages")
+                        )
                         onProcessingSuccess(toolId, context, result)
                     }
                     "jpg_to_pdf" -> {
-                        val result = pdfProcessor.convertImagesToPdf(context, files)
+                        val result = pdfProcessor.convertImagesToPdf(
+                            context = context,
+                            uris = files,
+                            onProgress = progressReporter("Converting images")
+                        )
                         onProcessingSuccess(toolId, context, result)
                     }
                     "pdf_to_jpg" -> {
-                        val results = pdfProcessor.convertPdfToImages(context, files.first())
+                        val preferences = userPreferencesRepository.preferences.first()
+                        val results = pdfProcessor.convertPdfToImages(
+                            context = context,
+                            uri = files.first(),
+                            dpi = preferences.exportDpi,
+                            onProgress = progressReporter("Rendering pages")
+                        )
                         onProcessingSuccessMultiple(toolId, context, results)
                     }
                     "split_pdf" -> {
@@ -272,8 +338,13 @@ class ToolViewModel @Inject constructor(
                         _uiState.value = ToolUiState.Error("Unknown tool: $toolId")
                     }
                 }
+            } catch (e: CancellationException) {
+                _progress.value = null
+                _uiState.value = ToolUiState.Idle
             } catch (e: Exception) {
                 _uiState.value = ToolUiState.Error(e.message ?: "An error occurred during processing")
+            } finally {
+                processingJob = null
             }
         }
     }
@@ -282,6 +353,7 @@ class ToolViewModel @Inject constructor(
         val fileName = getFileName(context, uri)
         recentFilesRepository.addRecent(fileName, toolId, uri.toString())
         _outputUris.value = listOf(uri)
+        _progress.value = 1f
         _uiState.value = ToolUiState.Success(listOf(uri))
     }
 
@@ -291,7 +363,19 @@ class ToolViewModel @Inject constructor(
             recentFilesRepository.addRecent(fileName, toolId, uris.first().toString())
         }
         _outputUris.value = uris
+        _progress.value = 1f
         _uiState.value = ToolUiState.Success(uris)
+    }
+
+    private fun progressReporter(statusPrefix: String): (Float) -> Unit {
+        return { value ->
+            val normalized = value.coerceIn(0f, 1f)
+            _progress.value = normalized
+            _uiState.value = ToolUiState.Processing(
+                progress = normalized,
+                statusMessage = "$statusPrefix ${(normalized * 100).toInt()}%"
+            )
+        }
     }
 
     private fun getFileName(context: Context, uri: Uri): String {

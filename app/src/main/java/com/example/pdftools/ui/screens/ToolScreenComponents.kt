@@ -66,10 +66,13 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.example.pdftools.R
 import com.example.pdftools.data.PdfTool
 
 /**
@@ -114,7 +117,7 @@ internal fun HeroSection(
             ) {
                 Icon(
                     imageVector = tool.icon,
-                    contentDescription = null,
+                    contentDescription = tool.name,
                     tint = accentColor,
                     modifier = Modifier.size(28.dp)
                 )
@@ -174,12 +177,12 @@ internal fun FilePickerZone(
         ) {
             Icon(
                 imageVector = Icons.Filled.CloudUpload,
-                contentDescription = null,
+                contentDescription = stringResource(R.string.select_files),
                 tint = accentColor,
                 modifier = Modifier.size(48.dp)
             )
             Text(
-                text = "Select your files",
+                text = stringResource(R.string.select_your_files),
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onSurface
             )
@@ -189,11 +192,11 @@ internal fun FilePickerZone(
             ) {
                 Icon(
                     imageVector = Icons.Filled.Add,
-                    contentDescription = null,
+                    contentDescription = stringResource(R.string.choose_files),
                     modifier = Modifier.size(18.dp)
                 )
                 Spacer(modifier = Modifier.width(6.dp))
-                Text("Choose Files")
+                Text(stringResource(R.string.choose_files))
             }
         }
     }
@@ -222,7 +225,7 @@ internal fun FileItem(
         ) {
             Icon(
                 imageVector = Icons.Filled.InsertDriveFile,
-                contentDescription = null,
+                contentDescription = stringResource(R.string.selected_file),
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(24.dp)
             )
@@ -240,7 +243,7 @@ internal fun FileItem(
             ) {
                 Icon(
                     imageVector = Icons.Filled.Close,
-                    contentDescription = "Remove file",
+                    contentDescription = stringResource(R.string.remove_file),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(18.dp)
                 )
@@ -291,14 +294,14 @@ internal fun SuccessCard(
                 ) {
                     Icon(
                         imageVector = Icons.Filled.CheckCircle,
-                        contentDescription = null,
+                        contentDescription = stringResource(R.string.processing_complete),
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(36.dp)
                     )
                 }
 
                 Text(
-                    text = "Processing Complete!",
+                    text = stringResource(R.string.processing_complete),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
@@ -306,9 +309,13 @@ internal fun SuccessCard(
 
                 Text(
                     text = if (tool.id == "pdf_to_jpg") {
-                        "${outputUris.size} page(s) successfully converted to images."
+                        pluralStringResource(
+                            R.plurals.converted_pages_to_images,
+                            outputUris.size,
+                            outputUris.size
+                        )
                     } else {
-                        "Your document has been processed and saved securely."
+                        stringResource(R.string.document_processed)
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -331,9 +338,13 @@ internal fun SuccessCard(
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = accentColor)
                     ) {
-                        Icon(Icons.Filled.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Icon(
+                            Icons.Filled.OpenInNew,
+                            contentDescription = stringResource(R.string.open_result),
+                            modifier = Modifier.size(18.dp)
+                        )
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Open Result")
+                        Text(stringResource(R.string.open_result))
                     }
 
                     Row(
@@ -348,9 +359,13 @@ internal fun SuccessCard(
                                 .height(48.dp),
                             shape = RoundedCornerShape(12.dp)
                         ) {
-                            Icon(Icons.Filled.Share, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Icon(
+                                Icons.Filled.Share,
+                                contentDescription = stringResource(R.string.share),
+                                modifier = Modifier.size(16.dp)
+                            )
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Share")
+                            Text(stringResource(R.string.share))
                         }
 
                         // Save to downloads
@@ -363,9 +378,13 @@ internal fun SuccessCard(
                                 .height(48.dp),
                             shape = RoundedCornerShape(12.dp)
                         ) {
-                            Icon(Icons.Filled.Download, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Icon(
+                                Icons.Filled.Download,
+                                contentDescription = stringResource(R.string.export),
+                                modifier = Modifier.size(16.dp)
+                            )
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Export")
+                            Text(stringResource(R.string.export))
                         }
                     }
 
@@ -374,7 +393,7 @@ internal fun SuccessCard(
                         onClick = onClear,
                         modifier = Modifier.align(Alignment.CenterHorizontally)
                     ) {
-                        Text("Process another file", color = accentColor)
+                        Text(stringResource(R.string.process_another_file), color = accentColor)
                     }
                 }
             }

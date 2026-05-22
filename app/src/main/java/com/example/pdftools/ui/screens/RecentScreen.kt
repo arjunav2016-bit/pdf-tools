@@ -48,12 +48,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.pdftools.R
 import com.example.pdftools.ui.viewmodels.RecentViewModel
 import com.example.pdftools.data.RecentFile
 import com.example.pdftools.data.ToolRepository
@@ -78,12 +80,12 @@ fun RecentScreen(
                 title = {
                     Column {
                         Text(
-                            text = "Recent Files",
+                            text = stringResource(R.string.recent_files),
                             style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "Your recently processed documents",
+                            text = stringResource(R.string.recent_files_subtitle),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -92,7 +94,7 @@ fun RecentScreen(
                 navigationIcon = {
                     Icon(
                         imageVector = Icons.Filled.History,
-                        contentDescription = null,
+                        contentDescription = stringResource(R.string.recent_files),
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(start = 8.dp)
                     )
@@ -102,7 +104,7 @@ fun RecentScreen(
                         IconButton(onClick = { viewModel.clear() }) {
                             Icon(
                                 imageVector = Icons.Filled.DeleteSweep,
-                                contentDescription = "Clear all history",
+                                contentDescription = stringResource(R.string.clear_all_history),
                                 tint = MaterialTheme.colorScheme.error
                             )
                         }
@@ -179,7 +181,10 @@ private fun RecentFileItem(
             ) {
                 Icon(
                     imageVector = tool?.icon ?: Icons.Filled.History,
-                    contentDescription = null,
+                    contentDescription = stringResource(
+                        R.string.recent_tool_icon,
+                        tool?.name ?: stringResource(R.string.process_action)
+                    ),
                     tint = accentColor,
                     modifier = Modifier.size(20.dp)
                 )
@@ -220,7 +225,7 @@ private fun RecentFileItem(
                 ) {
                     Icon(
                         imageVector = Icons.Filled.OpenInNew,
-                        contentDescription = "Open file",
+                        contentDescription = stringResource(R.string.open_file),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(18.dp)
                     )
@@ -231,7 +236,7 @@ private fun RecentFileItem(
                 ) {
                     Icon(
                         imageVector = Icons.Filled.Share,
-                        contentDescription = "Share file",
+                        contentDescription = stringResource(R.string.share_file),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(18.dp)
                     )
@@ -270,21 +275,21 @@ private fun EmptyRecentsState() {
             ) {
                 Icon(
                     imageVector = Icons.Outlined.HistoryToggleOff,
-                    contentDescription = null,
+                    contentDescription = stringResource(R.string.no_recent_files),
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(48.dp)
                 )
             }
             Spacer(modifier = Modifier.height(24.dp))
             Text(
-                text = "No Recent Files",
+                text = stringResource(R.string.no_recent_files),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "When you merge, compress, or convert documents, your history will appear here for quick access.",
+                text = stringResource(R.string.no_recent_files_detail),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
@@ -299,7 +304,7 @@ private fun openFile(context: Context, recent: RecentFile) {
         val fileUri = Uri.parse(recent.filePath)
         val file = File(fileUri.path ?: "")
         if (!file.exists()) {
-            Toast.makeText(context, "File no longer exists", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.file_no_longer_exists), Toast.LENGTH_SHORT).show()
             return
         }
         val contentUri = FileProvider.getUriForFile(context, "com.example.pdftools.fileprovider", file)
@@ -309,9 +314,13 @@ private fun openFile(context: Context, recent: RecentFile) {
             setDataAndType(contentUri, mimeType)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
-        context.startActivity(Intent.createChooser(intent, "Open File"))
+        context.startActivity(Intent.createChooser(intent, context.getString(R.string.open_file)))
     } catch (e: Exception) {
-        Toast.makeText(context, "Error opening file: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+        Toast.makeText(
+            context,
+            context.getString(R.string.error_opening_file, e.localizedMessage),
+            Toast.LENGTH_SHORT
+        ).show()
     }
 }
 
@@ -320,7 +329,7 @@ private fun shareFile(context: Context, recent: RecentFile) {
         val fileUri = Uri.parse(recent.filePath)
         val file = File(fileUri.path ?: "")
         if (!file.exists()) {
-            Toast.makeText(context, "File no longer exists", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.file_no_longer_exists), Toast.LENGTH_SHORT).show()
             return
         }
         val contentUri = FileProvider.getUriForFile(context, "com.example.pdftools.fileprovider", file)
@@ -331,8 +340,12 @@ private fun shareFile(context: Context, recent: RecentFile) {
             putExtra(Intent.EXTRA_STREAM, contentUri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
-        context.startActivity(Intent.createChooser(intent, "Share File"))
+        context.startActivity(Intent.createChooser(intent, context.getString(R.string.share_file)))
     } catch (e: Exception) {
-        Toast.makeText(context, "Error sharing file: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+        Toast.makeText(
+            context,
+            context.getString(R.string.error_sharing_file, e.localizedMessage),
+            Toast.LENGTH_SHORT
+        ).show()
     }
 }

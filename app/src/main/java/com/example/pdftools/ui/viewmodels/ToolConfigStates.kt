@@ -8,7 +8,8 @@ import com.example.pdftools.data.PdfProcessor
 import com.example.pdftools.data.TextAnnotation
 
 data class PageRangeConfig(
-    val pageRange: String = ""
+    val pageRange: String = "",
+    val selectedPages: Set<Int> = emptySet()
 )
 
 data class PasswordConfig(
@@ -33,12 +34,14 @@ data class PageNumberConfig(
 
 data class RotateConfig(
     val degrees: Int = 90,
-    val pageRange: String = ""
+    val pageRange: String = "",
+    val selectedPages: Set<Int> = emptySet()
 )
 
 data class CropConfig(
     val marginPercentage: Float = 0.10f,
-    val pageRange: String = ""
+    val pageRange: String = "",
+    val selectedPages: Set<Int> = emptySet()
 )
 
 data class OrganizeConfig(

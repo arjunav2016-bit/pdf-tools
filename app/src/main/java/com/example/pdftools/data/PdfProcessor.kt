@@ -35,8 +35,11 @@ class PdfProcessor @Inject constructor(
     fun parsePageRanges(rangeStr: String, totalPages: Int): List<Int> =
         PageRangeUtils.parsePageRanges(rangeStr, totalPages)
 
-    suspend fun mergePdfs(context: Context, uris: List<Uri>): Uri =
-        organizeProcessor.mergePdfs(context, uris)
+    suspend fun mergePdfs(
+        context: Context,
+        uris: List<Uri>,
+        onProgress: ((Float) -> Unit)? = null
+    ): Uri = organizeProcessor.mergePdfs(context, uris, onProgress)
 
     suspend fun splitPdf(context: Context, uri: Uri, pageRange: String): Uri =
         organizeProcessor.splitPdf(context, uri, pageRange)
@@ -61,8 +64,12 @@ class PdfProcessor @Inject constructor(
 
     // ===== Optimize Operations (OptimizeProcessor) =====
 
-    suspend fun compressPdf(context: Context, uri: Uri): Uri =
-        optimizeProcessor.compressPdf(context, uri)
+    suspend fun compressPdf(
+        context: Context,
+        uri: Uri,
+        quality: Int = 70,
+        onProgress: ((Float) -> Unit)? = null
+    ): Uri = optimizeProcessor.compressPdf(context, uri, quality, onProgress)
 
     suspend fun repairPdf(context: Context, uri: Uri): Uri =
         optimizeProcessor.repairPdf(context, uri)
@@ -75,11 +82,18 @@ class PdfProcessor @Inject constructor(
 
     // ===== Convert Operations (ConvertProcessor) =====
 
-    suspend fun convertImagesToPdf(context: Context, uris: List<Uri>): Uri =
-        convertProcessor.convertImagesToPdf(context, uris)
+    suspend fun convertImagesToPdf(
+        context: Context,
+        uris: List<Uri>,
+        onProgress: ((Float) -> Unit)? = null
+    ): Uri = convertProcessor.convertImagesToPdf(context, uris, onProgress)
 
-    suspend fun convertPdfToImages(context: Context, uri: Uri): List<Uri> =
-        convertProcessor.convertPdfToImages(context, uri)
+    suspend fun convertPdfToImages(
+        context: Context,
+        uri: Uri,
+        dpi: Int = 150,
+        onProgress: ((Float) -> Unit)? = null
+    ): List<Uri> = convertProcessor.convertPdfToImages(context, uri, dpi, onProgress)
 
     suspend fun scanToPdf(context: Context, imageUris: List<Uri>, rotations: List<Int>, filter: String): Uri =
         convertProcessor.scanToPdf(context, imageUris, rotations, filter)

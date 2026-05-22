@@ -21,6 +21,8 @@ import java.io.File
 import com.example.pdftools.utils.PageRangeUtils
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 
 /**
  * Handles PDF optimization operations: compress, repair, crop, convertToPdfA.
@@ -32,9 +34,15 @@ class OptimizeProcessor @Inject constructor() {
      * Compresses a PDF file by rendering pages to compressed JPEGs and repackaging.
      * Returns the Uri of the compressed file in cache.
      */
-    suspend fun compressPdf(context: Context, uri: Uri): Uri = withContext(Dispatchers.IO) {
+    suspend fun compressPdf(
+        context: Context,
+        uri: Uri,
+        quality: Int = 70,
+        onProgress: ((Float) -> Unit)? = null
+    ): Uri = withContext(Dispatchers.IO) {
         val tempInputFile = File.createTempFile("compress_input_", ".pdf", context.cacheDir)
         val outputFile = File(context.cacheDir, "Compressed_${System.currentTimeMillis()}.pdf")
+        val jpegQuality = quality.coerceIn(30, 100)
         
         try {
             context.contentResolver.openInputStream(uri)?.use { input ->
@@ -47,6 +55,7 @@ class OptimizeProcessor @Inject constructor() {
                 PDDocument().use { outDoc ->
                     val renderer = PDFRenderer(doc)
                     for (i in 0 until doc.numberOfPages) {
+                        currentCoroutineContext().ensureActive()
                         // Render page to bitmap at 130 DPI (perfect blend of readability and size)
                         val bitmap = renderer.renderImageWithDPI(i, 130f, ImageType.ARGB)
                         val page = PDPage(PDRectangle(bitmap.width.toFloat(), bitmap.height.toFloat()))
@@ -55,7 +64,7 @@ class OptimizeProcessor @Inject constructor() {
                         val tempImgFile = File.createTempFile("compress_page_", ".jpg", context.cacheDir)
                         try {
                             tempImgFile.outputStream().use { outStream ->
-                                bitmap.compress(Bitmap.CompressFormat.JPEG, 50, outStream)
+                                bitmap.compress(Bitmap.CompressFormat.JPEG, jpegQuality, outStream)
                             }
                             
                             val pdImage = JPEGFactory.createFromStream(outDoc, tempImgFile.inputStream())
@@ -66,6 +75,7 @@ class OptimizeProcessor @Inject constructor() {
                             tempImgFile.delete()
                             bitmap.recycle()
                         }
+                        onProgress?.invoke((i + 1f) / doc.numberOfPages.coerceAtLeast(1))
                     }
                     outDoc.save(outputFile)
                 }
