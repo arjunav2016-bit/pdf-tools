@@ -122,4 +122,164 @@ class ToolViewModelTest {
 
         verify(favoritesRepository).toggleFavorite("repair_pdf")
     }
+
+    @Test
+    fun compressConfigResetsToDefault() {
+        viewModel.compressConfig.value = CompressConfig(tier = CompressTier.EXTREME)
+        viewModel.reset()
+        assertEquals(CompressConfig(), viewModel.compressConfig.value)
+    }
+
+    @Test
+    fun processCompressPdfMapsQualityCorrectly() = runTest {
+        val input = Uri.parse("file:///tmp/input.pdf")
+        val output = Uri.parse("file:///tmp/output.pdf")
+        viewModel.addFiles(listOf(input))
+
+        whenever(pdfProcessor.compressPdf(
+            context = org.mockito.kotlin.eq(context),
+            uri = org.mockito.kotlin.eq(input),
+            quality = org.mockito.kotlin.eq(40),
+            onProgress = org.mockito.kotlin.anyOrNull()
+        )).thenReturn(output)
+
+        viewModel.compressConfig.value = CompressConfig(tier = CompressTier.EXTREME)
+        viewModel.process("compress_pdf", context)
+
+        mainDispatcherRule.dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(ToolUiState.Success(listOf(output)), viewModel.uiState.value)
+        verify(pdfProcessor).compressPdf(
+            context = org.mockito.kotlin.eq(context),
+            uri = org.mockito.kotlin.eq(input),
+            quality = org.mockito.kotlin.eq(40),
+            onProgress = org.mockito.kotlin.anyOrNull()
+        )
+    }
+
+    @Test
+    fun updateSelectedFilesModifiesList() {
+        val first = Uri.parse("file:///tmp/first.pdf")
+        val second = Uri.parse("file:///tmp/second.pdf")
+        viewModel.addFiles(listOf(first, second))
+
+        viewModel.updateSelectedFiles(listOf(second, first))
+
+        assertEquals(listOf(second, first), viewModel.selectedFiles.value)
+    }
+
+    @Test
+    fun getPageCountSuspendReturnsResolvedCount() = runTest {
+        val input = Uri.parse("file:///tmp/input.pdf")
+        whenever(previewRepository.getPageCount(context, input)).thenReturn(12)
+
+        val count = viewModel.getPageCountSuspend(context, input)
+
+        assertEquals(12, count)
+        verify(previewRepository).getPageCount(context, input)
+    }
+
+    @Test
+    fun pdfToImageConfigResetsToDefault() {
+        viewModel.pdfToImageConfig.value = PdfToImageConfig(
+            format = "png",
+            quality = 90,
+            dpi = 300,
+            pageSelection = "custom",
+            customPageRange = "1-2"
+        )
+        viewModel.reset()
+        assertEquals(PdfToImageConfig(), viewModel.pdfToImageConfig.value)
+    }
+
+    @Test
+    fun processPdfToJpgMapsParametersCorrectly() = runTest {
+        val input = Uri.parse("file:///tmp/input.pdf")
+        val outputs = listOf(Uri.parse("file:///tmp/output_1.jpg"), Uri.parse("file:///tmp/output_2.jpg"))
+        viewModel.addFiles(listOf(input))
+
+        whenever(pdfProcessor.convertPdfToImages(
+            context = org.mockito.kotlin.eq(context),
+            uri = org.mockito.kotlin.eq(input),
+            dpi = org.mockito.kotlin.eq(300),
+            format = org.mockito.kotlin.eq("png"),
+            quality = org.mockito.kotlin.eq(95),
+            pageSelection = org.mockito.kotlin.eq("custom"),
+            customPageRange = org.mockito.kotlin.eq("1-3"),
+            onProgress = org.mockito.kotlin.anyOrNull()
+        )).thenReturn(outputs)
+
+        viewModel.pdfToImageConfig.value = PdfToImageConfig(
+            format = "png",
+            quality = 95,
+            dpi = 300,
+            pageSelection = "custom",
+            customPageRange = "1-3"
+        )
+        viewModel.process("pdf_to_jpg", context)
+
+        mainDispatcherRule.dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(ToolUiState.Success(outputs), viewModel.uiState.value)
+        verify(pdfProcessor).convertPdfToImages(
+            context = org.mockito.kotlin.eq(context),
+            uri = org.mockito.kotlin.eq(input),
+            dpi = org.mockito.kotlin.eq(300),
+            format = org.mockito.kotlin.eq("png"),
+            quality = org.mockito.kotlin.eq(95),
+            pageSelection = org.mockito.kotlin.eq("custom"),
+            customPageRange = org.mockito.kotlin.eq("1-3"),
+            onProgress = org.mockito.kotlin.anyOrNull()
+        )
+    }
+
+    @Test
+    fun pdfToPptConfigResetsToDefault() {
+        viewModel.pdfToPptConfig.value = PdfToPptConfig(
+            slidesPerPage = 4,
+            includeNotes = true,
+            runOcr = false,
+            exportFormat = "otp"
+        )
+        viewModel.reset()
+        assertEquals(PdfToPptConfig(), viewModel.pdfToPptConfig.value)
+    }
+
+    @Test
+    fun processPdfToPptMapsParametersCorrectly() = runTest {
+        val input = Uri.parse("file:///tmp/input.pdf")
+        val output = Uri.parse("file:///tmp/output.pptx")
+        viewModel.addFiles(listOf(input))
+
+        whenever(pdfProcessor.convertPdfToPpt(
+            context = org.mockito.kotlin.eq(context),
+            uri = org.mockito.kotlin.eq(input),
+            slidesPerPage = org.mockito.kotlin.eq(4),
+            includeNotes = org.mockito.kotlin.eq(true),
+            runOcr = org.mockito.kotlin.eq(false),
+            exportFormat = org.mockito.kotlin.eq("otp")
+        )).thenReturn(output)
+
+        viewModel.pdfToPptConfig.value = PdfToPptConfig(
+            slidesPerPage = 4,
+            includeNotes = true,
+            runOcr = false,
+            exportFormat = "otp"
+        )
+        viewModel.process("pdf_to_ppt", context)
+
+        mainDispatcherRule.dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(ToolUiState.Success(listOf(output)), viewModel.uiState.value)
+        verify(pdfProcessor).convertPdfToPpt(
+            context = org.mockito.kotlin.eq(context),
+            uri = org.mockito.kotlin.eq(input),
+            slidesPerPage = org.mockito.kotlin.eq(4),
+            includeNotes = org.mockito.kotlin.eq(true),
+            runOcr = org.mockito.kotlin.eq(false),
+            exportFormat = org.mockito.kotlin.eq("otp")
+        )
+    }
 }
+
+

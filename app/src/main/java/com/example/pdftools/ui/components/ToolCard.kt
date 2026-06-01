@@ -59,30 +59,6 @@ fun ToolCard(
     modifier: Modifier = Modifier,
     animationDelay: Int = 0
 ) {
-    var visible by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
-        delay(animationDelay.toLong())
-        visible = true
-    }
-
-    val entryScale by animateFloatAsState(
-        targetValue = if (visible) 1f else 0.8f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessLow
-        ),
-        label = "entryScale"
-    )
-
-    val iconBounce by animateFloatAsState(
-        targetValue = if (visible) 1f else 0.5f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioHighBouncy,
-            stiffness = Spring.StiffnessMedium
-        ),
-        label = "iconBounce"
-    )
-
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val pressScale by animateFloatAsState(
@@ -107,36 +83,11 @@ fun ToolCard(
     val accentColor = if (isDarkTheme) tool.category.darkAccentColor else tool.category.accentColor
     val containerColor = if (isDarkTheme) tool.category.darkContainerColor else tool.category.containerColor
 
-    // Shimmer effect on icon circle
-    val infiniteTransition = rememberInfiniteTransition(label = "shimmerTransition")
-    val shimmerOffset by infiniteTransition.animateFloat(
-        initialValue = -100f,
-        targetValue = 200f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1500, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "shimmerOffset"
-    )
-
-    val shimmerBrush = Brush.linearGradient(
-        colors = listOf(
-            containerColor,
-            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-            containerColor
-        ),
-        start = Offset(shimmerOffset, shimmerOffset),
-        end = Offset(shimmerOffset + 80f, shimmerOffset + 80f)
-    )
-
     val haptic = LocalHapticFeedback.current
 
     Card(
         modifier = modifier
-            .scale(entryScale * pressScale)
-            .graphicsLayer {
-                alpha = if (visible) 1f else 0f
-            }
+            .scale(pressScale)
             .defaultMinSize(minHeight = 140.dp)
             .clickable(
                 interactionSource = interactionSource,
@@ -166,13 +117,12 @@ fun ToolCard(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Icon circle with shimmer
+            // Icon circle
             Box(
                 modifier = Modifier
                     .size(56.dp)
                     .clip(CircleShape)
-                    .background(shimmerBrush)
-                    .scale(iconBounce),
+                    .background(containerColor),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(

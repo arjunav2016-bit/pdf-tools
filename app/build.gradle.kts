@@ -113,6 +113,9 @@ dependencies {
   // ML Kit Text Recognition (On-device OCR)
   implementation("com.google.android.gms:play-services-mlkit-text-recognition:19.0.0")
 
+  // ML Kit Document Scanner (Camera-based document scanning with edge detection)
+  implementation("com.google.android.gms:play-services-mlkit-document-scanner:16.0.0-beta1")
+
   // Navigation
   implementation(libs.androidx.navigation3.ui)
   implementation(libs.androidx.navigation3.runtime)

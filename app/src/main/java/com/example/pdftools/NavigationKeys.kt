@@ -10,3 +10,5 @@ import kotlinx.serialization.Serializable
 @Serializable data object Onboarding : NavKey
 
 @Serializable data class ToolDetail(val toolId: String) : NavKey
+
+@Serializable data object ScanFlow : NavKey

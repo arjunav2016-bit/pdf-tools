@@ -9,8 +9,10 @@ import android.graphics.ColorMatrixColorFilter
 import android.graphics.Matrix
 import android.graphics.Paint
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.ParcelFileDescriptor
+import android.os.CancellationSignal
 import android.print.PrintAttributes
 import android.print.PageRange
 import android.webkit.WebView
@@ -34,7 +36,19 @@ import org.apache.poi.xslf.usermodel.XSLFTextShape
 import org.apache.poi.xssf.usermodel.XSSFWorkbook
 import org.apache.poi.ss.usermodel.CellType
 import org.apache.poi.ss.usermodel.DateUtil
+import android.util.Log
 import java.io.File
+import java.io.OutputStream
+import java.net.HttpURLConnection
+import java.net.URL
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions
+import com.google.android.gms.tasks.Tasks
+import org.apache.poi.xslf.usermodel.XSLFTextBox
+
 
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -46,6 +60,8 @@ import kotlinx.coroutines.ensureActive
  */
 @Singleton
 class ConvertProcessor @Inject constructor() {
+    private val pptConversionBackendUrl = "http://10.0.2.2:8080/convert/presentation-to-pdf"
+
 
     /**
      * Converts a list of image URIs (JPEG/PNG) into a single PDF.
@@ -54,37 +70,110 @@ class ConvertProcessor @Inject constructor() {
     suspend fun convertImagesToPdf(
         context: Context,
         uris: List<Uri>,
+        pageSize: String = "auto", // "auto", "a4", "letter"
+        orientation: String = "portrait", // "portrait", "landscape"
+        margin: Float = 0f, // 0f, 12f, 24f, 36f points
+        maxSizeMb: Int? = null, // null (unlimited), 1, 2, 5
         onProgress: ((Float) -> Unit)? = null
     ): Uri = withContext(Dispatchers.IO) {
         val outputFile = File(context.cacheDir, "Converted_${System.currentTimeMillis()}.pdf")
         
+        val maxBytesPerImage = maxSizeMb?.let {
+            (it * 1024L * 1024L) / uris.size.coerceAtLeast(1)
+        }
+
         try {
             PDDocument().use { doc ->
                 for ((index, uri) in uris.withIndex()) {
                     currentCoroutineContext().ensureActive()
                     context.contentResolver.openInputStream(uri)?.use { inputStream ->
-                        val tempImgFile = File.createTempFile("convert_input_", ".jpg", context.cacheDir)
-                        try {
-                            tempImgFile.outputStream().use { output ->
-                                inputStream.copyTo(output)
+                        val options = BitmapFactory.Options().apply {
+                            inJustDecodeBounds = false
+                        }
+                        val bitmap = BitmapFactory.decodeStream(inputStream, null, options)
+                        if (bitmap != null) {
+                            val imgWidth = bitmap.width.toFloat()
+                            val imgHeight = bitmap.height.toFloat()
+                            
+                            // 1. Determine page size and orientation
+                            val pgWidth: Float
+                            val pgHeight: Float
+                            when (pageSize.lowercase()) {
+                                "a4" -> {
+                                    val baseWidth = PDRectangle.A4.width
+                                    val baseHeight = PDRectangle.A4.height
+                                    if (orientation.lowercase() == "landscape") {
+                                        pgWidth = baseHeight
+                                        pgHeight = baseWidth
+                                    } else {
+                                        pgWidth = baseWidth
+                                        pgHeight = baseHeight
+                                    }
+                                }
+                                "letter" -> {
+                                    val baseWidth = PDRectangle.LETTER.width
+                                    val baseHeight = PDRectangle.LETTER.height
+                                    if (orientation.lowercase() == "landscape") {
+                                        pgWidth = baseHeight
+                                        pgHeight = baseWidth
+                                    } else {
+                                        pgWidth = baseWidth
+                                        pgHeight = baseHeight
+                                    }
+                                }
+                                else -> { // "auto"
+                                    if (orientation.lowercase() == "landscape" && imgHeight > imgWidth) {
+                                        pgWidth = imgHeight
+                                        pgHeight = imgWidth
+                                    } else {
+                                        pgWidth = imgWidth
+                                        pgHeight = imgHeight
+                                    }
+                                }
                             }
                             
-                            val options = BitmapFactory.Options().apply {
-                                inJustDecodeBounds = true
-                            }
-                            BitmapFactory.decodeFile(tempImgFile.absolutePath, options)
-                            val width = options.outWidth.toFloat()
-                            val height = options.outHeight.toFloat()
+                            // 2. Adjust margins
+                            val usableWidth = pgWidth - 2 * margin
+                            val usableHeight = pgHeight - 2 * margin
                             
-                            val page = PDPage(PDRectangle(width, height))
+                            val scale = minOf(usableWidth / imgWidth, usableHeight / imgHeight)
+                            val drawWidth = imgWidth * scale
+                            val drawHeight = imgHeight * scale
+                            
+                            val drawX = margin + (usableWidth - drawWidth) / 2f
+                            val drawY = margin + (usableHeight - drawHeight) / 2f
+                            
+                            val page = PDPage(PDRectangle(pgWidth, pgHeight))
                             doc.addPage(page)
                             
-                            val pdImage = JPEGFactory.createFromStream(doc, tempImgFile.inputStream())
-                            PDPageContentStream(doc, page).use { contentStream ->
-                                contentStream.drawImage(pdImage, 0f, 0f, width, height)
+                            // 3. Dynamic compression based on Max Size
+                            val tempImgFile = File.createTempFile("convert_compress_", ".jpg", context.cacheDir)
+                            try {
+                                if (maxBytesPerImage != null) {
+                                    var currentQuality = 90
+                                    while (currentQuality >= 10) {
+                                        tempImgFile.outputStream().use { outStream ->
+                                            bitmap.compress(Bitmap.CompressFormat.JPEG, currentQuality, outStream)
+                                        }
+                                        if (tempImgFile.length() <= maxBytesPerImage || currentQuality == 10) {
+                                            break
+                                        }
+                                        currentQuality -= 15
+                                    }
+                                } else {
+                                    tempImgFile.outputStream().use { outStream ->
+                                        bitmap.compress(Bitmap.CompressFormat.JPEG, 85, outStream)
+                                    }
+                                }
+                                
+                                val pdImage = JPEGFactory.createFromStream(doc, tempImgFile.inputStream())
+                                PDPageContentStream(doc, page).use { contentStream ->
+                                    contentStream.drawImage(pdImage, drawX, drawY, drawWidth, drawHeight)
+                                }
+                            } finally {
+                                tempImgFile.delete()
+                                bitmap.recycle()
                             }
-                        } finally {
-                            tempImgFile.delete()
                         }
                     }
                     onProgress?.invoke((index + 1f) / uris.size.coerceAtLeast(1))
@@ -99,16 +188,39 @@ class ConvertProcessor @Inject constructor() {
     }
 
     /**
-     * Converts a PDF file into a list of image files (JPEGs) of the pages.
+     * Converts a PDF file into a list of image files of the pages.
+     * Supports JPG, PNG, and WebP formats, quality control, DPI, and page selection.
      * Returns a list of image Uris in cache.
      */
     suspend fun convertPdfToImages(
         context: Context,
         uri: Uri,
         dpi: Int = 150,
+        format: String = "jpg",
+        quality: Int = 85,
+        pageSelection: String = "all",
+        customPageRange: String = "",
         onProgress: ((Float) -> Unit)? = null
     ): List<Uri> = withContext(Dispatchers.IO) {
-        val tempInputFile = File.createTempFile("pdf_to_jpg_input_", ".pdf", context.cacheDir)
+        val tempInputFile = File.createTempFile("pdf_to_img_input_", ".pdf", context.cacheDir)
+        val extension = when (format.lowercase()) {
+            "png" -> "png"
+            "webp" -> "webp"
+            else -> "jpg"
+        }
+        val compressFormat = when (format.lowercase()) {
+            "png" -> Bitmap.CompressFormat.PNG
+            "webp" -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                Bitmap.CompressFormat.WEBP_LOSSY
+            } else {
+                @Suppress("DEPRECATION")
+                Bitmap.CompressFormat.WEBP
+            }
+            else -> Bitmap.CompressFormat.JPEG
+        }
+        // PNG is lossless, quality param is ignored by Android for PNG
+        val effectiveQuality = if (format.lowercase() == "png") 100 else quality.coerceIn(1, 100)
+
         val outputDir = File(context.cacheDir, "PDF_Pages_${System.currentTimeMillis()}")
         outputDir.mkdirs()
         val imageUris = mutableListOf<Uri>()
@@ -122,20 +234,32 @@ class ConvertProcessor @Inject constructor() {
             
             PDDocument.load(tempInputFile).use { doc ->
                 val renderer = PDFRenderer(doc)
-                for (i in 0 until doc.numberOfPages) {
+                val totalPages = doc.numberOfPages
+
+                // Determine which pages to convert
+                val pagesToConvert: List<Int> = if (pageSelection == "custom" && customPageRange.isNotBlank()) {
+                    parsePageRange(customPageRange, totalPages)
+                } else {
+                    (0 until totalPages).toList()
+                }
+
+                val pageCount = pagesToConvert.size.coerceAtLeast(1)
+                pagesToConvert.forEachIndexed { idx, pageIndex ->
                     currentCoroutineContext().ensureActive()
+                    if (pageIndex < 0 || pageIndex >= totalPages) return@forEachIndexed
+
                     val bitmap = renderer.renderImageWithDPI(
-                        i,
-                        dpi.coerceIn(72, 300).toFloat(),
+                        pageIndex,
+                        dpi.coerceIn(72, 600).toFloat(),
                         ImageType.ARGB
                     )
-                    val imgFile = File(outputDir, "Page_${i + 1}.jpg")
+                    val imgFile = File(outputDir, "Page_${pageIndex + 1}.$extension")
                     imgFile.outputStream().use { outStream ->
-                        bitmap.compress(Bitmap.CompressFormat.JPEG, 85, outStream)
+                        bitmap.compress(compressFormat, effectiveQuality, outStream)
                     }
                     bitmap.recycle()
                     imageUris.add(Uri.fromFile(imgFile))
-                    onProgress?.invoke((i + 1f) / doc.numberOfPages.coerceAtLeast(1))
+                    onProgress?.invoke((idx + 1f) / pageCount)
                 }
             }
             imageUris
@@ -149,19 +273,48 @@ class ConvertProcessor @Inject constructor() {
     }
 
     /**
+     * Parses a page range string like "1-5, 8, 10-12" into a sorted list of 0-indexed page indices.
+     */
+    private fun parsePageRange(rangeStr: String, totalPages: Int): List<Int> {
+        val pages = mutableSetOf<Int>()
+        rangeStr.split(",").map { it.trim() }.filter { it.isNotEmpty() }.forEach { part ->
+            if (part.contains("-")) {
+                val bounds = part.split("-").map { it.trim().toIntOrNull() }
+                val start = bounds.getOrNull(0)
+                val end = bounds.getOrNull(1)
+                if (start != null && end != null) {
+                    for (p in start..end) {
+                        if (p in 1..totalPages) pages.add(p - 1) // convert to 0-indexed
+                    }
+                }
+            } else {
+                val p = part.toIntOrNull()
+                if (p != null && p in 1..totalPages) pages.add(p - 1)
+            }
+        }
+        return pages.sorted()
+    }
+
+
+    /**
      * Converts a list of image URIs (with custom rotations and filters) into a single PDF.
+     * Supports page size scaling (auto/a4/letter), quality-aware compression, and progress reporting.
      * Returns the Uri of the output PDF in cache.
      */
     suspend fun scanToPdf(
         context: Context,
         imageUris: List<Uri>,
         rotations: List<Int>,
-        filter: String
+        filter: String,
+        pageSize: String = "auto",
+        quality: Int = 85,
+        onProgress: ((Float) -> Unit)? = null
     ): Uri = withContext(Dispatchers.IO) {
         val outputFile = File(context.cacheDir, "Scanned_${System.currentTimeMillis()}.pdf")
         try {
             PDDocument().use { doc ->
                 for (index in imageUris.indices) {
+                    currentCoroutineContext().ensureActive()
                     val uri = imageUris[index]
                     val rotation = rotations.getOrNull(index) ?: 0
                     
@@ -220,18 +373,72 @@ class ConvertProcessor @Inject constructor() {
                                 }
                             }
                             
-                            val width = filteredBitmap.width.toFloat()
-                            val height = filteredBitmap.height.toFloat()
-                            val page = PDPage(PDRectangle(width, height))
+                            // 3. Calculate page dimensions based on pageSize setting
+                            val imgWidth = filteredBitmap.width.toFloat()
+                            val imgHeight = filteredBitmap.height.toFloat()
+                            
+                            val drawX: Float
+                            val drawY: Float
+                            val drawWidth: Float
+                            val drawHeight: Float
+                            val pgWidth: Float
+                            val pgHeight: Float
+
+                            when (pageSize.lowercase()) {
+                                "a4" -> {
+                                    pgWidth = PDRectangle.A4.width
+                                    pgHeight = PDRectangle.A4.height
+                                    val scale = minOf(pgWidth / imgWidth, pgHeight / imgHeight)
+                                    drawWidth = imgWidth * scale
+                                    drawHeight = imgHeight * scale
+                                    drawX = (pgWidth - drawWidth) / 2f
+                                    drawY = (pgHeight - drawHeight) / 2f
+                                }
+                                "letter" -> {
+                                    pgWidth = PDRectangle.LETTER.width
+                                    pgHeight = PDRectangle.LETTER.height
+                                    val scale = minOf(pgWidth / imgWidth, pgHeight / imgHeight)
+                                    drawWidth = imgWidth * scale
+                                    drawHeight = imgHeight * scale
+                                    drawX = (pgWidth - drawWidth) / 2f
+                                    drawY = (pgHeight - drawHeight) / 2f
+                                }
+                                else -> { // "auto" — match image dimensions
+                                    pgWidth = imgWidth
+                                    pgHeight = imgHeight
+                                    drawX = 0f
+                                    drawY = 0f
+                                    drawWidth = imgWidth
+                                    drawHeight = imgHeight
+                                }
+                            }
+
+                            val page = PDPage(PDRectangle(pgWidth, pgHeight))
                             doc.addPage(page)
                             
-                            val pdImage = LosslessFactory.createFromImage(doc, filteredBitmap)
+                            // 4. Embed image with quality-aware compression
+                            val pdImage = if (quality < 100) {
+                                // Use JPEG compression for smaller file size
+                                val tempJpeg = File.createTempFile("scan_jpeg_", ".jpg", context.cacheDir)
+                                try {
+                                    tempJpeg.outputStream().use { out ->
+                                        filteredBitmap.compress(Bitmap.CompressFormat.JPEG, quality, out)
+                                    }
+                                    JPEGFactory.createFromStream(doc, tempJpeg.inputStream())
+                                } finally {
+                                    tempJpeg.delete()
+                                }
+                            } else {
+                                LosslessFactory.createFromImage(doc, filteredBitmap)
+                            }
+
                             PDPageContentStream(doc, page).use { contentStream ->
-                                contentStream.drawImage(pdImage, 0f, 0f, width, height)
+                                contentStream.drawImage(pdImage, drawX, drawY, drawWidth, drawHeight)
                             }
                             filteredBitmap.recycle()
                         }
                     }
+                    onProgress?.invoke((index + 1f) / imageUris.size.coerceAtLeast(1))
                 }
                 doc.save(outputFile)
             }
@@ -247,7 +454,14 @@ class ConvertProcessor @Inject constructor() {
      */
     suspend fun convertHtmlToPdf(
         context: Context,
-        htmlContent: String
+        htmlContent: String,
+        inputType: String = "html",
+        url: String = "",
+        loadJs: Boolean = true,
+        loadBackgroundGraphics: Boolean = true,
+        pageScale: Float = 1.0f,
+        captureArea: String = "whole_page",
+        selectedAreaSelector: String = ""
     ): Uri {
         // Transparent bypass for JVM / Robolectric environment where WebView throws stub exceptions.
         // Check BEFORE switching to Dispatchers.Main to avoid hanging in test environments.
@@ -271,7 +485,21 @@ class ConvertProcessor @Inject constructor() {
                         contentStream.showText("HTML to PDF Offline Conversion (Test Output)")
                         contentStream.newLineAtOffset(0f, -20f)
                         contentStream.setFont(PDType1Font.HELVETICA, 10f)
-                        contentStream.showText("Converted length: ${htmlContent.length} characters")
+                        contentStream.showText("Input Type: ${inputType.filter { it.code in 32..126 }}")
+                        contentStream.newLineAtOffset(0f, -15f)
+                        contentStream.showText("URL: ${url.filter { it.code in 32..126 }}")
+                        contentStream.newLineAtOffset(0f, -15f)
+                        contentStream.showText("JavaScript Enabled: $loadJs")
+                        contentStream.newLineAtOffset(0f, -15f)
+                        contentStream.showText("BG Graphics Enabled: $loadBackgroundGraphics")
+                        contentStream.newLineAtOffset(0f, -15f)
+                        contentStream.showText("Page Scale: $pageScale")
+                        contentStream.newLineAtOffset(0f, -15f)
+                        contentStream.showText("Capture Area: ${captureArea.filter { it.code in 32..126 }}")
+                        contentStream.newLineAtOffset(0f, -15f)
+                        contentStream.showText("Selector: ${selectedAreaSelector.filter { it.code in 32..126 }}")
+                        contentStream.newLineAtOffset(0f, -15f)
+                        contentStream.showText("HTML content length: ${htmlContent.length}")
                         contentStream.endText()
                     }
                     doc.save(outputFile)
@@ -285,67 +513,114 @@ class ConvertProcessor @Inject constructor() {
         val completer = kotlinx.coroutines.CompletableDeferred<Uri>()
         val webView = WebView(context)
         
+        // Configure settings
+        webView.settings.javaScriptEnabled = loadJs
+        webView.settings.useWideViewPort = true
+        webView.settings.loadWithOverviewMode = true
+        webView.settings.domStorageEnabled = true
+        
+        // Apply zoom/scale
+        webView.setInitialScale((pageScale * 100).toInt())
+        
         webView.webViewClient = object : WebViewClient() {
             override fun onPageFinished(view: WebView?, url: String?) {
-                try {
-                    val outputFile = File(context.cacheDir, "Converted_${System.currentTimeMillis()}.pdf")
-                    val printAdapter = webView.createPrintDocumentAdapter("HTML_to_PDF")
-                    
-                    val printAttributes = PrintAttributes.Builder()
-                        .setMediaSize(PrintAttributes.MediaSize.ISO_A4)
-                        .setResolution(PrintAttributes.Resolution("pdf", "pdf", 300, 300))
-                        .setMinMargins(PrintAttributes.Margins.NO_MARGINS)
-                        .build()
+                // Determine CSS style injection based on loadBackgroundGraphics
+                val bgCss = if (loadBackgroundGraphics) {
+                    "@media print { * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; } }"
+                } else {
+                    "@media print { * { background: transparent !important; color: #000 !important; box-shadow: none !important; text-shadow: none !important; } }"
+                }
+                
+                // Construct JS to run.
+                // 1. CSS Injection
+                var jsCode = """
+                    (function() {
+                        var style = document.createElement('style');
+                        style.type = 'text/css';
+                        style.innerHTML = '$bgCss';
+                        document.head.appendChild(style);
+                    })();
+                """.trimIndent()
+                
+                // 2. Element isolation
+                if (captureArea == "selected_area" && selectedAreaSelector.isNotBlank()) {
+                    jsCode += "\n" + """
+                        (function() {
+                            var el = document.querySelector('$selectedAreaSelector');
+                            if (el) {
+                                document.body.innerHTML = el.outerHTML;
+                            }
+                        })();
+                    """.trimIndent()
+                }
+                
+                // Execute JS and proceed with print creation in the callback
+                webView.evaluateJavascript(jsCode) {
+                    try {
+                        val outputFile = File(context.cacheDir, "Converted_${System.currentTimeMillis()}.pdf")
+                        val printAdapter = webView.createPrintDocumentAdapter("HTML_to_PDF")
                         
-                    val fileDescriptor = ParcelFileDescriptor.open(
-                        outputFile,
-                        ParcelFileDescriptor.MODE_CREATE or ParcelFileDescriptor.MODE_READ_WRITE
-                    )
-                    
-                    printAdapter.onLayout(
-                        null,
-                        printAttributes,
-                        null,
-                        android.print.PrintHelper.createLayoutCallback(object : android.print.PrintHelper.LayoutCallback {
-                            override fun onLayoutFinished(info: android.print.PrintDocumentInfo?, changed: Boolean) {
-                                printAdapter.onWrite(
-                                    arrayOf(PageRange.ALL_PAGES),
-                                    fileDescriptor,
-                                    null,
-                                    android.print.PrintHelper.createWriteCallback(object : android.print.PrintHelper.WriteCallback {
-                                        override fun onWriteFinished(pages: Array<out PageRange>?) {
-                                            try {
-                                                fileDescriptor.close()
-                                                completer.complete(Uri.fromFile(outputFile))
-                                            } catch (e: Exception) {
-                                                completer.completeExceptionally(e)
+                        val printAttributes = PrintAttributes.Builder()
+                            .setMediaSize(PrintAttributes.MediaSize.ISO_A4)
+                            .setResolution(PrintAttributes.Resolution("pdf", "pdf", 300, 300))
+                            .setMinMargins(PrintAttributes.Margins.NO_MARGINS)
+                            .build()
+                            
+                        val fileDescriptor = ParcelFileDescriptor.open(
+                            outputFile,
+                            ParcelFileDescriptor.MODE_CREATE or ParcelFileDescriptor.MODE_READ_WRITE
+                        )
+                        
+                        val cancellationSignal = CancellationSignal()
+                        printAdapter.onLayout(
+                            printAttributes,
+                            printAttributes,
+                            cancellationSignal,
+                            android.print.PrintHelper.createLayoutCallback(object : android.print.PrintHelper.LayoutCallback {
+                                override fun onLayoutFinished(info: android.print.PrintDocumentInfo?, changed: Boolean) {
+                                    printAdapter.onWrite(
+                                        arrayOf(PageRange.ALL_PAGES),
+                                        fileDescriptor,
+                                        cancellationSignal,
+                                        android.print.PrintHelper.createWriteCallback(object : android.print.PrintHelper.WriteCallback {
+                                            override fun onWriteFinished(pages: Array<out PageRange>?) {
+                                                try {
+                                                    fileDescriptor.close()
+                                                    completer.complete(Uri.fromFile(outputFile))
+                                                } catch (e: Exception) {
+                                                    completer.completeExceptionally(e)
+                                                }
                                             }
-                                        }
-                                        override fun onWriteFailed(error: CharSequence?) {
-                                            try {
-                                                fileDescriptor.close()
-                                            } catch (e: Exception) {}
-                                            completer.completeExceptionally(Exception("Print write failed: $error"))
-                                        }
-                                    })
-                                )
-                            }
-                            override fun onLayoutFailed(error: CharSequence?) {
-                                try {
-                                    fileDescriptor.close()
-                                } catch (e: Exception) {}
-                                completer.completeExceptionally(Exception("Print layout failed: $error"))
-                            }
-                        }),
-                        Bundle()
-                    )
-                } catch (e: Exception) {
-                    completer.completeExceptionally(e)
+                                            override fun onWriteFailed(error: CharSequence?) {
+                                                try {
+                                                    fileDescriptor.close()
+                                                } catch (e: Exception) {}
+                                                completer.completeExceptionally(Exception("Print write failed: $error"))
+                                            }
+                                        })
+                                    )
+                                }
+                                override fun onLayoutFailed(error: CharSequence?) {
+                                    try {
+                                        fileDescriptor.close()
+                                    } catch (e: Exception) {}
+                                    completer.completeExceptionally(Exception("Print layout failed: $error"))
+                                }
+                            }),
+                            Bundle()
+                        )
+                    } catch (e: Exception) {
+                        completer.completeExceptionally(e)
+                    }
                 }
             }
         }
         
-        webView.loadDataWithBaseURL(null, htmlContent, "text/html", "UTF-8", null)
+        if (inputType == "url" && url.isNotBlank()) {
+            webView.loadUrl(url)
+        } else {
+            webView.loadDataWithBaseURL(null, htmlContent, "text/html", "UTF-8", null)
+        }
         completer.await()
         }
     }
@@ -353,7 +628,13 @@ class ConvertProcessor @Inject constructor() {
     /**
      * Converts a Word (.docx) document into a PDF by extracting paragraphs and tables.
      */
-    suspend fun convertWordToPdf(context: Context, uri: Uri): Uri = withContext(Dispatchers.IO) {
+    suspend fun convertWordToPdf(
+        context: Context,
+        uri: Uri,
+        maintainLayout: Boolean = true,
+        imageQuality: String = "medium",
+        runOcr: Boolean = false
+    ): Uri = withContext(Dispatchers.IO) {
         val outputFile = File(context.cacheDir, "WordToPdf_${System.currentTimeMillis()}.pdf")
 
         try {
@@ -396,11 +677,12 @@ class ConvertProcessor @Inject constructor() {
                         // Truncate if too long for page width
                         val maxChars = ((usableWidth / (fontSize * 0.5f)).toInt()).coerceAtLeast(10)
                         val displayText = if (text.length > maxChars) text.take(maxChars) + "..." else text
+                        val cleanText = displayText.replace("\t", "    ")
                         try {
-                            contentStream.showText(displayText)
+                            contentStream.showText(cleanText)
                         } catch (e: Exception) {
                             // Filter non-encodable chars
-                            val safe = displayText.filter { it.code in 32..126 || it == '\t' }
+                            val safe = cleanText.filter { it.code in 32..126 }
                             contentStream.showText(safe)
                         }
                         contentStream.endText()
@@ -476,86 +758,292 @@ class ConvertProcessor @Inject constructor() {
         }
     }
 
-    /**
-     * Converts a PowerPoint (.pptx) presentation into a PDF (one page per slide).
-     */
-    suspend fun convertPptToPdf(context: Context, uri: Uri): Uri = withContext(Dispatchers.IO) {
-        val outputFile = File(context.cacheDir, "PptToPdf_${System.currentTimeMillis()}.pdf")
+    private fun shouldUsePptBackend(
+        slideRange: String,
+        selectedSlides: Set<Int>,
+        slidesPerPage: Int,
+        includeNotes: Boolean
+    ): Boolean {
+        return slideRange != "custom" &&
+            selectedSlides.isEmpty() &&
+            slidesPerPage == 1 &&
+            !includeNotes
+    }
 
+    private fun convertPptToPdfWithBackend(context: Context, uri: Uri, outputFile: File) {
+        val boundary = "PdfToolsBoundary${System.currentTimeMillis()}"
+        val fileName = getSafeUploadFileName(context, uri)
+        val connection = (URL(pptConversionBackendUrl).openConnection() as HttpURLConnection).apply {
+            requestMethod = "POST"
+            connectTimeout = 5000
+            readTimeout = 120000
+            doOutput = true
+            setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
+            setRequestProperty("Accept", "application/pdf")
+        }
+
+        try {
+            connection.outputStream.use { output ->
+                output.writeUtf8("--$boundary\r\n")
+                output.writeUtf8("Content-Disposition: form-data; name=\"file\"; filename=\"$fileName\"\r\n")
+                output.writeUtf8("Content-Type: application/vnd.openxmlformats-officedocument.presentationml.presentation\r\n\r\n")
+                context.contentResolver.openInputStream(uri)?.use { input ->
+                    input.copyTo(output)
+                } ?: throw IllegalArgumentException("Could not open the PowerPoint file.")
+                output.writeUtf8("\r\n--$boundary--\r\n")
+            }
+
+            val status = connection.responseCode
+            if (status !in 200..299) {
+                val message = connection.errorStream?.bufferedReader()?.use { it.readText() }
+                    ?: "HTTP $status"
+                throw IllegalStateException("Backend conversion failed: $message")
+            }
+
+            connection.inputStream.use { input ->
+                outputFile.outputStream().use { output ->
+                    input.copyTo(output)
+                }
+            }
+
+            if (!outputFile.exists() || outputFile.length() == 0L) {
+                throw IllegalStateException("Backend returned an empty PDF.")
+            }
+        } finally {
+            connection.disconnect()
+        }
+    }
+
+    private fun OutputStream.writeUtf8(value: String) {
+        write(value.toByteArray(Charsets.UTF_8))
+    }
+
+    private fun getSafeUploadFileName(context: Context, uri: Uri): String {
+        val fallback = "presentation.pptx"
+        return try {
+            val name = uri.lastPathSegment
+                ?.substringAfterLast('/')
+                ?.takeIf { it.endsWith(".pptx", true) || it.endsWith(".ppt", true) || it.endsWith(".odp", true) }
+            name ?: fallback
+        } catch (_: Throwable) {
+            fallback
+        }
+    }
+
+    /**
+     * Returns the total number of slides in a PowerPoint (.pptx) file.
+     */
+    suspend fun getSlideCount(context: Context, uri: Uri): Int = withContext(Dispatchers.IO) {
         try {
             context.contentResolver.openInputStream(uri)?.use { inputStream ->
                 val slideShow = XMLSlideShow(inputStream)
-                val slideSize = slideShow.pageSize
-                val slideWidth = slideSize.width.toFloat()
-                val slideHeight = slideSize.height.toFloat()
+                val count = slideShow.slides.size
+                slideShow.close()
+                count
+            } ?: 0
+        } catch (_: Throwable) {
+            0
+        }
+    }
+
+    /**
+     * Returns a list of short text previews (title + first line) for each slide in a PPTX file.
+     * Each element corresponds to a slide at that index.
+     */
+    suspend fun getSlidePreviewTexts(context: Context, uri: Uri): List<String> = withContext(Dispatchers.IO) {
+        try {
+            context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                val slideShow = XMLSlideShow(inputStream)
+                val previews = slideShow.slides.map { slide ->
+                    val lines = mutableListOf<String>()
+                    for (shape in slide.shapes) {
+                        if (shape is XSLFTextShape) {
+                            for (paragraph in shape.textParagraphs) {
+                                val text = paragraph.text.trim()
+                                if (text.isNotEmpty()) {
+                                    lines.add(text)
+                                    if (lines.size >= 3) break
+                                }
+                            }
+                        }
+                        if (lines.size >= 3) break
+                    }
+                    lines.joinToString("\n").take(120)
+                }
+                slideShow.close()
+                previews
+            } ?: emptyList()
+        } catch (_: Throwable) {
+            emptyList()
+        }
+    }
+
+    /**
+     * Converts a PowerPoint (.pptx) presentation into a PDF.
+     * Supports slide filtering, handout layout, speaker notes, and quality control.
+     */
+    suspend fun convertPptToPdf(
+        context: Context,
+        uri: Uri,
+        slideRange: String = "all",
+        customRange: String = "",
+        selectedSlides: Set<Int> = emptySet(),
+        slidesPerPage: Int = 1,
+        includeNotes: Boolean = false,
+        quality: String = "medium"
+    ): Uri = withContext(Dispatchers.IO) {
+        val outputFile = File(context.cacheDir, "PptToPdf_${System.currentTimeMillis()}.pdf")
+
+        try {
+            if (shouldUsePptBackend(slideRange, selectedSlides, slidesPerPage, includeNotes)) {
+                try {
+                    convertPptToPdfWithBackend(context, uri, outputFile)
+                    return@withContext Uri.fromFile(outputFile)
+                } catch (e: Throwable) {
+                    Log.w("ConvertProcessor", "PPT backend conversion failed; using local fallback", e)
+                    outputFile.delete()
+                }
+            }
+
+            context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                val slideShow = XMLSlideShow(inputStream)
+                // Dynamically resolve slide dimensions
+                val dimensions = getPresentationSlideSize(slideShow)
+                val slideWidth = dimensions.first
+                val slideHeight = dimensions.second
+                val allSlides = slideShow.slides
+
+                // Determine which slides to include (1-indexed)
+                val slidesToConvert = if (slideRange == "custom") {
+                    if (selectedSlides.isNotEmpty()) {
+                        allSlides.filterIndexed { index, _ -> (index + 1) in selectedSlides }
+                    } else if (customRange.isNotBlank()) {
+                        val indices = parseSlideRange(customRange, allSlides.size)
+                        allSlides.filterIndexed { index, _ -> (index + 1) in indices }
+                    } else {
+                        allSlides
+                    }
+                } else {
+                    allSlides
+                }
+
+                if (slidesToConvert.isEmpty()) {
+                    slideShow.close()
+                    throw IllegalArgumentException("No slides selected for conversion.")
+                }
+
+                // Font size scaling based on quality
+                val fontScale = when (quality) {
+                    "low" -> 0.85f
+                    "high" -> 1.15f
+                    else -> 1.0f
+                }
 
                 PDDocument().use { pdfDoc ->
                     val font = PDType1Font.HELVETICA
                     val boldFont = PDType1Font.HELVETICA_BOLD
-                    val defaultFontSize = 14f
+                    val italicFont = PDType1Font.HELVETICA_OBLIQUE
+                    val boldItalicFont = PDType1Font.HELVETICA_BOLD_OBLIQUE
+                    val defaultFontSize = 10f * fontScale
                     val margin = 50f
 
-                    for ((slideIndex, slide) in slideShow.slides.withIndex()) {
-                        // Landscape page matching slide aspect ratio
-                        val page = PDPage(PDRectangle(slideWidth, slideHeight))
-                        pdfDoc.addPage(page)
+                    val clampedPerPage = slidesPerPage.coerceIn(1, 4)
 
-                        PDPageContentStream(pdfDoc, page).use { contentStream ->
-                            // Draw a light background to simulate slide area
-                            contentStream.setNonStrokingColor(1f, 1f, 1f)
-                            contentStream.addRect(0f, 0f, slideWidth, slideHeight)
-                            contentStream.fill()
+                    // Group slides by pages
+                    val slideGroups = slidesToConvert.chunked(clampedPerPage)
 
-                            var yPos = slideHeight - margin
-                            val usableWidth = slideWidth - 2 * margin
+                    for (group in slideGroups) {
+                        currentCoroutineContext().ensureActive()
 
-                            // Extract text from all shapes
-                            for (shape in slide.shapes) {
-                                if (shape is XSLFTextShape) {
-                                    for (paragraph in shape.textParagraphs) {
-                                        val text = paragraph.text.trim()
-                                        if (text.isEmpty()) {
-                                            yPos -= defaultFontSize * 0.6f
-                                            continue
+                        if (clampedPerPage == 1) {
+                            // Single slide per page — use slide dimensions
+                            val noteText = if (includeNotes) extractNotes(group[0]) else null
+                            val extraHeight = if (!noteText.isNullOrBlank()) 120f else 0f
+                            val page = PDPage(PDRectangle(slideWidth, slideHeight + extraHeight))
+                            pdfDoc.addPage(page)
+
+                            PDPageContentStream(pdfDoc, page).use { cs ->
+                                cs.setNonStrokingColor(1f, 1f, 1f)
+                                cs.addRect(0f, 0f, slideWidth, slideHeight + extraHeight)
+                                cs.fill()
+
+                                renderSlideContent(context, pdfDoc, cs, group[0], margin, slideWidth, slideHeight, boldFont, font, defaultFontSize, slideHeight + extraHeight)
+
+                                // Speaker notes
+                                if (!noteText.isNullOrBlank()) {
+                                    val notesY = extraHeight - 20f
+                                    cs.setNonStrokingColor(0.92f, 0.92f, 0.92f)
+                                    cs.addRect(0f, 0f, slideWidth, extraHeight)
+                                    cs.fill()
+
+                                    cs.beginText()
+                                    cs.setFont(boldFont, 9f)
+                                    cs.setNonStrokingColor(0.3f, 0.3f, 0.3f)
+                                    cs.newLineAtOffset(margin, notesY)
+                                    cs.showText("Speaker Notes:")
+                                    cs.endText()
+
+                                    cs.beginText()
+                                    cs.setFont(font, 8f)
+                                    cs.setNonStrokingColor(0.4f, 0.4f, 0.4f)
+                                    cs.newLineAtOffset(margin, notesY - 14f)
+                                    val truncatedNotes = if (noteText.length > 200) noteText.take(200) + "..." else noteText
+                                    try {
+                                        cs.showText(truncatedNotes.filter { it.code in 32..126 })
+                                    } catch (_: Exception) { }
+                                    cs.endText()
+                                }
+                            }
+                        } else {
+                            // Multiple slides per page (handout layout)
+                            val pageW = 595f
+                            val pageH = 842f
+                            val page = PDPage(PDRectangle(pageW, pageH))
+                            pdfDoc.addPage(page)
+
+                            PDPageContentStream(pdfDoc, page).use { cs ->
+                                cs.setNonStrokingColor(1f, 1f, 1f)
+                                cs.addRect(0f, 0f, pageW, pageH)
+                                cs.fill()
+
+                                val cols = if (clampedPerPage == 2) 1 else 2
+                                val rows = if (clampedPerPage == 2) 2 else 2
+                                val cellMargin = 24f
+                                val cellW = (pageW - cellMargin * (cols + 1)) / cols
+                                val cellH = (pageH - cellMargin * (rows + 1)) / rows
+
+                                for ((i, slide) in group.withIndex()) {
+                                    val col = i % cols
+                                    val row = i / cols
+                                    val cellX = cellMargin + col * (cellW + cellMargin)
+                                    val cellY = pageH - cellMargin - (row + 1) * (cellH + cellMargin) + cellMargin
+
+                                    // Draw cell border
+                                    cs.setStrokingColor(0.85f, 0.85f, 0.85f)
+                                    cs.setLineWidth(0.5f)
+                                    cs.addRect(cellX, cellY, cellW, cellH)
+                                    cs.stroke()
+
+                                    val innerMargin = 12f
+                                    renderSlideContentInBounds(context, pdfDoc, cs, slide, cellX + innerMargin, cellY + innerMargin, cellW - 2 * innerMargin, cellH - 2 * innerMargin, boldFont, font, defaultFontSize * 0.7f)
+
+                                    // Notes below each cell if enabled
+                                    if (includeNotes) {
+                                        val noteText = extractNotes(slide)
+                                        if (!noteText.isNullOrBlank()) {
+                                            cs.beginText()
+                                            cs.setFont(font, 6f)
+                                            cs.setNonStrokingColor(0.5f, 0.5f, 0.5f)
+                                            cs.newLineAtOffset(cellX + innerMargin, cellY + 4f)
+                                            val truncated = if (noteText.length > 60) noteText.take(60) + "..." else noteText
+                                            try {
+                                                cs.showText(truncated.filter { it.code in 32..126 })
+                                            } catch (_: Exception) { }
+                                            cs.endText()
                                         }
-
-                                        val isBold = paragraph.textRuns.any { it.isBold }
-                                        var fontSize = defaultFontSize
-                                        // Try to extract font size from runs
-                                        paragraph.textRuns.firstOrNull()?.fontSize?.let { fs ->
-                                            if (fs > 0) fontSize = fs.toFloat().coerceIn(8f, 48f)
-                                        }
-                                        val selectedFont = if (isBold) boldFont else font
-                                        val lineHeight = fontSize * 1.3f
-
-                                        if (yPos - lineHeight < margin) {
-                                            break // Stay on current page; don't overflow
-                                        }
-
-                                        contentStream.beginText()
-                                        contentStream.setFont(selectedFont, fontSize)
-                                        contentStream.setNonStrokingColor(0.1f, 0.1f, 0.1f)
-                                        contentStream.newLineAtOffset(margin, yPos)
-                                        val maxChars = ((usableWidth / (fontSize * 0.5f)).toInt()).coerceAtLeast(10)
-                                        val displayText = if (text.length > maxChars) text.take(maxChars) + "..." else text
-                                        try {
-                                            contentStream.showText(displayText)
-                                        } catch (e: Exception) {
-                                            contentStream.showText(displayText.filter { it.code in 32..126 })
-                                        }
-                                        contentStream.endText()
-                                        yPos -= lineHeight
                                     }
                                 }
                             }
-
-                            // Slide number watermark
-                            contentStream.beginText()
-                            contentStream.setFont(font, 10f)
-                            contentStream.setNonStrokingColor(0.6f, 0.6f, 0.6f)
-                            contentStream.newLineAtOffset(slideWidth - margin - 40f, margin / 2f)
-                            contentStream.showText("Slide ${slideIndex + 1}")
-                            contentStream.endText()
                         }
                     }
 
@@ -564,16 +1052,718 @@ class ConvertProcessor @Inject constructor() {
                 }
             } ?: throw IllegalArgumentException("Could not open the PowerPoint file.")
             Uri.fromFile(outputFile)
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             outputFile.delete()
             throw e
         }
     }
 
     /**
+     * Parse a slide range string like "1-5, 8, 10-12" into a set of 1-indexed slide numbers.
+     */
+    private fun parseSlideRange(range: String, totalSlides: Int): Set<Int> {
+        val result = mutableSetOf<Int>()
+        val parts = range.split(",").map { it.trim() }
+        for (part in parts) {
+            if (part.contains("-")) {
+                val bounds = part.split("-").map { it.trim().toIntOrNull() }
+                if (bounds.size == 2 && bounds[0] != null && bounds[1] != null) {
+                    val start = bounds[0]!!.coerceIn(1, totalSlides)
+                    val end = bounds[1]!!.coerceIn(1, totalSlides)
+                    result.addAll(start..end)
+                }
+            } else {
+                part.toIntOrNull()?.let { num ->
+                    if (num in 1..totalSlides) result.add(num)
+                }
+            }
+        }
+        return result
+    }
+
+    /**
+     * Extracts speaker notes text from a slide.
+     */
+    private fun extractNotes(slide: org.apache.poi.xslf.usermodel.XSLFSlide): String? {
+        return try {
+            val notes = slide.notes ?: return null
+            val sb = StringBuilder()
+            for (shape in notes.shapes) {
+                if (shape is XSLFTextShape) {
+                    for (p in shape.textParagraphs) {
+                        val t = p.text.trim()
+                        if (t.isNotEmpty()) {
+                            if (sb.isNotEmpty()) sb.append(" ")
+                            sb.append(t)
+                        }
+                    }
+                }
+            }
+            sb.toString().takeIf { it.isNotBlank() }
+        } catch (_: Throwable) { null }
+    }
+
+    private fun getSlideShapesInPaintOrder(
+        slide: org.apache.poi.xslf.usermodel.XSLFSlide
+    ): List<org.apache.poi.xslf.usermodel.XSLFShape> {
+        val shapes = mutableListOf<org.apache.poi.xslf.usermodel.XSLFShape>()
+
+        fun addInherited(source: Iterable<org.apache.poi.xslf.usermodel.XSLFShape>?) {
+            source?.forEach { shape ->
+                if (!isPlaceholderShape(shape)) {
+                    shapes.add(shape)
+                }
+            }
+        }
+
+        try {
+            addInherited(slide.slideMaster?.shapes)
+        } catch (_: Throwable) {}
+
+        try {
+            addInherited(slide.slideLayout?.shapes)
+        } catch (_: Throwable) {}
+
+        try {
+            shapes.addAll(slide.shapes)
+        } catch (_: Throwable) {}
+
+        return shapes
+    }
+
+    private fun isPlaceholderShape(shape: Any): Boolean {
+        try {
+            val placeholder = shape.javaClass.getMethod("getPlaceholder").invoke(shape)
+            if (placeholder != null) return true
+        } catch (_: Throwable) {}
+
+        try {
+            val xmlObject = shape.javaClass.getMethod("getXmlObject").invoke(shape) ?: return false
+            val nvPr = findNoVisualProperties(xmlObject) ?: return false
+            val ph = try {
+                nvPr.javaClass.getMethod("getPh").invoke(nvPr)
+            } catch (_: Throwable) {
+                null
+            }
+            if (ph != null) return true
+        } catch (_: Throwable) {}
+
+        return false
+    }
+
+    private fun findNoVisualProperties(xmlObject: Any): Any? {
+        val candidateNames = listOf("getNvSpPr", "getNvPicPr", "getNvCxnSpPr", "getNvGraphicFramePr", "getNvGrpSpPr")
+        for (name in candidateNames) {
+            try {
+                val nv = xmlObject.javaClass.getMethod(name).invoke(xmlObject) ?: continue
+                val nvPr = try {
+                    nv.javaClass.getMethod("getNvPr").invoke(nv)
+                } catch (_: Throwable) {
+                    null
+                }
+                if (nvPr != null) return nvPr
+            } catch (_: Throwable) {}
+        }
+        return null
+    }
+
+    private fun renderSlideContent(
+        context: Context,
+        pdfDoc: PDDocument,
+        cs: PDPageContentStream,
+        slide: org.apache.poi.xslf.usermodel.XSLFSlide,
+        margin: Float,
+        slideWidth: Float,
+        slideHeight: Float,
+        boldFont: PDType1Font,
+        font: PDType1Font,
+        defaultFontSize: Float,
+        pageHeight: Float
+    ) {
+        try {
+            renderSlideContentVisual(context, pdfDoc, cs, slide, margin, slideWidth, slideHeight, boldFont, font, defaultFontSize, pageHeight)
+        } catch (e: Throwable) {
+            // Only fall back for truly catastrophic failures (e.g. content stream already closed)
+            Log.w("ConvertProcessor", "Visual renderer failed for slide ${try { slide.slideNumber } catch (_: Throwable) { "?" }}, falling back to text-only", e)
+            try {
+                renderSlideContentFallback(cs, slide, margin, slideWidth, slideHeight, boldFont, font, defaultFontSize, pageHeight)
+            } catch (e2: Throwable) {
+                Log.e("ConvertProcessor", "Fallback renderer also failed", e2)
+            }
+        }
+    }
+
+    private fun renderSlideContentVisual(
+        context: Context,
+        pdfDoc: PDDocument,
+        cs: PDPageContentStream,
+        slide: org.apache.poi.xslf.usermodel.XSLFSlide,
+        margin: Float,
+        slideWidth: Float,
+        slideHeight: Float,
+        boldFont: PDType1Font,
+        font: PDType1Font,
+        defaultFontSize: Float,
+        pageHeight: Float
+    ) {
+        val extraHeight = pageHeight - slideHeight
+
+        // Draw slide background
+        val bgCol = getSlideBackgroundColorSafe(slide)
+        if (bgCol != null) {
+            val r = ((bgCol shr 16) and 0xFF) / 255f
+            val g = ((bgCol shr 8) and 0xFF) / 255f
+            val b = (bgCol and 0xFF) / 255f
+            cs.setNonStrokingColor(r, g, b)
+        } else {
+            cs.setNonStrokingColor(1f, 1f, 1f)
+        }
+        cs.addRect(0f, extraHeight, slideWidth, slideHeight)
+        cs.fill()
+
+        // Render each shape individually — per-shape error handling so one broken shape
+        // doesn't prevent the rest of the slide from rendering
+        for (shape in getSlideShapesInPaintOrder(slide)) {
+            try {
+                val anchor = getShapeAnchorSafe(shape) ?: continue
+                val sx = anchor.left
+                val sy = anchor.top
+                val sw = anchor.width()
+                val sh = anchor.height()
+
+                val pdfY = pageHeight - sy - sh
+
+                // Render shape fills and borders
+                if (shape is org.apache.poi.xslf.usermodel.XSLFSimpleShape) {
+                    try {
+                        val fillCol = getFillColorSafe(shape)
+                        if (fillCol != null) {
+                            val r = ((fillCol shr 16) and 0xFF) / 255f
+                            val g = ((fillCol shr 8) and 0xFF) / 255f
+                            val b = (fillCol and 0xFF) / 255f
+                            cs.setNonStrokingColor(r, g, b)
+                            cs.addRect(sx, pdfY, sw, sh)
+                            cs.fill()
+                        }
+                    } catch (e: Throwable) {
+                        Log.w("ConvertProcessor", "Failed to render shape fill", e)
+                    }
+
+                    try {
+                        val lineCol = getLineColorSafe(shape)
+                        if (lineCol != null) {
+                            val r = ((lineCol shr 16) and 0xFF) / 255f
+                            val g = ((lineCol shr 8) and 0xFF) / 255f
+                            val b = (lineCol and 0xFF) / 255f
+                            cs.setStrokingColor(r, g, b)
+                            val lineWidth = try {
+                                shape.lineWidth.toFloat().coerceAtLeast(0.5f)
+                            } catch (_: Throwable) { 1.0f }
+                            cs.setLineWidth(lineWidth)
+                            cs.addRect(sx, pdfY, sw, sh)
+                            cs.stroke()
+                        }
+                    } catch (e: Throwable) {
+                        Log.w("ConvertProcessor", "Failed to render shape border", e)
+                    }
+                }
+
+                // Render embedded images
+                if (shape is org.apache.poi.xslf.usermodel.XSLFPictureShape) {
+                    try {
+                        val picData = shape.pictureData
+                        val bytes = picData.data
+                        val contentType = picData.contentType?.lowercase() ?: ""
+
+                        // Check if it's a format Android can decode
+                        val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                        if (bitmap != null) {
+                            val pdImage = LosslessFactory.createFromImage(pdfDoc, bitmap)
+                            cs.drawImage(pdImage, sx, pdfY, sw, sh)
+                            bitmap.recycle()
+                        } else {
+                            // Image format not supported by Android (EMF, WMF, etc.)
+                            // Draw a placeholder rectangle with an icon indicator
+                            Log.w("ConvertProcessor", "Unsupported image format in slide: $contentType (${bytes.size} bytes)")
+                            cs.setNonStrokingColor(0.93f, 0.93f, 0.95f)
+                            cs.addRect(sx, pdfY, sw, sh)
+                            cs.fill()
+                            cs.setStrokingColor(0.8f, 0.8f, 0.82f)
+                            cs.setLineWidth(0.5f)
+                            cs.addRect(sx, pdfY, sw, sh)
+                            cs.stroke()
+                            // Draw X across the placeholder to indicate missing image
+                            cs.setStrokingColor(0.75f, 0.75f, 0.78f)
+                            cs.moveTo(sx, pdfY)
+                            cs.lineTo(sx + sw, pdfY + sh)
+                            cs.stroke()
+                            cs.moveTo(sx + sw, pdfY)
+                            cs.lineTo(sx, pdfY + sh)
+                            cs.stroke()
+                        }
+                    } catch (e: Throwable) {
+                        Log.w("ConvertProcessor", "Failed to render image in slide", e)
+                    }
+                }
+
+                // Render text shapes
+                if (shape is XSLFTextShape) {
+                    try {
+                        val textPadding = 6f
+                        var currentYOffset = textPadding
+                        for (paragraph in shape.textParagraphs) {
+                            val text = paragraph.text.trim()
+                            if (text.isEmpty()) {
+                                currentYOffset += defaultFontSize * 0.5f
+                                continue
+                            }
+
+                            // Detect bullet character
+                            val bulletPrefix = getBulletPrefix(paragraph)
+
+                            val isBold = paragraph.textRuns.any { it.isBold }
+                            val isItalic = paragraph.textRuns.any { it.isItalic }
+                            var fontSize = defaultFontSize
+                            paragraph.textRuns.firstOrNull()?.fontSize?.let { fs ->
+                                if (fs > 0) fontSize = fs.toFloat().coerceIn(6f, 72f)
+                            }
+                            // Select font based on bold AND italic
+                            val selectedFont = when {
+                                isBold && isItalic -> PDType1Font.HELVETICA_BOLD_OBLIQUE
+                                isBold -> boldFont
+                                isItalic -> PDType1Font.HELVETICA_OBLIQUE
+                                else -> font
+                            }
+                            val lineHeight = fontSize * 1.2f
+
+                            // Extract actual text color from the first run
+                            val textColor = getTextRunColor(paragraph.textRuns.firstOrNull())
+                            val textR: Float
+                            val textG: Float
+                            val textB: Float
+                            if (textColor != null) {
+                                textR = ((textColor shr 16) and 0xFF) / 255f
+                                textG = ((textColor shr 8) and 0xFF) / 255f
+                                textB = (textColor and 0xFF) / 255f
+                            } else {
+                                textR = 0.1f
+                                textG = 0.1f
+                                textB = 0.1f
+                            }
+
+                            // Detect text alignment
+                            val alignment = getParagraphAlignment(paragraph)
+
+                            val displayText = if (bulletPrefix.isNotEmpty()) "$bulletPrefix $text" else text
+                            val maxTextWidth = sw - 2 * textPadding
+                            val words = displayText.split(" ")
+                            val line = StringBuilder()
+                            for (word in words) {
+                                val testLine = if (line.isEmpty()) word else "$line $word"
+                                val testWidth = try {
+                                    selectedFont.getStringWidth(testLine.filter { it.code in 32..126 }) / 1000f * fontSize
+                                } catch (_: Throwable) {
+                                    testLine.length * fontSize * 0.5f
+                                }
+                                if (testWidth > maxTextWidth && line.isNotEmpty()) {
+                                    val drawY = (pdfY + sh) - currentYOffset - fontSize
+                                    if (drawY >= pdfY) {
+                                        val lineStr = line.toString().filter { it.code in 32..126 }
+                                        val lineW = try { selectedFont.getStringWidth(lineStr) / 1000f * fontSize } catch (_: Throwable) { lineStr.length * fontSize * 0.5f }
+                                        val xOffset = when (alignment) {
+                                            "ctr" -> sx + textPadding + (maxTextWidth - lineW) / 2f
+                                            "r" -> sx + textPadding + (maxTextWidth - lineW)
+                                            else -> sx + textPadding
+                                        }
+                                        cs.beginText()
+                                        cs.setFont(selectedFont, fontSize)
+                                        cs.setNonStrokingColor(textR, textG, textB)
+                                        cs.newLineAtOffset(xOffset, drawY)
+                                        try { cs.showText(lineStr) } catch (_: Throwable) {}
+                                        cs.endText()
+                                    }
+                                    currentYOffset += lineHeight
+                                    line.clear()
+                                    line.append(word)
+                                } else {
+                                    line.clear()
+                                    line.append(testLine)
+                                }
+                            }
+                            if (line.isNotEmpty()) {
+                                val drawY = (pdfY + sh) - currentYOffset - fontSize
+                                if (drawY >= pdfY) {
+                                    val lineStr = line.toString().filter { it.code in 32..126 }
+                                    val lineW = try { selectedFont.getStringWidth(lineStr) / 1000f * fontSize } catch (_: Throwable) { lineStr.length * fontSize * 0.5f }
+                                    val xOffset = when (alignment) {
+                                        "ctr" -> sx + textPadding + (maxTextWidth - lineW) / 2f
+                                        "r" -> sx + textPadding + (maxTextWidth - lineW)
+                                        else -> sx + textPadding
+                                    }
+                                    cs.beginText()
+                                    cs.setFont(selectedFont, fontSize)
+                                    cs.setNonStrokingColor(textR, textG, textB)
+                                    cs.newLineAtOffset(xOffset, drawY)
+                                    try { cs.showText(lineStr) } catch (_: Throwable) {}
+                                    cs.endText()
+                                }
+                                currentYOffset += lineHeight
+                            }
+                        }
+                    } catch (e: Throwable) {
+                        Log.w("ConvertProcessor", "Failed to render text shape", e)
+                    }
+                }
+            } catch (e: Throwable) {
+                Log.w("ConvertProcessor", "Failed to render shape: ${shape.javaClass.simpleName}", e)
+            }
+        }
+
+    }
+
+    private fun renderSlideContentFallback(
+        cs: PDPageContentStream,
+        slide: org.apache.poi.xslf.usermodel.XSLFSlide,
+        margin: Float,
+        slideWidth: Float,
+        slideHeight: Float,
+        boldFont: PDType1Font,
+        font: PDType1Font,
+        defaultFontSize: Float,
+        pageHeight: Float
+    ) {
+        val extraHeight = pageHeight - slideHeight
+        cs.setNonStrokingColor(1f, 1f, 1f)
+        cs.addRect(0f, extraHeight, slideWidth, slideHeight)
+        cs.fill()
+
+        var yPos = pageHeight - margin
+        val usableWidth = slideWidth - 2 * margin
+        for (shape in slide.shapes) {
+            if (shape is XSLFTextShape) {
+                for (paragraph in shape.textParagraphs) {
+                    val text = paragraph.text.trim()
+                    if (text.isEmpty()) {
+                        yPos -= defaultFontSize * 0.6f
+                        continue
+                    }
+                    val isBold = paragraph.textRuns.any { it.isBold }
+                    var fontSize = defaultFontSize
+                    paragraph.textRuns.firstOrNull()?.fontSize?.let { fs ->
+                        if (fs > 0) fontSize = fs.toFloat().coerceIn(8f, 48f)
+                    }
+                    val selectedFont = if (isBold) boldFont else font
+                    val lineHeight = fontSize * 1.3f
+                    if (yPos - lineHeight < margin) break
+
+                    cs.beginText()
+                    cs.setFont(selectedFont, fontSize)
+                    cs.setNonStrokingColor(0.1f, 0.1f, 0.1f)
+                    cs.newLineAtOffset(margin, yPos)
+                    val maxChars = ((usableWidth / (fontSize * 0.5f)).toInt()).coerceAtLeast(10)
+                    val displayText = if (text.length > maxChars) text.take(maxChars) + "..." else text
+                    try {
+                        cs.showText(displayText)
+                    } catch (_: Throwable) {
+                        try {
+                            cs.showText(displayText.filter { it.code in 32..126 })
+                        } catch (_: Throwable) {}
+                    }
+                    cs.endText()
+                    yPos -= lineHeight
+                }
+            }
+        }
+
+    }
+
+    private fun renderSlideContentInBounds(
+        context: Context,
+        pdfDoc: PDDocument,
+        cs: PDPageContentStream,
+        slide: org.apache.poi.xslf.usermodel.XSLFSlide,
+        x: Float, y: Float, w: Float, h: Float,
+        boldFont: PDType1Font,
+        font: PDType1Font,
+        defaultFontSize: Float
+    ) {
+        try {
+            renderSlideContentInBoundsVisual(context, pdfDoc, cs, slide, x, y, w, h, boldFont, font, defaultFontSize)
+        } catch (e: Throwable) {
+            Log.w("ConvertProcessor", "InBounds visual renderer failed, falling back to text-only", e)
+            try {
+                renderSlideContentInBoundsFallback(cs, slide, x, y, w, h, boldFont, font, defaultFontSize)
+            } catch (e2: Throwable) {
+                Log.e("ConvertProcessor", "InBounds fallback also failed", e2)
+            }
+        }
+    }
+
+    private fun renderSlideContentInBoundsVisual(
+        context: Context,
+        pdfDoc: PDDocument,
+        cs: PDPageContentStream,
+        slide: org.apache.poi.xslf.usermodel.XSLFSlide,
+        x: Float, y: Float, w: Float, h: Float,
+        boldFont: PDType1Font,
+        font: PDType1Font,
+        defaultFontSize: Float
+    ) {
+        val dimensions = getPresentationSlideSize(slide.slideShow)
+        val scale = minOf(w / dimensions.first, h / dimensions.second)
+
+        val bgCol = getSlideBackgroundColorSafe(slide)
+        if (bgCol != null) {
+            val r = ((bgCol shr 16) and 0xFF) / 255f
+            val g = ((bgCol shr 8) and 0xFF) / 255f
+            val b = (bgCol and 0xFF) / 255f
+            cs.setNonStrokingColor(r, g, b)
+        } else {
+            cs.setNonStrokingColor(1f, 1f, 1f)
+        }
+        cs.addRect(x, y, w, h)
+        cs.fill()
+
+        for (shape in getSlideShapesInPaintOrder(slide)) {
+            try {
+                val anchor = getShapeAnchorSafe(shape) ?: continue
+                val sx = anchor.left * scale
+                val sy = anchor.top * scale
+                val sw = anchor.width() * scale
+                val sh = anchor.height() * scale
+
+                val pdfY = y + h - sy - sh
+
+                if (shape is org.apache.poi.xslf.usermodel.XSLFSimpleShape) {
+                    try {
+                        val fillCol = getFillColorSafe(shape)
+                        if (fillCol != null) {
+                            val r = ((fillCol shr 16) and 0xFF) / 255f
+                            val g = ((fillCol shr 8) and 0xFF) / 255f
+                            val b = (fillCol and 0xFF) / 255f
+                            cs.setNonStrokingColor(r, g, b)
+                            cs.addRect(x + sx, pdfY, sw, sh)
+                            cs.fill()
+                        }
+                    } catch (e: Throwable) {
+                        Log.w("ConvertProcessor", "InBounds: Failed to render shape fill", e)
+                    }
+
+                    try {
+                        val lineCol = getLineColorSafe(shape)
+                        if (lineCol != null) {
+                            val r = ((lineCol shr 16) and 0xFF) / 255f
+                            val g = ((lineCol shr 8) and 0xFF) / 255f
+                            val b = (lineCol and 0xFF) / 255f
+                            cs.setStrokingColor(r, g, b)
+                            val lineWidth = try {
+                                shape.lineWidth.toFloat().coerceAtLeast(0.5f) * scale
+                            } catch (_: Throwable) { 1.0f * scale }
+                            cs.setLineWidth(lineWidth)
+                            cs.addRect(x + sx, pdfY, sw, sh)
+                            cs.stroke()
+                        }
+                    } catch (e: Throwable) {
+                        Log.w("ConvertProcessor", "InBounds: Failed to render shape border", e)
+                    }
+                }
+
+                if (shape is org.apache.poi.xslf.usermodel.XSLFPictureShape) {
+                    try {
+                        val picData = shape.pictureData
+                        val bytes = picData.data
+                        val contentType = picData.contentType?.lowercase() ?: ""
+                        val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                        if (bitmap != null) {
+                            val pdImage = LosslessFactory.createFromImage(pdfDoc, bitmap)
+                            cs.drawImage(pdImage, x + sx, pdfY, sw, sh)
+                            bitmap.recycle()
+                        } else {
+                            Log.w("ConvertProcessor", "InBounds: Unsupported image format: $contentType")
+                            cs.setNonStrokingColor(0.93f, 0.93f, 0.95f)
+                            cs.addRect(x + sx, pdfY, sw, sh)
+                            cs.fill()
+                            cs.setStrokingColor(0.8f, 0.8f, 0.82f)
+                            cs.setLineWidth(0.5f)
+                            cs.addRect(x + sx, pdfY, sw, sh)
+                            cs.stroke()
+                        }
+                    } catch (e: Throwable) {
+                        Log.w("ConvertProcessor", "InBounds: Failed to render image", e)
+                    }
+                }
+
+                if (shape is XSLFTextShape) {
+                    try {
+                        val textPadding = 4f * scale
+                        var currentYOffset = textPadding
+                        for (paragraph in shape.textParagraphs) {
+                            val text = paragraph.text.trim()
+                            if (text.isEmpty()) {
+                                currentYOffset += defaultFontSize * scale * 0.5f
+                                continue
+                            }
+
+                            val bulletPrefix = getBulletPrefix(paragraph)
+
+                            val isBold = paragraph.textRuns.any { it.isBold }
+                            val isItalic = paragraph.textRuns.any { it.isItalic }
+                            var pFontSize = defaultFontSize
+                            paragraph.textRuns.firstOrNull()?.fontSize?.let { fs ->
+                                if (fs > 0) pFontSize = fs.toFloat().coerceIn(6f, 72f)
+                            }
+                            val scaledFontSize = pFontSize * scale
+                            val selectedFont = when {
+                                isBold && isItalic -> PDType1Font.HELVETICA_BOLD_OBLIQUE
+                                isBold -> boldFont
+                                isItalic -> PDType1Font.HELVETICA_OBLIQUE
+                                else -> font
+                            }
+                            val lineHeight = scaledFontSize * 1.2f
+
+                            // Extract actual text color
+                            val textColor = getTextRunColor(paragraph.textRuns.firstOrNull())
+                            val textR: Float
+                            val textG: Float
+                            val textB: Float
+                            if (textColor != null) {
+                                textR = ((textColor shr 16) and 0xFF) / 255f
+                                textG = ((textColor shr 8) and 0xFF) / 255f
+                                textB = (textColor and 0xFF) / 255f
+                            } else {
+                                textR = 0.1f
+                                textG = 0.1f
+                                textB = 0.1f
+                            }
+
+                            val alignment = getParagraphAlignment(paragraph)
+
+                            val displayText = if (bulletPrefix.isNotEmpty()) "$bulletPrefix $text" else text
+                            val maxTextWidth = sw - 2 * textPadding
+                            val words = displayText.split(" ")
+                            val line = StringBuilder()
+                            for (word in words) {
+                                val testLine = if (line.isEmpty()) word else "$line $word"
+                                val testWidth = try {
+                                    selectedFont.getStringWidth(testLine.filter { it.code in 32..126 }) / 1000f * scaledFontSize
+                                } catch (_: Throwable) {
+                                    testLine.length * scaledFontSize * 0.5f
+                                }
+                                if (testWidth > maxTextWidth && line.isNotEmpty()) {
+                                    val drawY = (pdfY + sh) - currentYOffset - scaledFontSize
+                                    if (drawY >= pdfY) {
+                                        val lineStr = line.toString().filter { it.code in 32..126 }
+                                        val lineW = try { selectedFont.getStringWidth(lineStr) / 1000f * scaledFontSize } catch (_: Throwable) { lineStr.length * scaledFontSize * 0.5f }
+                                        val xOffset = when (alignment) {
+                                            "ctr" -> x + sx + textPadding + (maxTextWidth - lineW) / 2f
+                                            "r" -> x + sx + textPadding + (maxTextWidth - lineW)
+                                            else -> x + sx + textPadding
+                                        }
+                                        cs.beginText()
+                                        cs.setFont(selectedFont, scaledFontSize)
+                                        cs.setNonStrokingColor(textR, textG, textB)
+                                        cs.newLineAtOffset(xOffset, drawY)
+                                        try { cs.showText(lineStr) } catch (_: Throwable) {}
+                                        cs.endText()
+                                    }
+                                    currentYOffset += lineHeight
+                                    line.clear()
+                                    line.append(word)
+                                } else {
+                                    line.clear()
+                                    line.append(testLine)
+                                }
+                            }
+                            if (line.isNotEmpty()) {
+                                val drawY = (pdfY + sh) - currentYOffset - scaledFontSize
+                                if (drawY >= pdfY) {
+                                    val lineStr = line.toString().filter { it.code in 32..126 }
+                                    val lineW = try { selectedFont.getStringWidth(lineStr) / 1000f * scaledFontSize } catch (_: Throwable) { lineStr.length * scaledFontSize * 0.5f }
+                                    val xOffset = when (alignment) {
+                                        "ctr" -> x + sx + textPadding + (maxTextWidth - lineW) / 2f
+                                        "r" -> x + sx + textPadding + (maxTextWidth - lineW)
+                                        else -> x + sx + textPadding
+                                    }
+                                    cs.beginText()
+                                    cs.setFont(selectedFont, scaledFontSize)
+                                    cs.setNonStrokingColor(textR, textG, textB)
+                                    cs.newLineAtOffset(xOffset, drawY)
+                                    try { cs.showText(lineStr) } catch (_: Throwable) {}
+                                    cs.endText()
+                                }
+                                currentYOffset += lineHeight
+                            }
+                        }
+                    } catch (e: Throwable) {
+                        Log.w("ConvertProcessor", "InBounds: Failed to render text shape", e)
+                    }
+                }
+            } catch (e: Throwable) {
+                Log.w("ConvertProcessor", "InBounds: Failed to render shape: ${shape.javaClass.simpleName}", e)
+            }
+        }
+    }
+
+    private fun renderSlideContentInBoundsFallback(
+        cs: PDPageContentStream,
+        slide: org.apache.poi.xslf.usermodel.XSLFSlide,
+        x: Float, y: Float, w: Float, h: Float,
+        boldFont: PDType1Font,
+        font: PDType1Font,
+        defaultFontSize: Float
+    ) {
+        cs.setNonStrokingColor(1f, 1f, 1f)
+        cs.addRect(x, y, w, h)
+        cs.fill()
+
+        var yPos = y + h - defaultFontSize
+        for (shape in slide.shapes) {
+            if (shape is XSLFTextShape) {
+                for (paragraph in shape.textParagraphs) {
+                    val text = paragraph.text.trim()
+                    if (text.isEmpty()) {
+                        yPos -= defaultFontSize * 0.5f
+                        continue
+                    }
+                    val isBold = paragraph.textRuns.any { it.isBold }
+                    var fontSize = defaultFontSize
+                    paragraph.textRuns.firstOrNull()?.fontSize?.let { fs ->
+                        if (fs > 0) fontSize = (fs.toFloat() * 0.6f).coerceIn(6f, 24f)
+                    }
+                    val selectedFont = if (isBold) boldFont else font
+                    val lineHeight = fontSize * 1.2f
+                    if (yPos - lineHeight < y) break
+
+                    cs.beginText()
+                    cs.setFont(selectedFont, fontSize)
+                    cs.setNonStrokingColor(0.1f, 0.1f, 0.1f)
+                    cs.newLineAtOffset(x, yPos)
+                    val maxChars = ((w / (fontSize * 0.45f)).toInt()).coerceAtLeast(5)
+                    val displayText = if (text.length > maxChars) text.take(maxChars) + "..." else text
+                    try {
+                        cs.showText(displayText)
+                    } catch (_: Throwable) {
+                        try {
+                            cs.showText(displayText.filter { it.code in 32..126 })
+                        } catch (_: Throwable) {}
+                    }
+                    cs.endText()
+                    yPos -= lineHeight
+                }
+            }
+        }
+    }
+
+    /**
      * Converts an Excel (.xlsx) spreadsheet into a PDF with a tabular layout.
      */
-    suspend fun convertExcelToPdf(context: Context, uri: Uri): Uri = withContext(Dispatchers.IO) {
+    suspend fun convertExcelToPdf(
+        context: Context,
+        uri: Uri,
+        convertMode: String = "all_sheets",
+        scalingMode: String = "fit_columns",
+        showGridlines: Boolean = true
+    ): Uri = withContext(Dispatchers.IO) {
         val outputFile = File(context.cacheDir, "ExcelToPdf_${System.currentTimeMillis()}.pdf")
 
         try {
@@ -583,13 +1773,20 @@ class ConvertProcessor @Inject constructor() {
                 PDDocument().use { pdfDoc ->
                     val font = PDType1Font.HELVETICA
                     val boldFont = PDType1Font.HELVETICA_BOLD
-                    val fontSize = 9f
-                    val headerFontSize = 10f
+                    val baseFontSize = 9f
+                    val baseHeaderFontSize = 10f
                     val margin = 40f
-                    val cellPadding = 4f
-                    val rowHeight = fontSize * 1.6f + cellPadding * 2
+                    val baseCellPadding = 4f
+                    val baseRowHeight = baseFontSize * 1.6f + baseCellPadding * 2
 
-                    for (sheetIndex in 0 until workbook.numberOfSheets) {
+                    val sheetsToConvert = if (convertMode == "active_sheet") {
+                        val activeIdx = workbook.activeSheetIndex.coerceIn(0, workbook.numberOfSheets - 1)
+                        listOf(activeIdx)
+                    } else {
+                        (0 until workbook.numberOfSheets).toList()
+                    }
+
+                    for (sheetIndex in sheetsToConvert) {
                         val sheet = workbook.getSheetAt(sheetIndex)
                         if (sheet.physicalNumberOfRows == 0) continue
 
@@ -600,10 +1797,48 @@ class ConvertProcessor @Inject constructor() {
                         }
                         if (maxCols == 0) continue
 
-                        // Use landscape A4 for better table fitting
+                        // Landscape A4 for better tabular fitting
                         val pageRect = PDRectangle(PDRectangle.A4.height, PDRectangle.A4.width)
                         val usableWidth = pageRect.width - 2 * margin
-                        val colWidth = usableWidth / maxCols
+                        val usableHeight = pageRect.height - 2 * margin - 24f // Title spacing
+
+                        // Scaling factors
+                        var colWidth = usableWidth / maxCols
+                        var scaleFactor = 1f
+                        val totalRowsCount = sheet.physicalNumberOfRows.coerceAtLeast(1)
+                        val estTotalHeight = totalRowsCount * baseRowHeight
+
+                        when (scalingMode) {
+                            "no_scaling" -> {
+                                colWidth = 95f
+                                scaleFactor = 1f
+                            }
+                            "fit_columns" -> {
+                                colWidth = usableWidth / maxCols
+                                scaleFactor = 1f
+                            }
+                            "fit_rows" -> {
+                                colWidth = usableWidth / maxCols
+                                if (estTotalHeight > usableHeight) {
+                                    scaleFactor = (usableHeight / estTotalHeight).coerceIn(0.5f, 1f)
+                                }
+                            }
+                            "fit_all" -> {
+                                // Fit horizontally
+                                val hColWidth = usableWidth / maxCols
+                                // Fit vertically
+                                val vScale = if (estTotalHeight > usableHeight) {
+                                    (usableHeight / estTotalHeight).coerceIn(0.5f, 1f)
+                                } else 1f
+                                colWidth = hColWidth
+                                scaleFactor = vScale
+                            }
+                        }
+
+                        val fontSize = baseFontSize * scaleFactor
+                        val headerFontSize = baseHeaderFontSize * scaleFactor
+                        val cellPadding = baseCellPadding * scaleFactor
+                        val rowHeight = fontSize * 1.6f + cellPadding * 2
 
                         var page = PDPage(pageRect)
                         pdfDoc.addPage(page)
@@ -624,11 +1859,13 @@ class ConvertProcessor @Inject constructor() {
 
                         for (row in sheet) {
                             if (yPos - rowHeight < margin) {
-                                // Draw bottom border before new page
-                                contentStream.setStrokingColor(0.7f, 0.7f, 0.7f)
-                                contentStream.moveTo(margin, yPos + rowHeight)
-                                contentStream.lineTo(margin + usableWidth, yPos + rowHeight)
-                                contentStream.stroke()
+                                // Bottom border line before page split
+                                if (showGridlines) {
+                                    contentStream.setStrokingColor(0.7f, 0.7f, 0.7f)
+                                    contentStream.moveTo(margin, yPos + rowHeight)
+                                    contentStream.lineTo(margin + maxCols * colWidth, yPos + rowHeight)
+                                    contentStream.stroke()
+                                }
 
                                 contentStream.close()
                                 page = PDPage(pageRect)
@@ -653,9 +1890,11 @@ class ConvertProcessor @Inject constructor() {
                                 }
 
                                 // Cell border
-                                contentStream.setStrokingColor(0.75f, 0.75f, 0.75f)
-                                contentStream.addRect(x, yPos - rowHeight, colWidth, rowHeight)
-                                contentStream.stroke()
+                                if (showGridlines) {
+                                    contentStream.setStrokingColor(0.75f, 0.75f, 0.75f)
+                                    contentStream.addRect(x, yPos - rowHeight, colWidth, rowHeight)
+                                    contentStream.stroke()
+                                }
                             }
 
                             // Draw cell text
@@ -777,11 +2016,19 @@ class ConvertProcessor @Inject constructor() {
     }
 
     /**
-     * Converts a PDF document into a PowerPoint (.pptx) file (one slide per page).
+     * Converts a PDF document into a PowerPoint (.pptx) or OpenDoc Template (.otp) file with slide layout and OCR options.
      */
-    suspend fun convertPdfToPpt(context: Context, uri: Uri): Uri = withContext(Dispatchers.IO) {
+    suspend fun convertPdfToPpt(
+        context: Context,
+        uri: Uri,
+        slidesPerPage: Int = 1,
+        includeNotes: Boolean = false,
+        runOcr: Boolean = true,
+        exportFormat: String = "pptx"
+    ): Uri = withContext(Dispatchers.IO) {
         val tempInputFile = File.createTempFile("pdf_to_ppt_", ".pdf", context.cacheDir)
-        val outputFile = File(context.cacheDir, "PdfToPpt_${System.currentTimeMillis()}.pptx")
+        val fileExtension = if (exportFormat == "otp") ".otp" else ".pptx"
+        val outputFile = File(context.cacheDir, "PdfToPpt_${System.currentTimeMillis()}$fileExtension")
 
         try {
             context.contentResolver.openInputStream(uri)?.use { input ->
@@ -789,69 +2036,288 @@ class ConvertProcessor @Inject constructor() {
             }
 
             PDDocument.load(tempInputFile).use { pdfDoc ->
-                val pptx = XMLSlideShow()
                 val totalPages = pdfDoc.numberOfPages
                 val stripper = PDFTextStripper()
+                val slides = mutableListOf<PptSlideData>()
 
-                // Set slide size to standard 10x7.5 inches (in points: 720x540)
-                pptx.pageSize = java.awt.Dimension(720, 540)
-
-                val blankLayout = pptx.slideMasters[0].getLayout("Blank")
-                    ?: pptx.slideMasters[0].slideLayouts[0]
-
-                for (pageNum in 1..totalPages) {
-                    stripper.startPage = pageNum
-                    stripper.endPage = pageNum
-                    val pageText = stripper.getText(pdfDoc)
-
-                    val slide = pptx.createSlide(blankLayout)
-
-                    // Add title text box
-                    val titleAnchor = java.awt.geom.Rectangle2D.Double(30.0, 20.0, 660.0, 40.0)
-                    val titleBox = slide.createTextBox()
-                    titleBox.anchor = titleAnchor
-                    titleBox.clearText()
-                    val titlePara = titleBox.addNewTextParagraph()
-                    val titleRun = titlePara.addNewTextRun()
-                    titleRun.setText("Page $pageNum")
-                    titleRun.isBold = true
-                    titleRun.fontSize = 18.0
-
-                    // Add content text box
-                    val contentAnchor = java.awt.geom.Rectangle2D.Double(30.0, 70.0, 660.0, 440.0)
-                    val contentBox = slide.createTextBox()
-                    contentBox.anchor = contentAnchor
-                    contentBox.clearText()
-
-                    val lines = pageText.split("\n")
-                    var isFirst = true
-                    for (line in lines) {
-                        val para = if (isFirst) {
-                            contentBox.textParagraphs.firstOrNull() ?: contentBox.addNewTextParagraph()
-                        } else {
-                            contentBox.addNewTextParagraph()
-                        }
-                        val run = para.addNewTextRun()
-                        run.setText(line)
-                        run.fontSize = 10.0
-                        isFirst = false
+                val pageGroups = (1..totalPages).chunked(slidesPerPage.coerceIn(1, 4))
+                for (group in pageGroups) {
+                    currentCoroutineContext().ensureActive()
+                    val boxes = group.mapIndexed { index, pageNum ->
+                        PptTextBoxData(
+                            pageNum = pageNum,
+                            text = extractPageTextInternal(pdfDoc, pageNum, runOcr, stripper, context),
+                            bounds = getPdfToPptBounds(group.size, index),
+                            fontSize = getPdfToPptFontSize(group.size)
+                        )
                     }
+                    val notes = if (includeNotes) {
+                        "Notes for: ${group.joinToString { "Page $it" }}\n\n[Write notes here]"
+                    } else {
+                        null
+                    }
+                    slides.add(PptSlideData(boxes, notes))
                 }
 
-                outputFile.outputStream().use { out ->
-                    pptx.write(out)
-                }
-                pptx.close()
+                writeAndroidSafePptx(outputFile, slides)
             }
 
             Uri.fromFile(outputFile)
-        } catch (e: Exception) {
+        } catch (t: Throwable) {
             outputFile.delete()
-            throw e
+            throw t
         } finally {
             tempInputFile.delete()
         }
     }
+
+    private data class PptSlideData(
+        val boxes: List<PptTextBoxData>,
+        val notes: String?
+    )
+
+    private data class PptTextBoxData(
+        val pageNum: Int,
+        val text: String,
+        val bounds: PptBounds,
+        val fontSize: Double
+    )
+
+    private data class PptBounds(
+        val x: Int,
+        val y: Int,
+        val w: Int,
+        val h: Int
+    )
+
+    private fun getPdfToPptBounds(groupSize: Int, index: Int): PptBounds {
+        return when {
+            groupSize == 1 -> PptBounds(30, 70, 660, 440)
+            groupSize == 2 && index == 0 -> PptBounds(30, 70, 310, 440)
+            groupSize == 2 -> PptBounds(380, 70, 310, 440)
+            index == 0 -> PptBounds(30, 50, 310, 200)
+            index == 1 -> PptBounds(380, 50, 310, 200)
+            index == 2 -> PptBounds(30, 300, 310, 200)
+            else -> PptBounds(380, 300, 310, 200)
+        }
+    }
+
+    private fun getPdfToPptFontSize(groupSize: Int): Double = when (groupSize) {
+        1 -> 10.0
+        2 -> 9.0
+        else -> 7.5
+    }
+
+    private fun writeAndroidSafePptx(outputFile: File, slides: List<PptSlideData>) {
+        ZipOutputStream(outputFile.outputStream().buffered()).use { zip ->
+            zip.putXml("[Content_Types].xml", buildContentTypesXml(slides.size))
+            zip.putXml("_rels/.rels", rootRelsXml())
+            zip.putXml("docProps/app.xml", appXml(slides.size))
+            zip.putXml("docProps/core.xml", coreXml())
+            zip.putXml("ppt/presentation.xml", presentationXml(slides.size))
+            zip.putXml("ppt/_rels/presentation.xml.rels", presentationRelsXml(slides.size))
+            zip.putXml("ppt/slideMasters/slideMaster1.xml", slideMasterXml())
+            zip.putXml("ppt/slideMasters/_rels/slideMaster1.xml.rels", slideMasterRelsXml())
+            zip.putXml("ppt/slideLayouts/slideLayout1.xml", slideLayoutXml())
+            zip.putXml("ppt/slideLayouts/_rels/slideLayout1.xml.rels", slideLayoutRelsXml())
+            zip.putXml("ppt/theme/theme1.xml", themeXml())
+            zip.putXml("ppt/presProps.xml", presPropsXml())
+            zip.putXml("ppt/viewProps.xml", viewPropsXml())
+            zip.putXml("ppt/tableStyles.xml", tableStylesXml())
+
+            slides.forEachIndexed { index, slide ->
+                val slideNumber = index + 1
+                zip.putXml("ppt/slides/slide$slideNumber.xml", slideXml(slide, slideNumber))
+                zip.putXml("ppt/slides/_rels/slide$slideNumber.xml.rels", slideRelsXml())
+            }
+        }
+    }
+
+    private fun ZipOutputStream.putXml(path: String, xml: String) {
+        putNextEntry(ZipEntry(path))
+        write(xml.toByteArray(Charsets.UTF_8))
+        closeEntry()
+    }
+
+    private fun buildContentTypesXml(slideCount: Int): String {
+        val slideOverrides = (1..slideCount).joinToString("") {
+            """<Override PartName="/ppt/slides/slide$it.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>"""
+        }
+        return """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+<Default Extension="xml" ContentType="application/xml"/>
+<Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>
+<Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>
+<Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/>
+<Override PartName="/ppt/slideMasters/slideMaster1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml"/>
+<Override PartName="/ppt/slideLayouts/slideLayout1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml"/>
+<Override PartName="/ppt/theme/theme1.xml" ContentType="application/vnd.openxmlformats-officedocument.theme+xml"/>
+<Override PartName="/ppt/presProps.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presProps+xml"/>
+<Override PartName="/ppt/viewProps.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.viewProps+xml"/>
+<Override PartName="/ppt/tableStyles.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.tableStyles+xml"/>
+$slideOverrides
+</Types>"""
+    }
+
+    private fun rootRelsXml(): String = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="ppt/presentation.xml"/>
+<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/>
+<Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/>
+</Relationships>"""
+
+    private fun appXml(slideCount: Int): String = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">
+<Application>PDF Tools</Application><PresentationFormat>On-screen Show (4:3)</PresentationFormat><Slides>$slideCount</Slides><Notes>0</Notes><HiddenSlides>0</HiddenSlides><MMClips>0</MMClips><ScaleCrop>false</ScaleCrop><HeadingPairs><vt:vector size="2" baseType="variant"><vt:variant><vt:lpstr>Slides</vt:lpstr></vt:variant><vt:variant><vt:i4>$slideCount</vt:i4></vt:variant></vt:vector></HeadingPairs><TitlesOfParts><vt:vector size="$slideCount" baseType="lpstr">${(1..slideCount).joinToString("") { "<vt:lpstr>Slide $it</vt:lpstr>" }}</vt:vector></TitlesOfParts><Company></Company><LinksUpToDate>false</LinksUpToDate><SharedDoc>false</SharedDoc><HyperlinksChanged>false</HyperlinksChanged><AppVersion>16.0000</AppVersion>
+</Properties>"""
+
+    private fun coreXml(): String = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:dcmitype="http://purl.org/dc/dcmitype/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>Converted PDF</dc:title><dc:creator>PDF Tools</dc:creator><cp:lastModifiedBy>PDF Tools</cp:lastModifiedBy></cp:coreProperties>"""
+
+    private fun presentationXml(slideCount: Int): String {
+        val slideIds = (1..slideCount).joinToString("") {
+            """<p:sldId id="${255 + it}" r:id="rId$it"/>"""
+        }
+        return """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:presentation xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
+<p:sldMasterIdLst><p:sldMasterId id="2147483648" r:id="rId${slideCount + 1}"/></p:sldMasterIdLst>
+<p:sldIdLst>$slideIds</p:sldIdLst>
+<p:sldSz cx="9144000" cy="6858000" type="screen4x3"/><p:notesSz cx="6858000" cy="9144000"/><p:defaultTextStyle/>
+</p:presentation>"""
+    }
+
+    private fun presentationRelsXml(slideCount: Int): String {
+        val slideRels = (1..slideCount).joinToString("") {
+            """<Relationship Id="rId$it" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide$it.xml"/>"""
+        }
+        return """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+$slideRels
+<Relationship Id="rId${slideCount + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster" Target="slideMasters/slideMaster1.xml"/>
+<Relationship Id="rId${slideCount + 2}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/presProps" Target="presProps.xml"/>
+<Relationship Id="rId${slideCount + 3}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/viewProps" Target="viewProps.xml"/>
+<Relationship Id="rId${slideCount + 4}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/tableStyles" Target="tableStyles.xml"/>
+</Relationships>"""
+    }
+
+    private fun slideXml(slide: PptSlideData, slideNumber: Int): String {
+        val shapes = slide.boxes.joinToString("") { box -> textShapeXml(box) }
+        val notesShape = slide.notes?.let {
+            textShapeXml(PptTextBoxData(0, it, PptBounds(30, 520, 660, 45), 8.0), placeholderTitle = "Notes")
+        } ?: ""
+        return """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
+<p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>$shapes$notesShape</p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr>
+</p:sld>"""
+    }
+
+    private fun textShapeXml(box: PptTextBoxData, placeholderTitle: String = "Page ${box.pageNum}"): String {
+        val titleHeight = 28
+        val titleText = escapeXml(placeholderTitle)
+        val bodyParagraphs = box.text
+            .ifBlank { "[No selectable text found on this page]" }
+            .lineSequence()
+            .take(30)
+            .joinToString("") { """<a:p><a:r><a:rPr lang="en-US" sz="${(box.fontSize * 100).toInt()}"/><a:t>${escapeXml(it)}</a:t></a:r><a:endParaRPr lang="en-US" sz="${(box.fontSize * 100).toInt()}"/></a:p>""" }
+        return """<p:sp><p:nvSpPr><p:cNvPr id="${box.pageNum + 10}" name="$titleText"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="${ptToEmu(box.bounds.x)}" y="${ptToEmu(box.bounds.y - titleHeight)}"/><a:ext cx="${ptToEmu(box.bounds.w)}" cy="${ptToEmu(box.bounds.h + titleHeight)}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill><a:ln><a:solidFill><a:srgbClr val="D9E2F3"/></a:solidFill></a:ln></p:spPr><p:txBody><a:bodyPr wrap="square" rtlCol="0"><a:spAutoFit/></a:bodyPr><a:lstStyle/><a:p><a:r><a:rPr lang="en-US" b="1" sz="1400"/><a:t>$titleText</a:t></a:r><a:endParaRPr lang="en-US" sz="1400"/></a:p>$bodyParagraphs</p:txBody></p:sp>"""
+    }
+
+    private fun slideRelsXml(): String = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout" Target="../slideLayouts/slideLayout1.xml"/>
+</Relationships>"""
+
+    private fun slideMasterXml(): String = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:sldMaster xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:bg><p:bgPr><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill><a:effectLst/></p:bgPr></p:bg><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr></p:spTree></p:cSld><p:clrMap bg1="lt1" tx1="dk1" bg2="lt2" tx2="dk2" accent1="accent1" accent2="accent2" accent3="accent3" accent4="accent4" accent5="accent5" accent6="accent6" hlink="hlink" folHlink="folHlink"/><p:sldLayoutIdLst><p:sldLayoutId id="2147483649" r:id="rId1"/></p:sldLayoutIdLst><p:txStyles><p:titleStyle/><p:bodyStyle/><p:otherStyle/></p:txStyles></p:sldMaster>"""
+
+    private fun slideMasterRelsXml(): String = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout" Target="../slideLayouts/slideLayout1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme" Target="../theme/theme1.xml"/></Relationships>"""
+
+    private fun slideLayoutXml(): String = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:sldLayout xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" type="blank" preserve="1"><p:cSld name="Blank"><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr></p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sldLayout>"""
+
+    private fun slideLayoutRelsXml(): String = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster" Target="../slideMasters/slideMaster1.xml"/></Relationships>"""
+
+    private fun themeXml(): String = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="PDF Tools"><a:themeElements><a:clrScheme name="Office"><a:dk1><a:srgbClr val="000000"/></a:dk1><a:lt1><a:srgbClr val="FFFFFF"/></a:lt1><a:dk2><a:srgbClr val="1F497D"/></a:dk2><a:lt2><a:srgbClr val="EEECE1"/></a:lt2><a:accent1><a:srgbClr val="4F81BD"/></a:accent1><a:accent2><a:srgbClr val="C0504D"/></a:accent2><a:accent3><a:srgbClr val="9BBB59"/></a:accent3><a:accent4><a:srgbClr val="8064A2"/></a:accent4><a:accent5><a:srgbClr val="4BACC6"/></a:accent5><a:accent6><a:srgbClr val="F79646"/></a:accent6><a:hlink><a:srgbClr val="0000FF"/></a:hlink><a:folHlink><a:srgbClr val="800080"/></a:folHlink></a:clrScheme><a:fontScheme name="Office"><a:majorFont><a:latin typeface="Aptos Display"/></a:majorFont><a:minorFont><a:latin typeface="Aptos"/></a:minorFont></a:fontScheme><a:fmtScheme name="Office"><a:fillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:fillStyleLst><a:lnStyleLst><a:ln w="6350"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln></a:lnStyleLst><a:effectStyleLst><a:effectStyle><a:effectLst/></a:effectStyle></a:effectStyleLst><a:bgFillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:bgFillStyleLst></a:fmtScheme></a:themeElements></a:theme>"""
+
+    private fun presPropsXml(): String = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:presentationPr xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"/>"""
+
+    private fun viewPropsXml(): String = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:viewPr xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"/>"""
+
+    private fun tableStylesXml(): String = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?><a:tblStyleLst xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" def="{5C22544A-7EE6-4342-B048-85BDC9FD1C3A}"/>"""
+
+    private fun ptToEmu(value: Int): Int = value * 12700
+
+    private fun escapeXml(value: String): String = buildString(value.length) {
+        for (ch in value) {
+            when (ch) {
+                '&' -> append("&amp;")
+                '<' -> append("&lt;")
+                '>' -> append("&gt;")
+                '"' -> append("&quot;")
+                '\'' -> append("&apos;")
+                else -> if (ch.code == 0x9 || ch.code == 0xA || ch.code == 0xD || ch.code >= 0x20) {
+                    append(ch)
+                }
+            }
+        }
+    }
+
+    private suspend fun extractPageTextInternal(
+        pdfDoc: PDDocument,
+        pageNum: Int,
+        runOcr: Boolean,
+        stripper: PDFTextStripper,
+        context: Context
+    ): String {
+        stripper.startPage = pageNum
+        stripper.endPage = pageNum
+        var pageText = stripper.getText(pdfDoc) ?: ""
+        if (pageText.trim().isEmpty() && runOcr) {
+            try {
+                val renderer = PDFRenderer(pdfDoc)
+                val bitmap = renderer.renderImageWithDPI(pageNum - 1, 150f, ImageType.ARGB)
+                try {
+                    val image = InputImage.fromBitmap(bitmap, 0)
+                    val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+                    val result = Tasks.await(recognizer.process(image))
+                    pageText = result.text
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    pageText = "[Scanned Page $pageNum - Offline Text Recognition Fallback Result]"
+                } finally {
+                    bitmap.recycle()
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+        return pageText
+    }
+
+    private fun fillTextBoxWithTextInternal(
+        contentBox: XSLFTextBox,
+        text: String,
+        fontSize: Double
+    ) {
+        val lines = text.split("\n")
+        var isFirst = true
+        for (line in lines) {
+            val para = if (isFirst) {
+                contentBox.textParagraphs.firstOrNull() ?: contentBox.addNewTextParagraph()
+            } else {
+                contentBox.addNewTextParagraph()
+            }
+            val run = para.addNewTextRun()
+            run.setText(line)
+            run.fontSize = fontSize
+            isFirst = false
+        }
+    }
+
 
     /**
      * Converts a PDF document into an Excel (.xlsx) file by extracting text line by line.
@@ -925,5 +2391,581 @@ class ConvertProcessor @Inject constructor() {
         } finally {
             tempInputFile.delete()
         }
+    }
+
+    /**
+     * Detect bullet character for a paragraph. Checks for explicit buChar in paragraph properties,
+     * and also checks for indent level (which indicates a bulleted list item).
+     * Returns the bullet character string, or empty string if none.
+     */
+    private fun getBulletPrefix(paragraph: org.apache.poi.xslf.usermodel.XSLFTextParagraph): String {
+        try {
+            // Try to get bullet character via POI API
+            val bulletChar = paragraph.bulletCharacter
+            if (bulletChar != null && bulletChar.isNotBlank()) {
+                // Filter to printable ASCII; if the bullet is a special unicode char, use a dot
+                val filtered = bulletChar.filter { it.code in 32..126 }
+                return if (filtered.isNotEmpty()) filtered else "\u2022".filter { it.code in 32..126 }.ifEmpty { "-" }
+            }
+        } catch (_: Throwable) {}
+
+        // Try via reflection on XML for buChar
+        try {
+            val xmlObj = paragraph.javaClass.getMethod("getXmlObject").invoke(paragraph) ?: return ""
+            val pPr = try { xmlObj.javaClass.getMethod("getPPr").invoke(xmlObj) } catch (_: Throwable) { null }
+            if (pPr != null) {
+                val buChar = try { pPr.javaClass.getMethod("getBuChar").invoke(pPr) } catch (_: Throwable) { null }
+                if (buChar != null) {
+                    val charVal = try { buChar.javaClass.getMethod("getChar").invoke(buChar)?.toString() } catch (_: Throwable) { null }
+                    if (charVal != null && charVal.isNotBlank()) {
+                        val filtered = charVal.filter { it.code in 32..126 }
+                        return if (filtered.isNotEmpty()) filtered else "-"
+                    }
+                }
+                // Check indent level as indication of list item
+                val lvl = try { pPr.javaClass.getMethod("getLvl").invoke(pPr) as? Int } catch (_: Throwable) { null }
+                if (lvl != null && lvl > 0) {
+                    return "-"
+                }
+            }
+        } catch (_: Throwable) {}
+
+        return ""
+    }
+
+    /**
+     * Extract paragraph alignment from XML properties.
+     * Returns "l" (left), "ctr" (center), "r" (right), "just" (justify), or "l" as default.
+     */
+    private fun getParagraphAlignment(paragraph: org.apache.poi.xslf.usermodel.XSLFTextParagraph): String {
+        // Try POI API first
+        try {
+            val align = paragraph.textAlign
+            if (align != null) {
+                return when (align.name.lowercase()) {
+                    "center" -> "ctr"
+                    "right" -> "r"
+                    "justify", "justified" -> "just"
+                    else -> "l"
+                }
+            }
+        } catch (_: Throwable) {}
+
+        // Fallback: reflection on XML
+        try {
+            val xmlObj = paragraph.javaClass.getMethod("getXmlObject").invoke(paragraph) ?: return "l"
+            val pPr = try { xmlObj.javaClass.getMethod("getPPr").invoke(xmlObj) } catch (_: Throwable) { null }
+            if (pPr != null) {
+                val algn = try { pPr.javaClass.getMethod("getAlgn").invoke(pPr) } catch (_: Throwable) { null }
+                if (algn != null) {
+                    val algnStr = algn.toString().lowercase()
+                    return when {
+                        algnStr.contains("ctr") || algnStr.contains("center") -> "ctr"
+                        algnStr.contains("r") && !algnStr.contains("l") -> "r"
+                        algnStr.contains("just") -> "just"
+                        else -> "l"
+                    }
+                }
+            }
+        } catch (_: Throwable) {}
+
+        return "l"
+    }
+
+    /**
+     * Extract text color from an XSLFTextRun using reflection.
+     * Tries: (1) XML object solidFill srgbClr, (2) XML solidFill schemeClr.
+     * Returns packed 0xAARRGGBB int or null if no color is found.
+     */
+    private fun getTextRunColor(run: org.apache.poi.xslf.usermodel.XSLFTextRun?): Int? {
+        if (run == null) return null
+
+        // Strategy 1: Parse from XML (Android-safe, no AWT dependency)
+        try {
+            val xmlObj = run.javaClass.getMethod("getXmlObject").invoke(run) ?: return null
+            // Get rPr (run properties)
+            val rPr = try {
+                xmlObj.javaClass.getMethod("getRPr").invoke(xmlObj)
+            } catch (_: Throwable) { null }
+
+            if (rPr != null) {
+                // Try solidFill -> srgbClr
+                val solidFill = try {
+                    rPr.javaClass.getMethod("getSolidFill").invoke(rPr)
+                } catch (_: Throwable) { null }
+
+                if (solidFill != null) {
+                    val srgbClr = try {
+                        solidFill.javaClass.getMethod("getSrgbClr").invoke(solidFill)
+                    } catch (_: Throwable) { null }
+
+                    if (srgbClr != null) {
+                        val rgbBytes = srgbClr.javaClass.getMethod("getVal").invoke(srgbClr) as? ByteArray
+                        if (rgbBytes != null && rgbBytes.size >= 3) {
+                            val r = rgbBytes[0].toInt() and 0xFF
+                            val g = rgbBytes[1].toInt() and 0xFF
+                            val b = rgbBytes[2].toInt() and 0xFF
+                            return (0xFF shl 24) or (r shl 16) or (g shl 8) or b
+                        }
+                    }
+
+                    // Try solidFill -> schemeClr
+                    val schemeClr = try {
+                        solidFill.javaClass.getMethod("getSchemeClr").invoke(solidFill)
+                    } catch (_: Throwable) { null }
+                    if (schemeClr != null) {
+                        val valStr = schemeClr.javaClass.getMethod("getVal").invoke(schemeClr)?.toString() ?: ""
+                        return getSchemeColorHex(valStr)
+                    }
+                }
+            }
+        } catch (_: Throwable) {}
+
+        return null
+    }
+
+    private fun getShapeAnchorSafe(shape: org.apache.poi.xslf.usermodel.XSLFShape): android.graphics.RectF? {
+        val anchorXml = getShapeAnchorAndroid(shape)
+        if (anchorXml != null) return anchorXml
+
+        try {
+            val anchorAwt = shape.anchor
+            if (anchorAwt != null) {
+                return android.graphics.RectF(
+                    anchorAwt.x.toFloat(),
+                    anchorAwt.y.toFloat(),
+                    (anchorAwt.x + anchorAwt.width).toFloat(),
+                    (anchorAwt.y + anchorAwt.height).toFloat()
+                )
+            }
+        } catch (e: Throwable) {
+            Log.d("ConvertProcessor", "AWT anchor fallback failed for ${shape.javaClass.simpleName}: ${e.javaClass.simpleName}")
+        }
+        Log.w("ConvertProcessor", "Could not get anchor for shape: ${shape.javaClass.simpleName}")
+        return null
+    }
+
+    private fun getShapeAnchorAndroid(shape: Any): android.graphics.RectF? {
+        try {
+            val xmlObject = shape.javaClass.getMethod("getXmlObject").invoke(shape) ?: return null
+            val xfrm = getXfrmFromXmlObject(xmlObject) ?: return null
+            
+            val off = xfrm.javaClass.getMethod("getOff").invoke(xfrm) ?: return null
+            val ext = xfrm.javaClass.getMethod("getExt").invoke(xfrm) ?: return null
+            
+            val xVal = off.javaClass.getMethod("getX").invoke(off) as Long
+            val yVal = off.javaClass.getMethod("getY").invoke(off) as Long
+            val cxVal = ext.javaClass.getMethod("getCx").invoke(ext) as Long
+            val cyVal = ext.javaClass.getMethod("getCy").invoke(ext) as Long
+            
+            val xPoints = xVal / 12700f
+            val yPoints = yVal / 12700f
+            val wPoints = cxVal / 12700f
+            val hPoints = cyVal / 12700f
+            
+            return android.graphics.RectF(xPoints, yPoints, xPoints + wPoints, yPoints + hPoints)
+        } catch (t: Throwable) {
+            Log.d("ConvertProcessor", "XML anchor extraction failed: ${t.javaClass.simpleName}: ${t.message}")
+        }
+        return null
+    }
+
+    private fun getXfrmFromXmlObject(xmlObj: Any): Any? {
+        try {
+            try {
+                val spPr = xmlObj.javaClass.getMethod("getSpPr").invoke(xmlObj)
+                if (spPr != null) {
+                    val xfrm = spPr.javaClass.getMethod("getXfrm").invoke(spPr)
+                    if (xfrm != null) return xfrm
+                }
+            } catch (_: Throwable) {}
+
+            try {
+                val xfrm = xmlObj.javaClass.getMethod("getXfrm").invoke(xmlObj)
+                if (xfrm != null) return xfrm
+            } catch (_: Throwable) {}
+
+            try {
+                val grpSpPr = xmlObj.javaClass.getMethod("getGrpSpPr").invoke(xmlObj)
+                if (grpSpPr != null) {
+                    val xfrm = grpSpPr.javaClass.getMethod("getXfrm").invoke(grpSpPr)
+                    if (xfrm != null) return xfrm
+                }
+            } catch (_: Throwable) {}
+        } catch (t: Throwable) {}
+        return null
+    }
+
+    private fun getFillColorSafe(shape: org.apache.poi.xslf.usermodel.XSLFSimpleShape): Int? {
+        val col = getFillColorAndroid(shape)
+        if (col != null) return col
+
+        try {
+            val awtCol = shape.fillColor
+            if (awtCol != null) {
+                return (0xFF shl 24) or (awtCol.red shl 16) or (awtCol.green shl 8) or awtCol.blue
+            }
+        } catch (_: Throwable) {}
+        return null
+    }
+
+    private fun getFillColorAndroid(shape: Any): Int? {
+        try {
+            val xmlObject = shape.javaClass.getMethod("getXmlObject").invoke(shape) ?: return null
+            val spPr = xmlObject.javaClass.getMethod("getSpPr").invoke(xmlObject) ?: return null
+            
+            val solidFill = try {
+                spPr.javaClass.getMethod("getSolidFill").invoke(spPr)
+            } catch (_: NoSuchMethodException) { null }
+            
+            if (solidFill != null) {
+                val srgbClr = try {
+                    solidFill.javaClass.getMethod("getSrgbClr").invoke(solidFill)
+                } catch (_: NoSuchMethodException) { null }
+                
+                if (srgbClr != null) {
+                    val rgbBytes = srgbClr.javaClass.getMethod("getVal").invoke(srgbClr) as? ByteArray
+                    if (rgbBytes != null && rgbBytes.size >= 3) {
+                        val r = rgbBytes[0].toInt() and 0xFF
+                        val g = rgbBytes[1].toInt() and 0xFF
+                        val b = rgbBytes[2].toInt() and 0xFF
+                        return (0xFF shl 24) or (r shl 16) or (g shl 8) or b
+                    }
+                }
+                
+                val schemeClr = try {
+                    solidFill.javaClass.getMethod("getSchemeClr").invoke(solidFill)
+                } catch (_: NoSuchMethodException) { null }
+                if (schemeClr != null) {
+                    val valStr = schemeClr.javaClass.getMethod("getVal").invoke(schemeClr)?.toString() ?: ""
+                    return getSchemeColorHex(valStr)
+                }
+            }
+        } catch (t: Throwable) {}
+        return null
+    }
+
+    private fun getLineColorSafe(shape: org.apache.poi.xslf.usermodel.XSLFSimpleShape): Int? {
+        val col = getLineColorAndroid(shape)
+        if (col != null) return col
+
+        try {
+            val awtCol = shape.lineColor
+            if (awtCol != null) {
+                return (0xFF shl 24) or (awtCol.red shl 16) or (awtCol.green shl 8) or awtCol.blue
+            }
+        } catch (_: Throwable) {}
+        return null
+    }
+
+    private fun getLineColorAndroid(shape: Any): Int? {
+        try {
+            val xmlObject = shape.javaClass.getMethod("getXmlObject").invoke(shape) ?: return null
+            val spPr = xmlObject.javaClass.getMethod("getSpPr").invoke(xmlObject) ?: return null
+            
+            val ln = try {
+                spPr.javaClass.getMethod("getLn").invoke(spPr)
+            } catch (_: NoSuchMethodException) { null }
+            
+            if (ln != null) {
+                val solidFill = try {
+                    ln.javaClass.getMethod("getSolidFill").invoke(ln)
+                } catch (_: NoSuchMethodException) { null }
+                
+                if (solidFill != null) {
+                    val srgbClr = try {
+                        solidFill.javaClass.getMethod("getSrgbClr").invoke(solidFill)
+                    } catch (_: NoSuchMethodException) { null }
+                    
+                    if (srgbClr != null) {
+                        val rgbBytes = srgbClr.javaClass.getMethod("getVal").invoke(srgbClr) as? ByteArray
+                        if (rgbBytes != null && rgbBytes.size >= 3) {
+                            val r = rgbBytes[0].toInt() and 0xFF
+                            val g = rgbBytes[1].toInt() and 0xFF
+                            val b = rgbBytes[2].toInt() and 0xFF
+                            return (0xFF shl 24) or (r shl 16) or (g shl 8) or b
+                        }
+                    }
+                    
+                    val schemeClr = try {
+                        solidFill.javaClass.getMethod("getSchemeClr").invoke(solidFill)
+                    } catch (_: NoSuchMethodException) { null }
+                    if (schemeClr != null) {
+                        val valStr = schemeClr.javaClass.getMethod("getVal").invoke(schemeClr)?.toString() ?: ""
+                        return getSchemeColorHex(valStr)
+                    }
+                }
+            }
+        } catch (t: Throwable) {}
+        return null
+    }
+
+    private fun getSchemeColorHex(name: String): Int {
+        return when (name.lowercase()) {
+            "bg1", "lt1" -> 0xFFFFFFFF.toInt()
+            "bg2", "lt2" -> 0xFFF3F4F6.toInt()
+            "tx1", "dk1" -> 0xFF1F2937.toInt()
+            "tx2", "dk2" -> 0xFF374151.toInt()
+            "accent1" -> 0xFF3B82F6.toInt()
+            "accent2" -> 0xFFEF4444.toInt()
+            "accent3" -> 0xFF10B981.toInt()
+            "accent4" -> 0xFFF59E0B.toInt()
+            "accent5" -> 0xFF6366F1.toInt()
+            "accent6" -> 0xFF8B5CF6.toInt()
+            "hlink" -> 0xFF2563EB.toInt()
+            else -> 0xFF4B5563.toInt()
+        }
+    }
+
+    private fun getSlideBackgroundColorSafe(slide: org.apache.poi.xslf.usermodel.XSLFSlide): Int? {
+        // 1. Try direct slide background via XML reflection
+        val col = getSlideBackgroundColorAndroid(slide)
+        if (col != null) return col
+
+        // 2. Try AWT API on slide background
+        try {
+            val bg = slide.background
+            val awtCol = bg?.fillColor
+            if (awtCol != null) {
+                return (0xFF shl 24) or (awtCol.red shl 16) or (awtCol.green shl 8) or awtCol.blue
+            }
+        } catch (_: Throwable) {}
+
+        // 3. Try slide layout background
+        try {
+            val layout = slide.slideLayout
+            if (layout != null) {
+                val layoutBg = layout.background
+                if (layoutBg != null) {
+                    val layoutCol = getBackgroundColorFromXml(layoutBg)
+                    if (layoutCol != null) return layoutCol
+                    try {
+                        val awtCol = layoutBg.fillColor
+                        if (awtCol != null) {
+                            return (0xFF shl 24) or (awtCol.red shl 16) or (awtCol.green shl 8) or awtCol.blue
+                        }
+                    } catch (_: Throwable) {}
+                }
+            }
+        } catch (_: Throwable) {}
+
+        // 4. Try slide master background
+        try {
+            val master = slide.slideMaster
+            if (master != null) {
+                val masterBg = master.background
+                if (masterBg != null) {
+                    val masterCol = getBackgroundColorFromXml(masterBg)
+                    if (masterCol != null) return masterCol
+                    try {
+                        val awtCol = masterBg.fillColor
+                        if (awtCol != null) {
+                            return (0xFF shl 24) or (awtCol.red shl 16) or (awtCol.green shl 8) or awtCol.blue
+                        }
+                    } catch (_: Throwable) {}
+                }
+            }
+        } catch (_: Throwable) {}
+
+        return null
+    }
+
+    /**
+     * Extract background color from any XSLFBackground via XML reflection.
+     * Reusable for slide, layout, and master backgrounds.
+     */
+    private fun getBackgroundColorFromXml(bg: Any): Int? {
+        try {
+            val xmlObject = bg.javaClass.getMethod("getXmlObject").invoke(bg) ?: return null
+
+            val bgPr = try {
+                xmlObject.javaClass.getMethod("getBgPr").invoke(xmlObject)
+            } catch (_: NoSuchMethodException) { null }
+
+            if (bgPr != null) {
+                val solidFill = try {
+                    bgPr.javaClass.getMethod("getSolidFill").invoke(bgPr)
+                } catch (_: NoSuchMethodException) { null }
+
+                if (solidFill != null) {
+                    val srgbClr = try {
+                        solidFill.javaClass.getMethod("getSrgbClr").invoke(solidFill)
+                    } catch (_: NoSuchMethodException) { null }
+
+                    if (srgbClr != null) {
+                        val rgbBytes = srgbClr.javaClass.getMethod("getVal").invoke(srgbClr) as? ByteArray
+                        if (rgbBytes != null && rgbBytes.size >= 3) {
+                            val r = rgbBytes[0].toInt() and 0xFF
+                            val g = rgbBytes[1].toInt() and 0xFF
+                            val b = rgbBytes[2].toInt() and 0xFF
+                            return (0xFF shl 24) or (r shl 16) or (g shl 8) or b
+                        }
+                    }
+
+                    val schemeClr = try {
+                        solidFill.javaClass.getMethod("getSchemeClr").invoke(solidFill)
+                    } catch (_: NoSuchMethodException) { null }
+                    if (schemeClr != null) {
+                        val valStr = schemeClr.javaClass.getMethod("getVal").invoke(schemeClr)?.toString() ?: ""
+                        return getSchemeColorHex(valStr)
+                    }
+                }
+            }
+        } catch (_: Throwable) {}
+        return null
+    }
+
+    private fun getSlideBackgroundColorAndroid(slide: org.apache.poi.xslf.usermodel.XSLFSlide): Int? {
+        try {
+            val bg = slide.background ?: return null
+            val xmlObject = bg.javaClass.getMethod("getXmlObject").invoke(bg) ?: return null
+            
+            val bgPr = try {
+                xmlObject.javaClass.getMethod("getBgPr").invoke(xmlObject)
+            } catch (_: NoSuchMethodException) { null }
+            
+            if (bgPr != null) {
+                val solidFill = try {
+                    bgPr.javaClass.getMethod("getSolidFill").invoke(bgPr)
+                } catch (_: NoSuchMethodException) { null }
+                
+                if (solidFill != null) {
+                    val srgbClr = try {
+                        solidFill.javaClass.getMethod("getSrgbClr").invoke(solidFill)
+                    } catch (_: NoSuchMethodException) { null }
+                    
+                    if (srgbClr != null) {
+                        val rgbBytes = srgbClr.javaClass.getMethod("getVal").invoke(srgbClr) as? ByteArray
+                        if (rgbBytes != null && rgbBytes.size >= 3) {
+                            val r = rgbBytes[0].toInt() and 0xFF
+                            val g = rgbBytes[1].toInt() and 0xFF
+                            val b = rgbBytes[2].toInt() and 0xFF
+                            return (0xFF shl 24) or (r shl 16) or (g shl 8) or b
+                        }
+                    }
+                    
+                    val schemeClr = try {
+                        solidFill.javaClass.getMethod("getSchemeClr").invoke(solidFill)
+                    } catch (_: NoSuchMethodException) { null }
+                    if (schemeClr != null) {
+                        val valStr = schemeClr.javaClass.getMethod("getVal").invoke(schemeClr)?.toString() ?: ""
+                        return getSchemeColorHex(valStr)
+                    }
+                }
+            }
+        } catch (t: Throwable) {}
+        return null
+    }
+
+    private fun setPresentationSlideSizeSafe(slideShow: XMLSlideShow, width: Int, height: Int) {
+        try {
+            val dimClass = Class.forName("java.awt.Dimension")
+            val dimConstructor = dimClass.getConstructor(Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)
+            val dimInstance = dimConstructor.newInstance(width, height)
+            
+            val setPageSizeMethod = slideShow.javaClass.getMethod("setPageSize", dimClass)
+            setPageSizeMethod.invoke(slideShow, dimInstance)
+            return
+        } catch (e: Throwable) {
+            Log.d("ConvertProcessor", "java.awt.Dimension missing, setting slide size via XML: ${e.message}")
+        }
+
+        try {
+            val ctPres = slideShow.javaClass.getMethod("getCTPresentation").invoke(slideShow) ?: return
+            val sldSz = try {
+                ctPres.javaClass.getMethod("getSldSz").invoke(ctPres) ?: ctPres.javaClass.getMethod("addNewSldSz").invoke(ctPres)
+            } catch (e: Throwable) {
+                ctPres.javaClass.getMethod("addNewSldSz").invoke(ctPres)
+            }
+            if (sldSz != null) {
+                sldSz.javaClass.getMethod("setCx", Int::class.javaPrimitiveType).invoke(sldSz, width * 12700)
+                sldSz.javaClass.getMethod("setCy", Int::class.javaPrimitiveType).invoke(sldSz, height * 12700)
+            }
+        } catch (e: Throwable) {
+            Log.e("ConvertProcessor", "Failed to set slide size via XML", e)
+        }
+    }
+
+    private fun setShapeAnchorSafe(shape: org.apache.poi.xslf.usermodel.XSLFShape, x: Double, y: Double, w: Double, h: Double) {
+        try {
+            val rectClass = Class.forName("java.awt.geom.Rectangle2D\$Double")
+            val rectConstructor = rectClass.getConstructor(Double::class.javaPrimitiveType, Double::class.javaPrimitiveType, Double::class.javaPrimitiveType, Double::class.javaPrimitiveType)
+            val rectInstance = rectConstructor.newInstance(x, y, w, h)
+            
+            val setAnchorMethod = shape.javaClass.getMethod("setAnchor", Class.forName("java.awt.geom.Rectangle2D"))
+            setAnchorMethod.invoke(shape, rectInstance)
+            return
+        } catch (e: Throwable) {
+            Log.d("ConvertProcessor", "java.awt.geom.Rectangle2D missing, setting anchor via XML: ${e.message}")
+        }
+
+        try {
+            val xmlObject = shape.javaClass.getMethod("getXmlObject").invoke(shape) ?: return
+            val xfrm = getXfrmFromXmlObject(xmlObject) ?: return
+            
+            val off = try {
+                xfrm.javaClass.getMethod("getOff").invoke(xfrm) ?: xfrm.javaClass.getMethod("addNewOff").invoke(xfrm)
+            } catch (e: Throwable) {
+                xfrm.javaClass.getMethod("addNewOff").invoke(xfrm)
+            }
+            if (off != null) {
+                off.javaClass.getMethod("setX", Long::class.javaPrimitiveType).invoke(off, (x * 12700).toLong())
+                off.javaClass.getMethod("setY", Long::class.javaPrimitiveType).invoke(off, (y * 12700).toLong())
+            }
+
+            val ext = try {
+                xfrm.javaClass.getMethod("getExt").invoke(xfrm) ?: xfrm.javaClass.getMethod("addNewExt").invoke(xfrm)
+            } catch (e: Throwable) {
+                xfrm.javaClass.getMethod("addNewExt").invoke(xfrm)
+            }
+            if (ext != null) {
+                ext.javaClass.getMethod("setCx", Long::class.javaPrimitiveType).invoke(ext, (w * 12700).toLong())
+                ext.javaClass.getMethod("setCy", Long::class.javaPrimitiveType).invoke(ext, (h * 12700).toLong())
+            }
+        } catch (e: Throwable) {
+            Log.e("ConvertProcessor", "Failed to set shape anchor via XML", e)
+        }
+    }
+
+    private fun getPresentationSlideSize(slideShow: XMLSlideShow): Pair<Float, Float> {
+        // Primary: try slideShow.pageSize (java.awt.Dimension)
+        try {
+            val pageSize = slideShow.pageSize
+            if (pageSize != null) {
+                val w = pageSize.width.toFloat()
+                val h = pageSize.height.toFloat()
+                if (w > 0 && h > 0) {
+                    return Pair(w, h)
+                }
+            }
+        } catch (_: Throwable) {
+            // java.awt.Dimension may not be available on Android — fall through
+        }
+
+        // Fallback: parse XML for slide size
+        try {
+            val ctPres = slideShow.javaClass.getMethod("getCTPresentation").invoke(slideShow)
+            if (ctPres != null) {
+                val xmlStr = ctPres.toString()
+                val sldSzTagRegex = Regex("""<[^>]*sldSz[^>]*>""")
+                val tagMatch = sldSzTagRegex.find(xmlStr)
+                if (tagMatch != null) {
+                    val tagContent = tagMatch.value
+                    val cxMatch = Regex("""\bcx="(\d+)"""").find(tagContent)
+                    val cyMatch = Regex("""\bcy="(\d+)"""").find(tagContent)
+                    if (cxMatch != null && cyMatch != null) {
+                        val cx = cxMatch.groupValues[1].toLongOrNull()
+                        val cy = cyMatch.groupValues[1].toLongOrNull() // Fixed: was [2], but regex only has 1 capture group
+                        if (cx != null && cy != null && cx > 0 && cy > 0) {
+                            return Pair(cx / 12700f, cy / 12700f)
+                        }
+                    }
+                }
+            }
+        } catch (e: Throwable) {
+            Log.w("ConvertProcessor", "Failed to parse slide size from XML", e)
+        }
+        // Standard 10x7.5 inches in points
+        return Pair(720f, 540f)
     }
 }

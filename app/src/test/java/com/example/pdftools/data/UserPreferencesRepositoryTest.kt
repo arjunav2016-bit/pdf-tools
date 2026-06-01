@@ -2,75 +2,68 @@ package com.example.pdftools.data
 
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import java.io.File
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
-import org.junit.Rule
 import org.junit.Test
-import org.junit.rules.TemporaryFolder
 
-@OptIn(ExperimentalCoroutinesApi::class)
 class UserPreferencesRepositoryTest {
-    @get:Rule
-    val tempFolder = TemporaryFolder()
 
-    private fun createRepository(scope: kotlinx.coroutines.CoroutineScope): UserPreferencesRepository {
-        val file = File(
-            tempFolder.root,
-            "user_preferences_${System.currentTimeMillis()}_${java.util.UUID.randomUUID()}.preferences_pb"
-        )
+    private fun createRepository(): UserPreferencesRepository {
+        val systemTempDir = File(System.getProperty("java.io.tmpdir") ?: ".")
+        val testDir = File(systemTempDir, "datastore_test_${java.util.UUID.randomUUID()}")
+        testDir.mkdirs()
+        val file = File(testDir, "user_preferences.preferences_pb")
         val dataStore = PreferenceDataStoreFactory.create(
-            scope = scope,
             produceFile = { file }
         )
         return UserPreferencesRepository(dataStore)
     }
 
     @Test
-    fun freshStoreEmitsDefaults() = runTest {
-        val repository = createRepository(backgroundScope)
+    fun freshStoreEmitsDefaults() = runBlocking {
+        val repository = createRepository()
         assertEquals(UserPreferences(), repository.preferences.first())
     }
 
     @Test
-    fun themeModeUpdatePersistsAndRoundTrips() = runTest {
-        val repository = createRepository(backgroundScope)
+    fun themeModeUpdatePersistsAndRoundTrips() = runBlocking {
+        val repository = createRepository()
         repository.updateThemeMode(ThemeMode.DARK)
         assertEquals(ThemeMode.DARK, repository.preferences.first().themeMode)
     }
 
     @Test
-    fun compressionQualityUpdatePersists() = runTest {
-        val repository = createRepository(backgroundScope)
+    fun compressionQualityUpdatePersists() = runBlocking {
+        val repository = createRepository()
         repository.updateCompressionQuality(92)
         assertEquals(92, repository.preferences.first().compressionQuality)
     }
 
     @Test
-    fun compressionQualityUpdateClamps() = runTest {
-        val repository = createRepository(backgroundScope)
+    fun compressionQualityUpdateClamps() = runBlocking {
+        val repository = createRepository()
         repository.updateCompressionQuality(5)
         assertEquals(30, repository.preferences.first().compressionQuality)
     }
 
     @Test
-    fun exportDpiUpdatePersists() = runTest {
-        val repository = createRepository(backgroundScope)
+    fun exportDpiUpdatePersists() = runBlocking {
+        val repository = createRepository()
         repository.updateExportDpi(220)
         assertEquals(220, repository.preferences.first().exportDpi)
     }
 
     @Test
-    fun exportDpiUpdateClamps() = runTest {
-        val repository = createRepository(backgroundScope)
+    fun exportDpiUpdateClamps() = runBlocking {
+        val repository = createRepository()
         repository.updateExportDpi(900)
         assertEquals(300, repository.preferences.first().exportDpi)
     }
 
     @Test
-    fun saveLocationUpdatePersistsAndRoundTrips() = runTest {
-        val repository = createRepository(backgroundScope)
+    fun saveLocationUpdatePersistsAndRoundTrips() = runBlocking {
+        val repository = createRepository()
         repository.updateDefaultSaveLocation(SaveLocation.DOWNLOADS)
         assertEquals(SaveLocation.DOWNLOADS, repository.preferences.first().defaultSaveLocation)
     }

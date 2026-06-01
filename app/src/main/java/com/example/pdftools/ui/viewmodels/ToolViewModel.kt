@@ -75,6 +75,18 @@ class ToolViewModel @Inject constructor(
     val ocrConfig = MutableStateFlow(OcrConfig())
     val compareConfig = MutableStateFlow(CompareConfig())
     val pdfaConfig = MutableStateFlow(PdfaConfig())
+    val pdfToImageConfig = MutableStateFlow(PdfToImageConfig())
+    val pdfToPptConfig = MutableStateFlow(PdfToPptConfig())
+    val compressConfig = MutableStateFlow(CompressConfig())
+    val jpgToPdfConfig = MutableStateFlow(JpgToPdfConfig())
+    val wordToPdfConfig = MutableStateFlow(WordToPdfConfig())
+    val pdfToWordConfig = MutableStateFlow(PdfToWordConfig())
+    val excelToPdfConfig = MutableStateFlow(ExcelToPdfConfig())
+    val pptToPdfConfig = MutableStateFlow(PptToPdfConfig())
+
+    // PPT preview state
+    private val _pptPreviewPdfUri = MutableStateFlow<Uri?>(null)
+    val pptPreviewPdfUri: StateFlow<Uri?> = _pptPreviewPdfUri.asStateFlow()
 
     // Actions
     fun addFiles(uris: List<Uri>) {
@@ -118,6 +130,15 @@ class ToolViewModel @Inject constructor(
         ocrConfig.value = OcrConfig()
         compareConfig.value = CompareConfig()
         pdfaConfig.value = PdfaConfig()
+        pdfToImageConfig.value = PdfToImageConfig()
+        pdfToPptConfig.value = PdfToPptConfig()
+        compressConfig.value = CompressConfig()
+        jpgToPdfConfig.value = JpgToPdfConfig()
+        wordToPdfConfig.value = WordToPdfConfig()
+        pdfToWordConfig.value = PdfToWordConfig()
+        excelToPdfConfig.value = ExcelToPdfConfig()
+        pptToPdfConfig.value = PptToPdfConfig()
+        _pptPreviewPdfUri.value = null
     }
 
     fun isFavorite(toolId: String): Boolean {
@@ -142,6 +163,34 @@ class ToolViewModel @Inject constructor(
 
     suspend fun renderPage(context: Context, uri: Uri, pageIndex: Int, width: Int): Bitmap {
         return pdfPreviewRepository.renderPage(context, uri, pageIndex, width)
+    }
+
+    fun updateSelectedFiles(uris: List<Uri>) {
+        _selectedFiles.value = uris
+    }
+
+    suspend fun getPageCountSuspend(context: Context, uri: Uri): Int {
+        return pdfPreviewRepository.getPageCount(context, uri)
+    }
+
+    // PPT helper methods
+    suspend fun getSlideCount(context: Context, uri: Uri): Int {
+        return pdfProcessor.getSlideCount(context, uri)
+    }
+
+    suspend fun getSlidePreviewTexts(context: Context, uri: Uri): List<String> {
+        return pdfProcessor.getSlidePreviewTexts(context, uri)
+    }
+
+    fun preparePptPreview(context: Context, uri: Uri) {
+        viewModelScope.launch {
+            try {
+                val previewUri = pdfProcessor.convertPptToPdf(context, uri)
+                _pptPreviewPdfUri.value = previewUri
+            } catch (_: Exception) {
+                _pptPreviewPdfUri.value = null
+            }
+        }
     }
 
     fun cancelProcessing() {
@@ -190,11 +239,15 @@ class ToolViewModel @Inject constructor(
                         onProcessingSuccess(toolId, context, result)
                     }
                     "pdf_to_jpg" -> {
-                        val preferences = userPreferencesRepository.preferences.first()
+                        val c = pdfToImageConfig.value
                         val results = pdfProcessor.convertPdfToImages(
                             context = context,
                             uri = files.first(),
-                            dpi = preferences.exportDpi,
+                            dpi = c.dpi,
+                            format = c.format,
+                            quality = c.quality,
+                            pageSelection = c.pageSelection,
+                            customPageRange = c.customPageRange,
                             onProgress = progressReporter("Rendering pages")
                         )
                         onProcessingSuccessMultiple(toolId, context, results)
@@ -255,7 +308,17 @@ class ToolViewModel @Inject constructor(
                     }
                     "pdf_to_pdfa" -> {
                         val c = pdfaConfig.value
-                        val result = pdfProcessor.convertToPdfA(context, files.first(), c.conformanceLevel)
+                        val result = pdfProcessor.convertToPdfA(
+                            context = context,
+                            uri = files.first(),
+                            conformanceLevel = c.conformanceLevel,
+                            embedFonts = c.embedFonts,
+                            removeTransparencies = c.removeTransparencies,
+                            convertSrgb = c.convertSrgb,
+                            title = c.title,
+                            author = c.author,
+                            subject = c.subject
+                        )
                         onProcessingSuccess(toolId, context, result)
                     }
                     "sign_pdf" -> {
@@ -315,7 +378,17 @@ class ToolViewModel @Inject constructor(
                         onProcessingSuccess(toolId, context, result)
                     }
                     "ppt_to_pdf" -> {
-                        val result = pdfProcessor.convertPptToPdf(context, files.first())
+                        val c = pptToPdfConfig.value
+                        val result = pdfProcessor.convertPptToPdf(
+                            context = context,
+                            uri = files.first(),
+                            slideRange = c.slideRange,
+                            customRange = c.customRange,
+                            selectedSlides = c.selectedSlides,
+                            slidesPerPage = c.slidesPerPage,
+                            includeNotes = c.includeNotes,
+                            quality = c.quality
+                        )
                         onProcessingSuccess(toolId, context, result)
                     }
                     "excel_to_pdf" -> {
@@ -327,7 +400,15 @@ class ToolViewModel @Inject constructor(
                         onProcessingSuccess(toolId, context, result)
                     }
                     "pdf_to_ppt" -> {
-                        val result = pdfProcessor.convertPdfToPpt(context, files.first())
+                        val c = pdfToPptConfig.value
+                        val result = pdfProcessor.convertPdfToPpt(
+                            context = context,
+                            uri = files.first(),
+                            slidesPerPage = c.slidesPerPage,
+                            includeNotes = c.includeNotes,
+                            runOcr = c.runOcr,
+                            exportFormat = c.exportFormat
+                        )
                         onProcessingSuccess(toolId, context, result)
                     }
                     "pdf_to_excel" -> {

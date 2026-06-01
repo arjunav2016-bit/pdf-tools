@@ -7,6 +7,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
+import android.provider.OpenableColumns
 import android.widget.Toast
 import androidx.core.content.FileProvider
 import com.example.pdftools.data.PdfTool
@@ -143,8 +144,12 @@ internal fun getOutputMimeType(tool: PdfTool, uri: Uri): String {
     return when (getOutputExtension(tool, uri)) {
         "txt" -> "text/plain"
         "jpg", "jpeg" -> "image/jpeg"
+        "png" -> "image/png"
+        "webp" -> "image/webp"
         "docx" -> "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         "pptx" -> "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+        "otp" -> "application/vnd.oasis.opendocument.presentation-template"
+
         "xlsx" -> "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         "pdf" -> "application/pdf"
         else -> "application/octet-stream"
@@ -156,8 +161,8 @@ internal fun getActionButtonText(toolId: String): String {
         "merge_pdf" -> "Merge PDFs"
         "compress_pdf" -> "Compress PDF"
         "jpg_to_pdf" -> "Convert to PDF"
-        "pdf_to_jpg" -> "Convert to JPG"
-        "split_pdf" -> "Split PDF"
+        "pdf_to_jpg" -> "Convert to Images"
+        "split_pdf" -> "Process PDF"
         "remove_pages" -> "Remove Pages"
         "protect_pdf" -> "Protect PDF"
         "unlock_pdf" -> "Unlock PDF"
@@ -186,3 +191,68 @@ internal fun getActionButtonText(toolId: String): String {
         else -> "Process"
     }
 }
+
+internal fun getFileNameFromUri(context: Context, uri: Uri): String {
+    var result: String? = null
+    if (uri.scheme == "content") {
+        val cursor = context.contentResolver.query(uri, null, null, null, null)
+        try {
+            if (cursor != null && cursor.moveToFirst()) {
+                val index = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                if (index >= 0) {
+                    result = cursor.getString(index)
+                }
+            }
+        } catch (e: Exception) {
+            // Fallback
+        } finally {
+            cursor?.close()
+        }
+    }
+    if (result == null) {
+        result = uri.path
+        val cut = result?.lastIndexOf('/') ?: -1
+        if (cut != -1) {
+            result = result?.substring(cut + 1)
+        }
+    }
+    return result ?: uri.lastPathSegment ?: "File"
+}
+
+internal fun getFileSizeFromUri(context: Context, uri: Uri): String {
+    var size: Long = 0
+    if (uri.scheme == "content") {
+        val cursor = context.contentResolver.query(uri, null, null, null, null)
+        try {
+            if (cursor != null && cursor.moveToFirst()) {
+                val index = cursor.getColumnIndex(android.provider.OpenableColumns.SIZE)
+                if (index >= 0) {
+                    size = cursor.getLong(index)
+                }
+            }
+        } catch (e: Exception) {
+            // Fallback
+        } finally {
+            cursor?.close()
+        }
+    }
+    if (size == 0L) {
+        val path = uri.path
+        if (path != null) {
+            val file = File(path)
+            if (file.exists()) {
+                size = file.length()
+            }
+        }
+    }
+    if (size <= 0) return "Unknown size"
+    val kb = size / 1024.0
+    val mb = kb / 1024.0
+    return if (mb >= 1.0) {
+        String.format(Locale.US, "%.1f MB", mb)
+    } else {
+        String.format(Locale.US, "%.1f KB", kb)
+    }
+}
+
+

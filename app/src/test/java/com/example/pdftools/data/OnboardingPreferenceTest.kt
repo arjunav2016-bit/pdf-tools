@@ -2,49 +2,42 @@ package com.example.pdftools.data
 
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import java.io.File
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.delay
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
-import org.junit.Rule
 import org.junit.Test
-import org.junit.rules.TemporaryFolder
 
-@OptIn(ExperimentalCoroutinesApi::class)
 class OnboardingPreferenceTest {
-    @get:Rule
-    val tempFolder = TemporaryFolder()
 
-    private fun createRepository(scope: kotlinx.coroutines.CoroutineScope): UserPreferencesRepository {
-        val file = File(
-            tempFolder.root,
-            "user_preferences_${System.currentTimeMillis()}_${java.util.UUID.randomUUID()}.preferences_pb"
-        )
+    private fun createRepository(): UserPreferencesRepository {
+        val systemTempDir = File(System.getProperty("java.io.tmpdir") ?: ".")
+        val testDir = File(systemTempDir, "datastore_test_${java.util.UUID.randomUUID()}")
+        testDir.mkdirs()
+        val file = File(testDir, "user_preferences.preferences_pb")
         val dataStore = PreferenceDataStoreFactory.create(
-            scope = scope,
             produceFile = { file }
         )
         return UserPreferencesRepository(dataStore)
     }
 
     @Test
-    fun defaultOnboardingCompletedIsFalse() = runTest {
-        val repository = createRepository(backgroundScope)
+    fun defaultOnboardingCompletedIsFalse() = runBlocking {
+        val repository = createRepository()
         assertFalse(repository.preferences.first().onboardingCompleted)
     }
 
     @Test
-    fun setOnboardingCompletedTruePersists() = runTest {
-        val repository = createRepository(backgroundScope)
+    fun setOnboardingCompletedTruePersists() = runBlocking {
+        val repository = createRepository()
         repository.setOnboardingCompleted(true)
         assertTrue(repository.preferences.first().onboardingCompleted)
     }
 
     @Test
-    fun setOnboardingCompletedFalsePersists() = runTest {
-        val repository = createRepository(backgroundScope)
+    fun setOnboardingCompletedFalsePersists() = runBlocking {
+        val repository = createRepository()
         repository.setOnboardingCompleted(false)
         assertFalse(repository.preferences.first().onboardingCompleted)
     }

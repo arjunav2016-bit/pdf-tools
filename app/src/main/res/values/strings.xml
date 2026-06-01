@@ -327,5 +327,129 @@
     <string name="tool_redact_pdf_desc">Permanently remove sensitive information from a PDF.</string>
     <string name="tool_compare_pdf_name">Compare PDF</string>
     <string name="tool_compare_pdf_desc">Highlight differences between two PDF documents side by side.</string>
+
+    <!-- Merge Tool -->
+    <string name="tool_merge_add_files">Add PDF Files</string>
+    <string name="tool_merge_add_subtitle">Tap to select files to merge</string>
+    <string name="tool_merge_instruction">Drag to reorder files before merging</string>
+    <string name="tool_merge_metadata_pages_single">1 page</string>
+    <string name="tool_merge_metadata_pages">%1$d pages</string>
+
+    <!-- Split Tool -->
+    <string name="tool_split_pages_total_single">1 page</string>
+    <string name="tool_split_pages_total">%1$d pages</string>
+    <string name="tool_split_page_range_label">Page Range</string>
+    <string name="tool_split_info_text">Select pages or enter a range to split</string>
+    <string name="tool_split_page_preview">Page Preview</string>
+    <string name="tool_split_deselect_all">Deselect All</string>
+    <string name="tool_split_select_all">Select All</string>
+    <string name="tool_split_action_button">Split PDF</string>
+
+    <!-- Remove Pages Tool -->
+    <string name="tool_remove_action_button_single">Remove 1 Page</string>
+    <string name="tool_remove_action_button_count">Remove %1$d Pages</string>
+    <string name="tool_remove_action_button">Remove Pages</string>
+    <string name="tool_remove_selected_subtitle_none">No pages selected</string>
+    <string name="tool_remove_selected_subtitle_single">1 page selected for removal</string>
+    <string name="tool_remove_selected_subtitle">%1$d pages selected for removal</string>
+
+    <!-- PDF/A Tool -->
+    <string name="tool_pdfa_convert_action">Convert to PDF/A</string>
+
+    <!-- Scanner / Scan Flow -->
+    <string name="scan_scanner_unavailable">Document scanner is not available on this device</string>
+    <string name="scan_camera_permission_title">Camera Permission Required</string>
+    <string name="scan_camera_permission_rationale">Camera access is needed to scan documents. Please grant the permission to continue.</string>
+    <string name="scan_camera_permission_grant">Grant Permission</string>
+    <string name="scan_review_title">Review Scanned Pages</string>
+    <string name="scan_generating">Generating PDF…</string>
+    <string name="scan_success">Scan Complete!</string>
+    <string name="scan_success_detail">Your scanned document has been saved successfully.</string>
+    <string name="scan_title">Scan Document</string>
+    <string name="scan_launcher_subtitle">Choose how to capture your document</string>
+    <string name="scan_with_camera">Scan with Camera</string>
+    <string name="scan_with_camera_desc">Use your camera to scan pages</string>
+    <string name="scan_from_gallery">Import from Gallery</string>
+    <string name="scan_from_gallery_desc">Select images from your photo library</string>
+    <string name="scan_scanned_pages">Scanned Pages</string>
+    <string name="scan_page_count">%1$d page</string>
+    <string name="scan_pages_count">%1$d pages</string>
+    <string name="scan_page_thumbnail">Page %1$d thumbnail</string>
+    <string name="scan_rotate_page">Rotate page</string>
+    <string name="scan_delete_page">Delete page</string>
+    <string name="scan_add_more">Add More Pages</string>
+    <string name="scan_visual_filter">Visual Filter</string>
+    <string name="scan_filter_original">Color</string>
+    <string name="scan_filter_grayscale">Grayscale</string>
+    <string name="scan_filter_bw">Black &amp; White</string>
+    <string name="scan_output_settings">Output Settings</string>
+    <string name="scan_page_size">Page Size</string>
+    <string name="scan_page_size_auto">Auto</string>
+    <string name="scan_page_size_a4">A4</string>
+    <string name="scan_page_size_letter">Letter</string>
+    <string name="scan_quality">Quality</string>
+    <string name="scan_quality_value">%1$d%%</string>
+    <string name="scan_dpi">Resolution (DPI)</string>
+    <string name="scan_generate_pdf">Generate PDF</string>
+
+    <!-- HTML to PDF Tool -->
+    <string name="tool_html_info">Convert web pages or HTML code into PDF documents</string>
+    <string name="tool_html_input_source">Input Source</string>
+    <string name="tool_html_input_url">URL</string>
+    <string name="tool_html_input_html">HTML Code</string>
+    <string name="tool_html_url_label">Website URL</string>
+    <string name="tool_html_url_placeholder">https://example.com</string>
+    <string name="tool_html_url_help">Enter a valid URL to convert its content to PDF</string>
+    <string name="tool_html_rendering_options">Rendering Options</string>
+    <string name="tool_html_load_js">Execute JavaScript</string>
+    <string name="tool_html_load_js_desc">Run page scripts before capturing</string>
+    <string name="tool_html_load_bg">Background Graphics</string>
+    <string name="tool_html_load_bg_desc">Include background images and colors</string>
+    <string name="tool_html_page_scale">Page Scale</string>
+    <string name="tool_html_page_scale_desc">Adjust the zoom level of the page</string>
+    <string name="tool_html_page_scale_value">%.0f%%</string>
+    <string name="tool_html_capture_area">Capture Area</string>
+    <string name="tool_html_capture_whole">Whole Page</string>
+    <string name="tool_html_capture_selected">Selected Area</string>
+    <string name="tool_html_selector_label">CSS Selector</string>
+    <string name="tool_html_selector_placeholder">#main-content</string>
+    <string name="tool_html_selector_help">Enter a CSS selector to capture a specific area</string>
+
+    <!-- PDF to PPT Tool -->
+    <string name="tool_pdf_to_ppt_conversion_settings">Conversion Settings</string>
+    <string name="tool_pdf_to_ppt_slide_layout">Slide Layout</string>
+    <string name="tool_pdf_to_ppt_layout_1">1 Slide per Page</string>
+    <string name="tool_pdf_to_ppt_layout_2">2 Slides per Page</string>
+    <string name="tool_pdf_to_ppt_layout_4">4 Slides per Page</string>
+    <string name="tool_pdf_to_ppt_include_notes">Include Notes</string>
+    <string name="tool_pdf_to_ppt_include_notes_desc">Extract text as speaker notes</string>
+    <string name="tool_pdf_to_ppt_ocr">OCR for Scanned Slides</string>
+    <string name="tool_pdf_to_ppt_ocr_desc">Extract text from scanned or image-based slides</string>
+    <string name="tool_pdf_to_ppt_export_format">Export Format</string>
+    <string name="tool_pdf_to_ppt_format_pptx_desc">Standard PowerPoint format</string>
+    <string name="tool_pdf_to_ppt_format_otp_desc">Open Document Presentation format</string>
+    <string name="tool_pdf_to_ppt_help_text">Conversion quality depends on the structure of the original PDF</string>
+
+    <!-- PDF/A Conformance Descriptions -->
+    <string name="tool_pdfa_1b_desc">Basic visual preservation, widest compatibility</string>
+    <string name="tool_pdfa_2b_desc">Recommended — supports transparency and layers</string>
+    <string name="tool_pdfa_3b_label">PDF/A-3b</string>
+    <string name="tool_pdfa_3b_desc">Allows embedded files and attachments</string>
+    <string name="tool_pdfa_compliance_controls">Compliance Controls</string>
+    <string name="tool_pdfa_embed_fonts">Embed Fonts</string>
+    <string name="tool_pdfa_embed_fonts_desc">Embed all fonts for guaranteed rendering</string>
+    <string name="tool_pdfa_remove_transparencies">Remove Transparencies</string>
+    <string name="tool_pdfa_remove_transparencies_desc">Flatten transparent objects for PDF/A-1b compatibility</string>
+    <string name="tool_pdfa_convert_srgb">Standardize Colors (sRGB)</string>
+    <string name="tool_pdfa_convert_srgb_desc">Convert color profiles to sRGB for consistency</string>
+    <string name="tool_pdfa_metadata">Archival Metadata</string>
+    <string name="tool_pdfa_title_label">Title</string>
+    <string name="tool_pdfa_title_placeholder">Document title</string>
+    <string name="tool_pdfa_author_label">Author</string>
+    <string name="tool_pdfa_author_placeholder">Author name</string>
+    <string name="tool_pdfa_subject_label">Subject</string>
+    <string name="tool_pdfa_subject_placeholder">Document subject</string>
+    <string name="tool_pdfa_guidance_title">About PDF/A</string>
+    <string name="tool_pdfa_guidance_text">PDF/A is an ISO-standardized version of PDF designed for long-term digital preservation of electronic documents.</string>
 </resources>
 

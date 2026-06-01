@@ -1,5 +1,6 @@
 package com.example.pdftools.ui.screens.tools
 
+import android.content.Context
 import android.net.Uri
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -7,9 +8,24 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.CropFree
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Fullscreen
+import androidx.compose.material.icons.filled.HighQuality
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.RotateRight
+import androidx.compose.material.icons.filled.SelectAll
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.ZoomIn
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -23,13 +39,22 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.pdftools.R
 import com.example.pdftools.ui.screens.rememberThumbnailBitmap
+import com.example.pdftools.ui.screens.getFileNameFromUri
 import com.example.pdftools.ui.viewmodels.HtmlConfig
+import com.example.pdftools.ui.viewmodels.PdfToImageConfig
 import com.example.pdftools.ui.viewmodels.ScanConfig
 import com.example.pdftools.ui.viewmodels.ToolViewModel
+import com.example.pdftools.ui.viewmodels.PdfToPptConfig
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Edit
+import com.example.pdftools.ui.components.PdfPagePreview
+import androidx.compose.foundation.isSystemInDarkTheme
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -241,7 +266,9 @@ fun HtmlToolConfig(
     accentColor: Color
 ) {
     val config by viewModel.htmlConfig.collectAsState()
-    val containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+
+    // HTML accent color - web-themed teal/cyan
+    val htmlAccent = Color(0xFF0097A7)
 
     // We can infer template selection from the content of htmlContent or keep it local to UI
     var templateSelection by remember {
@@ -261,47 +288,159 @@ fun HtmlToolConfig(
             .padding(vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Text(
-            text = stringResource(R.string.tool_html_designer_title),
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurface
-        )
+        // ─── Info Card ───────────────────────────────────────
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = htmlAccent.copy(alpha = 0.08f)
+            ),
+            border = androidx.compose.foundation.BorderStroke(1.dp, htmlAccent.copy(alpha = 0.3f))
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalAlignment = Alignment.Top,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Info,
+                    contentDescription = "Info",
+                    tint = htmlAccent,
+                    modifier = Modifier.size(22.dp)
+                )
+                Text(
+                    text = stringResource(R.string.tool_html_info),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
 
+        // ─── 1. Content Source Toggle ────────────────────────
         Text(
-            text = stringResource(R.string.tool_html_template_title),
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurface
+            text = stringResource(R.string.tool_html_input_source),
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            val templates = listOf(
-                "invoice" to stringResource(R.string.tool_html_template_invoice),
-                "cv" to stringResource(R.string.tool_html_template_cv),
-                "report" to stringResource(R.string.tool_html_template_report)
+            val sources = listOf(
+                "url" to stringResource(R.string.tool_html_input_url),
+                "html" to stringResource(R.string.tool_html_input_html)
+            )
+            sources.forEach { (mode, title) ->
+                val isSelected = config.inputType == mode
+                val cardBg = if (isSelected) htmlAccent.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)
+                val borderCol = if (isSelected) htmlAccent else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                val textCol = if (isSelected) htmlAccent else MaterialTheme.colorScheme.onSurface
+
+                Card(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(68.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(cardBg)
+                        .clickable {
+                            viewModel.htmlConfig.value = config.copy(inputType = mode)
+                        },
+                    border = androidx.compose.foundation.BorderStroke(1.dp, borderCol),
+                    colors = CardDefaults.cardColors(containerColor = Color.Transparent)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (mode == "url") Icons.Filled.Language else Icons.Filled.Code,
+                            contentDescription = title,
+                            tint = textCol,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Text(
+                            text = title,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = textCol
+                        )
+                    }
+                }
+            }
+        }
+
+        // ─── 2. URL Input or HTML Editor ─────────────────────
+        if (config.inputType == "url") {
+            // URL Input Field
+            OutlinedTextField(
+                value = config.url,
+                onValueChange = { viewModel.htmlConfig.value = config.copy(url = it) },
+                label = { Text(stringResource(R.string.tool_html_url_label)) },
+                placeholder = { Text(stringResource(R.string.tool_html_url_placeholder)) },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Filled.Language,
+                        contentDescription = "URL",
+                        tint = htmlAccent
+                    )
+                },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                shape = RoundedCornerShape(16.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = htmlAccent,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+                    focusedLabelColor = htmlAccent
+                )
+            )
+            Text(
+                text = stringResource(R.string.tool_html_url_help),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        } else {
+            // Raw HTML mode: template selector + code editor
+            Text(
+                text = stringResource(R.string.tool_html_template_title),
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
-            templates.forEach { (template, label) ->
-                val isSel = templateSelection == template
-                Card(
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = if (isSel) accentColor else containerColor,
-                        contentColor = if (isSel) Color.White else MaterialTheme.colorScheme.onSurface
-                    )
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                templateSelection = template
-                                val templateContent = when (template) {
-                                    "invoice" -> """<!DOCTYPE html>
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                val templates = listOf(
+                    "invoice" to stringResource(R.string.tool_html_template_invoice),
+                    "cv" to stringResource(R.string.tool_html_template_cv),
+                    "report" to stringResource(R.string.tool_html_template_report)
+                )
+
+                templates.forEach { (template, label) ->
+                    val isSel = templateSelection == template
+                    Card(
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (isSel) htmlAccent else MaterialTheme.colorScheme.surfaceContainerLow,
+                            contentColor = if (isSel) Color.White else MaterialTheme.colorScheme.onSurface
+                        )
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    templateSelection = template
+                                    val templateContent = when (template) {
+                                        "invoice" -> """<!DOCTYPE html>
 <html>
 <head>
 <style>
@@ -359,34 +498,34 @@ fun HtmlToolConfig(
       <tr>
         <td>Premium Android App UI & Architecture Consulting</td>
         <td style="text-align: center;">40 hrs</td>
-        <td style="text-align: right;">$150.00</td>
-        <td style="text-align: right;">$6,000.00</td>
+        <td style="text-align: right;">${'$'}150.00</td>
+        <td style="text-align: right;">${'$'}6,000.00</td>
       </tr>
       <tr>
         <td>PDF Conversion & Editing Engine Integration</td>
         <td style="text-align: center;">15 hrs</td>
-        <td style="text-align: right;">$150.00</td>
-        <td style="text-align: right;">$2,250.00</td>
+        <td style="text-align: right;">${'$'}150.00</td>
+        <td style="text-align: right;">${'$'}2,250.00</td>
       </tr>
       <tr>
         <td>Robolectric Offscreen WebView Test Bypass setup</td>
         <td style="text-align: center;">5 hrs</td>
-        <td style="text-align: right;">$150.00</td>
-        <td style="text-align: right;">$750.00</td>
+        <td style="text-align: right;">${'$'}150.00</td>
+        <td style="text-align: right;">${'$'}750.00</td>
       </tr>
     </tbody>
   </table>
   <div class="total-section">
-    Subtotal: $9,000.00<br>
-    Tax (0%): $0.00<br>
-    <span style="color: #E74C3C; font-size: 22px;">Total Due: $9,000.00</span>
+    Subtotal: ${'$'}9,000.00<br>
+    Tax (0%): ${'$'}0.00<br>
+    <span style="color: #E74C3C; font-size: 22px;">Total Due: ${'$'}9,000.00</span>
   </div>
   <div class="footer">
     Thank you for your business! Please pay within 30 days.
   </div>
 </body>
 </html>"""
-                                    "cv" -> """<!DOCTYPE html>
+                                        "cv" -> """<!DOCTYPE html>
 <html>
 <head>
 <style>
@@ -447,7 +586,7 @@ fun HtmlToolConfig(
   </div>
 </body>
 </html>"""
-                                    "report" -> """<!DOCTYPE html>
+                                        "report" -> """<!DOCTYPE html>
 <html>
 <head>
 <style>
@@ -486,55 +625,1230 @@ fun HtmlToolConfig(
   </p>
 </body>
 </html>"""
-                                    else -> ""
+                                        else -> ""
+                                    }
+                                    viewModel.htmlConfig.value = config.copy(htmlContent = templateContent)
                                 }
-                                viewModel.htmlConfig.value = config.copy(htmlContent = templateContent)
-                            }
-                            .padding(vertical = 12.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
+                                .padding(vertical = 12.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = label,
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            Text(
+                text = stringResource(R.string.tool_html_custom_source),
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            OutlinedTextField(
+                value = config.htmlContent,
+                onValueChange = { viewModel.htmlConfig.value = config.copy(htmlContent = it) },
+                placeholder = { Text(stringResource(R.string.tool_html_placeholder)) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(220.dp),
+                shape = RoundedCornerShape(16.dp),
+                maxLines = 15,
+                textStyle = androidx.compose.ui.text.TextStyle(
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                    fontSize = 12.sp
+                ),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = htmlAccent,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                )
+            )
+
+            Text(
+                text = stringResource(R.string.tool_html_help),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        // ─── 3. Rendering Options ────────────────────────────
+        Text(
+            text = stringResource(R.string.tool_html_rendering_options),
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        // JavaScript Toggle Card
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable {
+                    viewModel.htmlConfig.value = config.copy(loadJs = !config.loadJs)
+                },
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = if (config.loadJs) htmlAccent.copy(alpha = 0.1f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)
+            ),
+            border = androidx.compose.foundation.BorderStroke(
+                1.dp,
+                if (config.loadJs) htmlAccent else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+            )
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Code,
+                        contentDescription = "JavaScript",
+                        tint = if (config.loadJs) htmlAccent else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Column {
                         Text(
-                            text = label,
+                            text = stringResource(R.string.tool_html_load_js),
+                            style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
-                            style = MaterialTheme.typography.bodySmall
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = stringResource(R.string.tool_html_load_js_desc),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                Switch(
+                    checked = config.loadJs,
+                    onCheckedChange = { value ->
+                        viewModel.htmlConfig.value = config.copy(loadJs = value)
+                    },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Color.White,
+                        checkedTrackColor = htmlAccent,
+                        uncheckedBorderColor = MaterialTheme.colorScheme.outline
+                    )
+                )
+            }
+        }
+
+        // Background Graphics Toggle Card
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable {
+                    viewModel.htmlConfig.value = config.copy(loadBackgroundGraphics = !config.loadBackgroundGraphics)
+                },
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = if (config.loadBackgroundGraphics) htmlAccent.copy(alpha = 0.1f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)
+            ),
+            border = androidx.compose.foundation.BorderStroke(
+                1.dp,
+                if (config.loadBackgroundGraphics) htmlAccent else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+            )
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Image,
+                        contentDescription = "Background",
+                        tint = if (config.loadBackgroundGraphics) htmlAccent else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Column {
+                        Text(
+                            text = stringResource(R.string.tool_html_load_bg),
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = stringResource(R.string.tool_html_load_bg_desc),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                Switch(
+                    checked = config.loadBackgroundGraphics,
+                    onCheckedChange = { value ->
+                        viewModel.htmlConfig.value = config.copy(loadBackgroundGraphics = value)
+                    },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Color.White,
+                        checkedTrackColor = htmlAccent,
+                        uncheckedBorderColor = MaterialTheme.colorScheme.outline
+                    )
+                )
+            }
+        }
+
+        // ─── 4. Page Scale Slider ────────────────────────────
+        Text(
+            text = stringResource(R.string.tool_html_page_scale),
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)
+            ),
+            border = androidx.compose.foundation.BorderStroke(
+                1.dp,
+                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+            )
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.ZoomIn,
+                            contentDescription = "Scale",
+                            tint = htmlAccent,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Text(
+                            text = stringResource(R.string.tool_html_page_scale_desc),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Text(
+                        text = stringResource(R.string.tool_html_page_scale_value, (config.pageScale * 100).toInt()),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = htmlAccent
+                    )
+                }
+                Slider(
+                    value = config.pageScale,
+                    onValueChange = { viewModel.htmlConfig.value = config.copy(pageScale = it) },
+                    valueRange = 0.25f..2.0f,
+                    steps = 6,
+                    colors = SliderDefaults.colors(
+                        thumbColor = htmlAccent,
+                        activeTrackColor = htmlAccent,
+                        inactiveTrackColor = htmlAccent.copy(alpha = 0.2f)
+                    )
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("25%", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("100%", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("200%", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+
+        // ─── 5. Capture Area Toggle ──────────────────────────
+        Text(
+            text = stringResource(R.string.tool_html_capture_area),
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            val areas = listOf(
+                "whole_page" to stringResource(R.string.tool_html_capture_whole),
+                "selected_area" to stringResource(R.string.tool_html_capture_selected)
+            )
+            areas.forEach { (mode, title) ->
+                val isSelected = config.captureArea == mode
+                val cardBg = if (isSelected) htmlAccent.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)
+                val borderCol = if (isSelected) htmlAccent else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                val textCol = if (isSelected) htmlAccent else MaterialTheme.colorScheme.onSurface
+
+                Card(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(68.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(cardBg)
+                        .clickable {
+                            viewModel.htmlConfig.value = config.copy(captureArea = mode)
+                        },
+                    border = androidx.compose.foundation.BorderStroke(1.dp, borderCol),
+                    colors = CardDefaults.cardColors(containerColor = Color.Transparent)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (mode == "whole_page") Icons.Filled.Fullscreen else Icons.Filled.CropFree,
+                            contentDescription = title,
+                            tint = textCol,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Text(
+                            text = title,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = textCol
                         )
                     }
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(4.dp))
-
-        Text(
-            text = stringResource(R.string.tool_html_custom_source),
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-
-        OutlinedTextField(
-            value = config.htmlContent,
-            onValueChange = { viewModel.htmlConfig.value = config.copy(htmlContent = it) },
-            placeholder = { Text(stringResource(R.string.tool_html_placeholder)) },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(220.dp),
-            shape = RoundedCornerShape(16.dp),
-            maxLines = 15,
-            textStyle = androidx.compose.ui.text.TextStyle(
-                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                fontSize = 12.sp
-            ),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = accentColor,
-                unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+        // CSS Selector input — only visible when "Selected Area" is chosen
+        if (config.captureArea == "selected_area") {
+            OutlinedTextField(
+                value = config.selectedAreaSelector,
+                onValueChange = { viewModel.htmlConfig.value = config.copy(selectedAreaSelector = it) },
+                label = { Text(stringResource(R.string.tool_html_selector_label)) },
+                placeholder = { Text(stringResource(R.string.tool_html_selector_placeholder)) },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Filled.CropFree,
+                        contentDescription = "Selector",
+                        tint = htmlAccent
+                    )
+                },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                shape = RoundedCornerShape(16.dp),
+                textStyle = androidx.compose.ui.text.TextStyle(
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                    fontSize = 14.sp
+                ),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = htmlAccent,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+                    focusedLabelColor = htmlAccent
+                )
             )
-        )
+            Text(
+                text = stringResource(R.string.tool_html_selector_help),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun PdfToImageToolConfig(
+    viewModel: ToolViewModel,
+    accentColor: Color
+) {
+    val config by viewModel.pdfToImageConfig.collectAsState()
+    val selectedFiles by viewModel.selectedFiles.collectAsState()
+    val pageCount by viewModel.pageCount.collectAsState()
+    val context = LocalContext.current
+
+    // Theme-aware palette (adapts to dark / light mode)
+    val primaryBlue = accentColor
+    val selectedAccentBg = accentColor.copy(alpha = 0.15f)
+    val cardBg = MaterialTheme.colorScheme.surfaceContainerHigh
+    val fileCardBg = MaterialTheme.colorScheme.surfaceContainer
+    val borderCol = MaterialTheme.colorScheme.outlineVariant
+    val inactiveTrackCol = MaterialTheme.colorScheme.surfaceContainerHighest
+    val onSurfaceCol = MaterialTheme.colorScheme.onSurface
+    val onSurfaceMuted = MaterialTheme.colorScheme.onSurfaceVariant
+    val textFieldBg = MaterialTheme.colorScheme.surfaceContainerHigh
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        // File details card (at the top, if file is selected)
+        val selectedFile = selectedFiles.firstOrNull()
+        if (selectedFile != null) {
+            val fileName = getFileNameFromUri(context, selectedFile)
+            val fileSizeFormatted = getFileSizeFormatted(context, selectedFile)
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = fileCardBg
+                ),
+                border = BorderStroke(1.dp, borderCol)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // PDF Icon Box (blue square)
+                    Box(
+                        modifier = Modifier
+                            .size(56.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(primaryBlue),
+                            contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                imageVector = Icons.Filled.Description,
+                                contentDescription = "PDF",
+                                tint = Color.White,
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Text(
+                                text = "PDF",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White,
+                                fontSize = 9.sp
+                            )
+                        }
+                    }
+
+                    // Text Details
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = fileName,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = onSurfaceCol
+                        )
+                        val pageCountText = pageCount?.let { " · $it Pages" } ?: ""
+                        Text(
+                            text = "$fileSizeFormatted$pageCountText",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = onSurfaceMuted
+                        )
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.padding(top = 4.dp)
+                        ) {
+                            BadgeChip("SECURE")
+                            BadgeChip("A4 FORMAT")
+                        }
+                    }
+                }
+            }
+        }
+
+        // Conversion Settings Header
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(vertical = 4.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Tune,
+                contentDescription = "Settings",
+                tint = primaryBlue,
+                modifier = Modifier.size(20.dp)
+            )
+            Text(
+                text = "Conversion Settings",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+        }
+
+        // ─── 1. Output Format Selection ──────────────────────
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = cardBg),
+            border = BorderStroke(1.dp, borderCol)
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = "Output Format",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = onSurfaceMuted
+                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.surfaceContainerHighest, RoundedCornerShape(12.dp))
+                        .padding(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    val formats = listOf("JPG", "PNG", "WebP")
+                    formats.forEach { fmt ->
+                        val isSelected = config.format.equals(fmt, ignoreCase = true)
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(36.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(if (isSelected) primaryBlue else Color.Transparent)
+                                .clickable {
+                                    viewModel.pdfToImageConfig.value = config.copy(format = fmt.lowercase())
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = fmt,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                color = if (isSelected) Color.White else onSurfaceMuted
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // ─── 2. Image Quality Slider ─────────────────────────
+        if (config.format != "png") {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = cardBg),
+                border = BorderStroke(1.dp, borderCol)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Image Quality",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = onSurfaceMuted
+                        )
+                        Text(
+                            text = "${config.quality}%",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = primaryBlue
+                        )
+                    }
+                    Slider(
+                        value = config.quality.toFloat(),
+                        onValueChange = { viewModel.pdfToImageConfig.value = config.copy(quality = it.toInt()) },
+                        valueRange = 10f..100f,
+                        colors = SliderDefaults.colors(
+                            thumbColor = primaryBlue,
+                            activeTrackColor = primaryBlue,
+                            inactiveTrackColor = inactiveTrackCol
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Standard", style = MaterialTheme.typography.bodySmall, color = onSurfaceMuted)
+                        Text("High", style = MaterialTheme.typography.bodySmall, color = onSurfaceMuted)
+                        Text("Maximum", style = MaterialTheme.typography.bodySmall, color = onSurfaceMuted)
+                    }
+                }
+            }
+        }
+
+        // ─── 3. DPI / Resolution Selector ────────────────────
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = cardBg),
+            border = BorderStroke(1.dp, borderCol)
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = "Resolution (DPI)",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = onSurfaceMuted
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    val dpiOptions = listOf(
+                        150 to "Standard",
+                        300 to "Print",
+                        600 to "Ultra"
+                    )
+                    dpiOptions.forEach { (dpi, label) ->
+                        val isSelected = config.dpi == dpi
+                        val optionBg = if (isSelected) selectedAccentBg else MaterialTheme.colorScheme.surface
+                        val optionBorder = if (isSelected) primaryBlue else borderCol
+                        val textColor = if (isSelected) primaryBlue else onSurfaceCol
+                        val subColor = if (isSelected) primaryBlue else onSurfaceMuted
+
+                        Card(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(68.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable {
+                                    viewModel.pdfToImageConfig.value = config.copy(dpi = dpi)
+                                },
+                            border = BorderStroke(if (isSelected) 2.dp else 1.dp, optionBorder),
+                            colors = CardDefaults.cardColors(containerColor = optionBg)
+                        ) {
+                            Column(
+                                modifier = Modifier.fillMaxSize(),
+                                verticalArrangement = Arrangement.Center,
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = dpi.toString(),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = textColor
+                                )
+                                Text(
+                                    text = label,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = subColor
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // ─── 4. Page Selection ────────────────────────────────
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = cardBg),
+            border = BorderStroke(1.dp, borderCol)
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.MenuBook,
+                        contentDescription = "Pages",
+                        tint = primaryBlue,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Text(
+                        text = "Page Selection",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = onSurfaceMuted
+                    )
+                }
+
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    // Option 1: All Pages
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                viewModel.pdfToImageConfig.value = config.copy(pageSelection = "all")
+                            }
+                            .padding(vertical = 4.dp)
+                    ) {
+                        RadioButton(
+                            selected = config.pageSelection == "all",
+                            onClick = { viewModel.pdfToImageConfig.value = config.copy(pageSelection = "all") },
+                            colors = RadioButtonDefaults.colors(
+                                selectedColor = primaryBlue,
+                                unselectedColor = onSurfaceMuted
+                            )
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "All Pages (${pageCount ?: 1})",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                            color = onSurfaceCol
+                        )
+                    }
+
+                    // Option 2: Custom Range
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                viewModel.pdfToImageConfig.value = config.copy(pageSelection = "custom")
+                            }
+                            .padding(vertical = 4.dp)
+                    ) {
+                        RadioButton(
+                            selected = config.pageSelection == "custom",
+                            onClick = { viewModel.pdfToImageConfig.value = config.copy(pageSelection = "custom") },
+                            colors = RadioButtonDefaults.colors(
+                                selectedColor = primaryBlue,
+                                unselectedColor = onSurfaceMuted
+                            )
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Custom Range",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                            color = onSurfaceCol
+                        )
+                    }
+
+                    // Text Field underneath (visible in both, always active but auto-focus selects custom range)
+                    OutlinedTextField(
+                        value = config.customPageRange,
+                        onValueChange = {
+                            viewModel.pdfToImageConfig.value = config.copy(
+                                customPageRange = it,
+                                pageSelection = "custom"
+                            )
+                        },
+                        placeholder = {
+                            Text(
+                                text = "e.g. 1, 5-10",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = onSurfaceMuted
+                            )
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 4.dp),
+                        singleLine = true,
+                        shape = RoundedCornerShape(10.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = onSurfaceCol,
+                            unfocusedTextColor = onSurfaceCol,
+                            focusedBorderColor = primaryBlue,
+                            unfocusedBorderColor = borderCol,
+                            focusedContainerColor = textFieldBg,
+                            unfocusedContainerColor = textFieldBg
+                        )
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun BadgeChip(text: String) {
+    Box(
+        modifier = Modifier
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(100.dp))
+            .padding(horizontal = 10.dp, vertical = 4.dp)
+    ) {
         Text(
-            text = stringResource(R.string.tool_html_help),
-            style = MaterialTheme.typography.bodySmall,
+            text = text,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }
+
+fun getFileSizeFormatted(context: Context, uri: Uri): String {
+    return try {
+        var bytes = 0L
+        if (uri.scheme == "content") {
+            context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                val sizeIndex = cursor.getColumnIndex(android.provider.OpenableColumns.SIZE)
+                if (sizeIndex != -1 && cursor.moveToFirst()) {
+                    bytes = cursor.getLong(sizeIndex)
+                }
+            }
+        }
+        if (bytes == 0L) {
+            val path = uri.path
+            if (path != null) {
+                val file = java.io.File(path)
+                if (file.exists()) {
+                    bytes = file.length()
+                }
+            }
+        }
+        
+        if (bytes < 1024) {
+            "${bytes} B"
+        } else if (bytes < 1024 * 1024) {
+            String.format(java.util.Locale.US, "%.1f KB", bytes / 1024.0)
+        } else {
+            String.format(java.util.Locale.US, "%.1f MB", bytes / (1024.0 * 1024.0))
+        }
+    } catch (e: Exception) {
+        "0 B"
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun PdfToPptToolConfig(
+    viewModel: ToolViewModel,
+    accentColor: Color,
+    onPickFile: () -> Unit = {}
+) {
+    val config by viewModel.pdfToPptConfig.collectAsState()
+    val selectedFiles by viewModel.selectedFiles.collectAsState()
+    val pageCount by viewModel.pageCount.collectAsState()
+    val context = LocalContext.current
+
+    val isDark = isSystemInDarkTheme()
+    val primaryBlue = if (isDark) Color(0xFF64B5F6) else Color(0xFF004B95)
+    
+    // Card background & borders
+    val fileCardBg = if (isDark) Color(0xFF1E293B) else Color(0xFFEBEDF2)
+    val settingsCardBg = if (isDark) Color(0xFF1E293B) else Color(0xFFF1F3F7)
+    val innerSelectorBg = if (isDark) Color(0xFF0F172A) else Color(0xFFE8EBF0)
+    val selectorItemActiveBg = if (isDark) Color(0xFF1E3A8A) else Color(0xFFC4DFFF)
+    
+    // Text colors
+    val textPrimary = if (isDark) Color.White else Color(0xFF1E293B)
+    val textSecondary = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B)
+    val badgeBg = if (isDark) Color(0xFF1E3A8A) else Color(0xFFD3E2F4)
+    val badgeText = if (isDark) Color(0xFF90CAF9) else Color(0xFF0D47A1)
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        // File details preview card
+        val selectedFile = selectedFiles.firstOrNull()
+        if (selectedFile != null) {
+            val fileName = getFileNameFromUri(context, selectedFile)
+            val fileSizeFormatted = getFileSizeFormatted(context, selectedFile)
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = fileCardBg
+                )
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // PDF Real Thumbnail Preview
+                    Box(
+                        modifier = Modifier
+                            .size(width = 54.dp, height = 72.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(Color.White),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        PdfPagePreview(
+                            uri = selectedFile,
+                            pageIndex = 0,
+                            loadThumbnail = { uri, idx, width ->
+                                viewModel.renderPage(context, uri, idx, width)
+                            },
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+
+                    // Metadata texts
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                text = fileName,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = textPrimary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f)
+                            )
+                            IconButton(
+                                onClick = onPickFile,
+                                modifier = Modifier.size(24.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Edit,
+                                    contentDescription = "Edit File",
+                                    tint = textSecondary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                        
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            // PDF Badge
+                            Box(
+                                modifier = Modifier
+                                    .background(badgeBg, RoundedCornerShape(4.dp))
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = "PDF",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = badgeText,
+                                    fontSize = 9.sp
+                                )
+                            }
+                            val pageCountText = pageCount?.let { " · $it Pages" } ?: ""
+                            Text(
+                                text = "$fileSizeFormatted$pageCountText",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = textSecondary,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // Conversion Settings Section Header
+        Text(
+            text = stringResource(R.string.tool_pdf_to_ppt_conversion_settings),
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Bold,
+            color = primaryBlue,
+            letterSpacing = 0.5.sp,
+            modifier = Modifier.padding(top = 8.dp)
+        )
+
+        // Main Conversion settings box
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = settingsCardBg),
+            border = BorderStroke(1.dp, if (isDark) Color(0xFF334155) else Color(0xFFE2E8F0).copy(alpha = 0.8f))
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(20.dp)
+            ) {
+                // Slide Layout option selector
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = stringResource(R.string.tool_pdf_to_ppt_slide_layout),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = textPrimary
+                    )
+                    
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(innerSelectorBg, RoundedCornerShape(12.dp))
+                            .padding(4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        val layoutOptions = listOf(
+                            1 to stringResource(R.string.tool_pdf_to_ppt_layout_1),
+                            2 to stringResource(R.string.tool_pdf_to_ppt_layout_2),
+                            4 to stringResource(R.string.tool_pdf_to_ppt_layout_4)
+                        )
+                        layoutOptions.forEach { (option, label) ->
+                            val isSelected = config.slidesPerPage == option
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(38.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (isSelected) selectorItemActiveBg else Color.Transparent)
+                                    .clickable {
+                                        viewModel.pdfToPptConfig.value = config.copy(slidesPerPage = option)
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = label,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (isSelected) primaryBlue else textSecondary
+                                )
+                            }
+                        }
+                    }
+                }
+
+                HorizontalDivider(color = if (isDark) Color(0xFF334155) else Color(0xFFE2E8F0))
+
+                // Include Notes Switch
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(
+                            text = stringResource(R.string.tool_pdf_to_ppt_include_notes),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = textPrimary
+                        )
+                        Text(
+                            text = stringResource(R.string.tool_pdf_to_ppt_include_notes_desc),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = textSecondary
+                        )
+                    }
+                    Switch(
+                        checked = config.includeNotes,
+                        onCheckedChange = { value ->
+                            viewModel.pdfToPptConfig.value = config.copy(includeNotes = value)
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = primaryBlue,
+                            uncheckedBorderColor = if (isDark) Color(0xFF475569) else Color(0xFFCBD5E1)
+                        )
+                    )
+                }
+
+                HorizontalDivider(color = if (isDark) Color(0xFF334155) else Color(0xFFE2E8F0))
+
+                // OCR Switch
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(
+                            text = stringResource(R.string.tool_pdf_to_ppt_ocr),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = textPrimary
+                        )
+                        Text(
+                            text = stringResource(R.string.tool_pdf_to_ppt_ocr_desc),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = textSecondary
+                        )
+                    }
+                    Switch(
+                        checked = config.runOcr,
+                        onCheckedChange = { value ->
+                            viewModel.pdfToPptConfig.value = config.copy(runOcr = value)
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = primaryBlue,
+                            uncheckedBorderColor = if (isDark) Color(0xFF475569) else Color(0xFFCBD5E1)
+                        )
+                    )
+                }
+            }
+        }
+
+        // Export Format Section Header
+        Text(
+            text = stringResource(R.string.tool_pdf_to_ppt_export_format),
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Bold,
+            color = primaryBlue,
+            letterSpacing = 0.5.sp,
+            modifier = Modifier.padding(top = 8.dp)
+        )
+
+        // Export format card options row
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // PPTX card option
+            val isPptxSelected = config.exportFormat == "pptx"
+            Card(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(100.dp)
+                    .clickable {
+                        viewModel.pdfToPptConfig.value = config.copy(exportFormat = "pptx")
+                    },
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (isPptxSelected) (if (isDark) Color(0xFF1E293B) else Color.White) else (if (isDark) Color(0xFF0F172A) else Color(0xFFEFF2F6))
+                ),
+                border = BorderStroke(
+                    if (isPptxSelected) 2.dp else 1.dp,
+                    if (isPptxSelected) primaryBlue else (if (isDark) Color(0xFF334155) else Color(0xFFE2E8F0))
+                )
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Description,
+                        contentDescription = ".pptx",
+                        tint = if (isPptxSelected) primaryBlue else textSecondary,
+                        modifier = Modifier.size(28.dp)
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = ".pptx",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isPptxSelected) primaryBlue else textPrimary
+                    )
+                    Text(
+                        text = stringResource(R.string.tool_pdf_to_ppt_format_pptx_desc),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isPptxSelected) primaryBlue else textSecondary,
+                        fontSize = 9.sp
+                    )
+                }
+            }
+
+            // OTP card option
+            val isOtpSelected = config.exportFormat == "otp"
+            Card(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(100.dp)
+                    .clickable {
+                        viewModel.pdfToPptConfig.value = config.copy(exportFormat = "otp")
+                    },
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (isOtpSelected) (if (isDark) Color(0xFF1E293B) else Color.White) else (if (isDark) Color(0xFF0F172A) else Color(0xFFEFF2F6))
+                ),
+                border = BorderStroke(
+                    if (isOtpSelected) 2.dp else 1.dp,
+                    if (isOtpSelected) primaryBlue else (if (isDark) Color(0xFF334155) else Color(0xFFE2E8F0))
+                )
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Description,
+                        contentDescription = ".otp",
+                        tint = if (isOtpSelected) primaryBlue else textSecondary,
+                        modifier = Modifier.size(28.dp)
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = ".otp",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isOtpSelected) primaryBlue else textPrimary
+                    )
+                    Text(
+                        text = stringResource(R.string.tool_pdf_to_ppt_format_otp_desc),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isOtpSelected) primaryBlue else textSecondary,
+                        fontSize = 9.sp
+                    )
+                }
+            }
+        }
+
+        // Information Help Card
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = primaryBlue.copy(alpha = 0.08f)
+            ),
+            border = BorderStroke(1.dp, primaryBlue.copy(alpha = 0.2f))
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(14.dp),
+                verticalAlignment = Alignment.Top,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Info,
+                    contentDescription = "Info",
+                    tint = primaryBlue,
+                    modifier = Modifier.size(20.dp)
+                )
+                Text(
+                    text = stringResource(R.string.tool_pdf_to_ppt_help_text),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (isDark) Color.White.copy(alpha = 0.9f) else Color(0xFF334155),
+                    lineHeight = 18.sp
+                )
+            }
+        }
+    }
+}
+
+

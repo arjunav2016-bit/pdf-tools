@@ -19,6 +19,7 @@ import com.example.pdftools.ui.screens.MainScreen
 import com.example.pdftools.ui.screens.SettingsScreen
 import com.example.pdftools.ui.screens.ToolScreen
 import com.example.pdftools.ui.screens.OnboardingScreen
+import com.example.pdftools.ui.screens.scan.ScanFlowScreen
 import com.example.pdftools.ui.viewmodels.NavigationViewModel
 
 @Composable
@@ -54,7 +55,11 @@ fun MainNavigation() {
             entry<Main> {
                 MainScreen(
                     onToolClick = { tool ->
-                        backStack.add(ToolDetail(toolId = tool.id))
+                        if (tool.id == "scan_to_pdf") {
+                            backStack.add(ScanFlow)
+                        } else {
+                            backStack.add(ToolDetail(toolId = tool.id))
+                        }
                     },
                     onSettingsClick = { backStack.add(Settings) },
                     modifier = Modifier.safeDrawingPadding()
@@ -63,6 +68,13 @@ fun MainNavigation() {
 
             entry<Settings> {
                 SettingsScreen(
+                    onBack = { backStack.removeLastOrNull() },
+                    modifier = Modifier.safeDrawingPadding()
+                )
+            }
+
+            entry<ScanFlow> {
+                ScanFlowScreen(
                     onBack = { backStack.removeLastOrNull() },
                     modifier = Modifier.safeDrawingPadding()
                 )
@@ -89,3 +101,4 @@ fun MainNavigation() {
         }
     )
 }
+

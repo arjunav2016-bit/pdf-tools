@@ -54,16 +54,6 @@ fun ComingSoonScreen(
     val accentColor = if (isDarkTheme) tool.category.darkAccentColor else tool.category.accentColor
     val containerColor = if (isDarkTheme) tool.category.darkContainerColor else tool.category.containerColor
 
-    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
-    val pulseScale by infiniteTransition.animateFloat(
-        initialValue = 1f,
-        targetValue = 1.1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1000),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pulseScale"
-    )
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -101,7 +91,6 @@ fun ComingSoonScreen(
             Box(
                 modifier = Modifier
                     .size(100.dp)
-                    .scale(pulseScale)
                     .clip(CircleShape)
                     .background(containerColor),
                 contentAlignment = Alignment.Center

@@ -23,6 +23,9 @@ import org.robolectric.annotation.Config
 import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
 import java.io.File
 import java.io.IOException
+import org.apache.poi.xwpf.usermodel.XWPFDocument
+import org.apache.poi.xslf.usermodel.XMLSlideShow
+import org.apache.poi.xssf.usermodel.XSSFWorkbook
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
@@ -428,6 +431,70 @@ class PdfProcessorTest {
     }
 
     @Test
+    fun testConvertToPdfAWithNewControls() = kotlinx.coroutines.test.runTest {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val tempDir = context.cacheDir
+        val dummyPdfFile = File(tempDir, "dummy_pdfa_controls_${System.currentTimeMillis()}.pdf")
+        
+        com.tom_roush.pdfbox.pdmodel.PDDocument().use { doc ->
+            doc.addPage(com.tom_roush.pdfbox.pdmodel.PDPage())
+            doc.save(dummyPdfFile)
+        }
+
+        val dummyUri = Uri.fromFile(dummyPdfFile)
+
+        try {
+            val pdfaUri = pdfProcessor.convertToPdfA(
+                context = context,
+                uri = dummyUri,
+                conformanceLevel = "pdfa_2b",
+                embedFonts = true,
+                removeTransparencies = true,
+                convertSrgb = true,
+                title = "Archived Contract",
+                author = "ProForma Corp",
+                subject = "Legal"
+            )
+            val pdfaFile = File(pdfaUri.path ?: "")
+            assertTrue(pdfaFile.exists())
+
+            com.tom_roush.pdfbox.pdmodel.PDDocument.load(pdfaFile).use { doc ->
+                assertEquals(1, doc.numberOfPages)
+                val catalog = doc.documentCatalog
+                
+                // Assert that Output Intent is set
+                val outputIntents = catalog.outputIntents
+                assertEquals(1, outputIntents.size)
+                assertEquals("sRGB IEC61966-2.1", outputIntents[0].outputConditionIdentifier)
+                
+                // Assert Document Information attributes
+                assertEquals("Archived Contract", doc.documentInformation.title)
+                assertEquals("ProForma Corp", doc.documentInformation.author)
+                assertEquals("Legal", doc.documentInformation.subject)
+                
+                // Assert that metadata block is set and contains conformance & description schemas
+                val metadata = catalog.metadata
+                assertTrue(metadata != null)
+                val xmpText = metadata.exportXMPMetadata().use { stream ->
+                    stream.readBytes().toString(Charsets.UTF_8)
+                }
+                assertTrue(xmpText.contains("<pdfaid:part>2</pdfaid:part>"))
+                assertTrue(xmpText.contains("<pdfaid:conformance>B</pdfaid:conformance>"))
+                assertTrue(xmpText.contains("<dc:title>"))
+                assertTrue(xmpText.contains("Archived Contract"))
+                assertTrue(xmpText.contains("<dc:creator>"))
+                assertTrue(xmpText.contains("ProForma Corp"))
+                assertTrue(xmpText.contains("<dc:description>"))
+                assertTrue(xmpText.contains("Legal"))
+            }
+
+            pdfaFile.delete()
+        } finally {
+            dummyPdfFile.delete()
+        }
+    }
+
+    @Test
     fun testSignPdf() = kotlinx.coroutines.test.runTest {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         val tempDir = context.cacheDir
@@ -784,8 +851,276 @@ class PdfProcessorTest {
             val textStripper = com.tom_roush.pdfbox.text.PDFTextStripper()
             val text = textStripper.getText(doc)
             assertTrue(text.contains("HTML to PDF Offline Conversion"))
-            assertTrue(text.contains("Converted length:"))
+            assertTrue(text.contains("HTML content length:"))
         }
         outputFile.delete()
     }
+
+
+    @Test
+    fun testConvertPdfToImages_allPages() = kotlinx.coroutines.test.runTest {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val tempDir = context.cacheDir
+        val dummyPdfFile = File(tempDir, "dummy_images_${System.currentTimeMillis()}.pdf")
+
+        com.tom_roush.pdfbox.pdmodel.PDDocument().use { doc ->
+            doc.addPage(com.tom_roush.pdfbox.pdmodel.PDPage())
+            doc.addPage(com.tom_roush.pdfbox.pdmodel.PDPage())
+            doc.save(dummyPdfFile)
+        }
+
+        val dummyUri = Uri.fromFile(dummyPdfFile)
+
+        try {
+            val imageUris = pdfProcessor.convertPdfToImages(
+                context = context,
+                uri = dummyUri,
+                dpi = 150,
+                format = "jpg",
+                quality = 80,
+                pageSelection = "all",
+                customPageRange = ""
+            )
+
+            assertEquals(2, imageUris.size)
+            imageUris.forEach { uri ->
+                val file = File(uri.path ?: "")
+                assertTrue(file.exists())
+                assertTrue(file.name.endsWith(".jpg"))
+                file.delete()
+            }
+        } finally {
+            dummyPdfFile.delete()
+        }
+    }
+
+    @Test
+    fun testConvertPdfToImages_customPages() = kotlinx.coroutines.test.runTest {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val tempDir = context.cacheDir
+        val dummyPdfFile = File(tempDir, "dummy_images_custom_${System.currentTimeMillis()}.pdf")
+
+        com.tom_roush.pdfbox.pdmodel.PDDocument().use { doc ->
+            doc.addPage(com.tom_roush.pdfbox.pdmodel.PDPage()) // Index 0 (Page 1)
+            doc.addPage(com.tom_roush.pdfbox.pdmodel.PDPage()) // Index 1 (Page 2)
+            doc.addPage(com.tom_roush.pdfbox.pdmodel.PDPage()) // Index 2 (Page 3)
+            doc.save(dummyPdfFile)
+        }
+
+        val dummyUri = Uri.fromFile(dummyPdfFile)
+
+        try {
+            val imageUris = pdfProcessor.convertPdfToImages(
+                context = context,
+                uri = dummyUri,
+                dpi = 150,
+                format = "png",
+                quality = 100,
+                pageSelection = "custom",
+                customPageRange = "2" // 1-indexed, so it converts page index 1
+            )
+
+            assertEquals(1, imageUris.size)
+            val file = File(imageUris[0].path ?: "")
+            assertTrue(file.exists())
+            assertTrue(file.name.endsWith(".png"))
+            assertTrue(file.name.contains("Page_2"))
+            file.delete()
+        } finally {
+            dummyPdfFile.delete()
+        }
+    }
+
+    @Test
+    fun testConvertPdfToPpt_defaultOptions() = kotlinx.coroutines.test.runTest {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val tempDir = context.cacheDir
+        val dummyPdfFile = File(tempDir, "dummy_ppt_${System.currentTimeMillis()}.pdf")
+
+        com.tom_roush.pdfbox.pdmodel.PDDocument().use { doc ->
+            doc.addPage(com.tom_roush.pdfbox.pdmodel.PDPage())
+            doc.addPage(com.tom_roush.pdfbox.pdmodel.PDPage())
+            doc.save(dummyPdfFile)
+        }
+
+        val dummyUri = Uri.fromFile(dummyPdfFile)
+
+        try {
+            val pptUri = pdfProcessor.convertPdfToPpt(
+                context = context,
+                uri = dummyUri,
+                slidesPerPage = 1,
+                includeNotes = false,
+                runOcr = false,
+                exportFormat = "pptx"
+            )
+
+            val file = File(pptUri.path ?: "")
+            assertTrue(file.exists())
+            assertTrue(file.name.endsWith(".pptx"))
+            file.delete()
+        } finally {
+            dummyPdfFile.delete()
+        }
+    }
+
+    @Test
+    fun testConvertPdfToPpt_otpAndNotes() = kotlinx.coroutines.test.runTest {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val tempDir = context.cacheDir
+        val dummyPdfFile = File(tempDir, "dummy_ppt_otp_${System.currentTimeMillis()}.pdf")
+
+        com.tom_roush.pdfbox.pdmodel.PDDocument().use { doc ->
+            doc.addPage(com.tom_roush.pdfbox.pdmodel.PDPage())
+            doc.addPage(com.tom_roush.pdfbox.pdmodel.PDPage())
+            doc.save(dummyPdfFile)
+        }
+
+        val dummyUri = Uri.fromFile(dummyPdfFile)
+
+        try {
+            val pptUri = pdfProcessor.convertPdfToPpt(
+                context = context,
+                uri = dummyUri,
+                slidesPerPage = 2,
+                includeNotes = true,
+                runOcr = false,
+                exportFormat = "otp"
+            )
+
+            val file = File(pptUri.path ?: "")
+            assertTrue(file.exists())
+            assertTrue(file.name.endsWith(".otp"))
+            file.delete()
+        } finally {
+            dummyPdfFile.delete()
+        }
+    }
+
+    @Test
+    fun testConvertImagesToPdf() = kotlinx.coroutines.test.runTest {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val tempDir = context.cacheDir
+        val imgFile = File(tempDir, "img_${System.currentTimeMillis()}.jpg")
+        try {
+            val bmp = Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
+            imgFile.outputStream().use { out ->
+                bmp.compress(Bitmap.CompressFormat.JPEG, 90, out)
+            }
+            bmp.recycle()
+
+            val uris = listOf(Uri.fromFile(imgFile))
+            val outputUri = pdfProcessor.convertImagesToPdf(
+                context = context,
+                uris = uris,
+                pageSize = "auto",
+                orientation = "portrait",
+                margin = 0f,
+                maxSizeMb = null
+            )
+            val file = File(outputUri.path ?: "")
+            assertTrue(file.exists())
+            com.tom_roush.pdfbox.pdmodel.PDDocument.load(file).use { doc ->
+                assertEquals(1, doc.numberOfPages)
+            }
+            file.delete()
+        } finally {
+            imgFile.delete()
+        }
+    }
+
+    @Test
+    fun testConvertWordToPdf() = kotlinx.coroutines.test.runTest {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val tempDir = context.cacheDir
+        val wordFile = File(tempDir, "word_${System.currentTimeMillis()}.docx")
+        try {
+            XWPFDocument().use { doc ->
+                val p = doc.createParagraph()
+                val r = p.createRun()
+                r.setText("Hello Word to PDF conversion! With a tab\tcharacter.")
+                
+                val table = doc.createTable()
+                val row = table.createRow()
+                row.createCell().text = "Cell 1"
+                row.createCell().text = "Cell 2"
+
+                wordFile.outputStream().use { out ->
+                    doc.write(out)
+                }
+            }
+
+            val outputUri = pdfProcessor.convertWordToPdf(
+                context = context,
+                uri = Uri.fromFile(wordFile)
+            )
+            val file = File(outputUri.path ?: "")
+            assertTrue(file.exists())
+            file.delete()
+        } finally {
+            wordFile.delete()
+        }
+    }
+
+    @Test
+    fun testConvertPptToPdf() = kotlinx.coroutines.test.runTest {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val tempDir = context.cacheDir
+        val pptFile = File(tempDir, "ppt_${System.currentTimeMillis()}.pptx")
+        try {
+            XMLSlideShow().use { ppt ->
+                val slide = ppt.createSlide()
+                val textShape = slide.createTextBox()
+                textShape.text = "Hello PPT to PDF!"
+                
+                pptFile.outputStream().use { out ->
+                    ppt.write(out)
+                }
+            }
+
+            val outputUri = pdfProcessor.convertPptToPdf(
+                context = context,
+                uri = Uri.fromFile(pptFile)
+            )
+            val file = File(outputUri.path ?: "")
+            assertTrue(file.exists())
+            file.delete()
+        } finally {
+            pptFile.delete()
+        }
+    }
+
+    @Test
+    fun testConvertExcelToPdf() = kotlinx.coroutines.test.runTest {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val tempDir = context.cacheDir
+        val excelFile = File(tempDir, "excel_${System.currentTimeMillis()}.xlsx")
+        try {
+            XSSFWorkbook().use { wb ->
+                val sheet = wb.createSheet("Sheet 1")
+                val row = sheet.createRow(0)
+                row.createCell(0).setCellValue("Header 1")
+                row.createCell(1).setCellValue("Header 2")
+                val row2 = sheet.createRow(1)
+                row2.createCell(0).setCellValue("Value 1")
+                row2.createCell(1).setCellValue(123.45)
+                
+                excelFile.outputStream().use { out ->
+                    wb.write(out)
+                }
+            }
+
+            val outputUri = pdfProcessor.convertExcelToPdf(
+                context = context,
+                uri = Uri.fromFile(excelFile)
+            )
+            val file = File(outputUri.path ?: "")
+            assertTrue(file.exists())
+            file.delete()
+        } finally {
+            excelFile.delete()
+        }
+    }
 }
+
+

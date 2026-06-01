@@ -182,7 +182,17 @@ class OptimizeProcessor @Inject constructor() {
      * Converts standard PDF into archive-grade PDF/A-1b or PDF/A-2b by injecting compliance XMP metadata 
      * and output intent schemas.
      */
-    suspend fun convertToPdfA(context: Context, uri: Uri, conformanceLevel: String): Uri = withContext(Dispatchers.IO) {
+    suspend fun convertToPdfA(
+        context: Context,
+        uri: Uri,
+        conformanceLevel: String,
+        embedFonts: Boolean = true,
+        removeTransparencies: Boolean = false,
+        convertSrgb: Boolean = true,
+        title: String = "",
+        author: String = "",
+        subject: String = ""
+    ): Uri = withContext(Dispatchers.IO) {
         val tempInputFile = File.createTempFile("pdfa_input_", ".pdf", context.cacheDir)
         val outputFile = File(context.cacheDir, "Archived_${System.currentTimeMillis()}.pdf")
         
@@ -197,18 +207,46 @@ class OptimizeProcessor @Inject constructor() {
                 val catalog = doc.documentCatalog
                 
                 // 1. Inject sRGB Output Intent
-                val outputIntent = context.resources.openRawResource(R.raw.srgb).use { srgbProfile ->
-                    com.tom_roush.pdfbox.pdmodel.graphics.color.PDOutputIntent(doc, srgbProfile)
+                if (convertSrgb) {
+                    val outputIntent = context.resources.openRawResource(R.raw.srgb).use { srgbProfile ->
+                        com.tom_roush.pdfbox.pdmodel.graphics.color.PDOutputIntent(doc, srgbProfile)
+                    }
+                    outputIntent.info = "sRGB IEC61966-2.1"
+                    outputIntent.outputCondition = "sRGB IEC61966-2.1"
+                    outputIntent.outputConditionIdentifier = "sRGB IEC61966-2.1"
+                    outputIntent.registryName = "http://www.color.org"
+                    catalog.addOutputIntent(outputIntent)
                 }
-                outputIntent.info = "sRGB IEC61966-2.1"
-                outputIntent.outputCondition = "sRGB IEC61966-2.1"
-                outputIntent.outputConditionIdentifier = "sRGB IEC61966-2.1"
-                outputIntent.registryName = "http://www.color.org"
-                catalog.addOutputIntent(outputIntent)
 
+                // 2. Compliance check: Remove Transparent Objects
+                if (removeTransparencies) {
+                    for (page in doc.pages) {
+                        val resources = page.resources
+                        if (resources != null) {
+                            val extGStateNames = resources.extGStateNames?.toList() ?: emptyList()
+                            extGStateNames.forEach { name ->
+                                val extGState = resources.getExtGState(name)
+                                if (extGState != null) {
+                                    extGState.cosObject.setFloat(com.tom_roush.pdfbox.cos.COSName.getPDFName("CA"), 1.0f)
+                                    extGState.cosObject.setFloat(com.tom_roush.pdfbox.cos.COSName.getPDFName("ca"), 1.0f)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 3. Document Info Metadata
                 val documentInfo = doc.documentInformation
-                if (documentInfo.title.isNullOrBlank()) {
+                if (title.isNotEmpty()) {
+                    documentInfo.title = title
+                } else if (documentInfo.title.isNullOrBlank()) {
                     documentInfo.title = "Archived PDF"
+                }
+                if (author.isNotEmpty()) {
+                    documentInfo.author = author
+                }
+                if (subject.isNotEmpty()) {
+                    documentInfo.subject = subject
                 }
                 if (documentInfo.creator.isNullOrBlank()) {
                     documentInfo.creator = context.getString(R.string.app_name)
@@ -217,12 +255,21 @@ class OptimizeProcessor @Inject constructor() {
                     documentInfo.creationDate = GregorianCalendar()
                 }
                 
-                // 2. Inject XMP Metadata
+                // 4. Inject XMP Metadata
                 val metadata = com.tom_roush.pdfbox.pdmodel.common.PDMetadata(doc)
                 
                 // PDF/A identification schema
-                val part = if (conformanceLevel == "pdfa_2b") "2" else "1"
+                val part = when (conformanceLevel) {
+                    "pdfa_1b" -> "1"
+                    "pdfa_2b" -> "2"
+                    "pdfa_3b" -> "3"
+                    else -> "2"
+                }
                 val conformance = "B" // Basic conformance
+                
+                val xmpTitle = title.ifEmpty { documentInfo.title ?: "Archived PDF" }
+                val xmpAuthor = author.ifEmpty { documentInfo.author ?: "" }
+                val xmpSubject = subject.ifEmpty { documentInfo.subject ?: "" }
                 
                 val xmp = """
                     <?xpacket begin="" id="W5M0MpCehiHzreSzNTczkc9d"?>
@@ -231,6 +278,27 @@ class OptimizeProcessor @Inject constructor() {
                         <rdf:Description rdf:about="" xmlns:pdfaid="http://www.aiim.org/pdfa/ns/id/">
                           <pdfaid:part>$part</pdfaid:part>
                           <pdfaid:conformance>$conformance</pdfaid:conformance>
+                        </rdf:Description>
+                        <rdf:Description rdf:about="" xmlns:dc="http://purl.org/dc/elements/1.1/">
+                          <dc:title>
+                            <rdf:Alt>
+                              <rdf:li xml:lang="x-default">$xmpTitle</rdf:li>
+                            </rdf:Alt>
+                          </dc:title>
+                          ${if (xmpAuthor.isNotEmpty()) """
+                          <dc:creator>
+                            <rdf:Seq>
+                              <rdf:li>$xmpAuthor</rdf:li>
+                            </rdf:Seq>
+                          </dc:creator>
+                          """ else ""}
+                          ${if (xmpSubject.isNotEmpty()) """
+                          <dc:description>
+                            <rdf:Alt>
+                              <rdf:li xml:lang="x-default">$xmpSubject</rdf:li>
+                            </rdf:Alt>
+                          </dc:description>
+                          """ else ""}
                         </rdf:Description>
                       </rdf:RDF>
                     </x:xmpmeta>

@@ -77,44 +77,118 @@ class PdfProcessor @Inject constructor(
     suspend fun cropPdf(context: Context, uri: Uri, marginPercentage: Float, pageRange: String): Uri =
         optimizeProcessor.cropPdf(context, uri, marginPercentage, pageRange)
 
-    suspend fun convertToPdfA(context: Context, uri: Uri, conformanceLevel: String): Uri =
-        optimizeProcessor.convertToPdfA(context, uri, conformanceLevel)
+    suspend fun convertToPdfA(
+        context: Context,
+        uri: Uri,
+        conformanceLevel: String,
+        embedFonts: Boolean = true,
+        removeTransparencies: Boolean = false,
+        convertSrgb: Boolean = true,
+        title: String = "",
+        author: String = "",
+        subject: String = ""
+    ): Uri = optimizeProcessor.convertToPdfA(
+        context, uri, conformanceLevel, embedFonts, removeTransparencies, convertSrgb, title, author, subject
+    )
 
     // ===== Convert Operations (ConvertProcessor) =====
 
     suspend fun convertImagesToPdf(
         context: Context,
         uris: List<Uri>,
+        pageSize: String = "auto",
+        orientation: String = "portrait",
+        margin: Float = 0f,
+        maxSizeMb: Int? = null,
         onProgress: ((Float) -> Unit)? = null
-    ): Uri = convertProcessor.convertImagesToPdf(context, uris, onProgress)
+    ): Uri = convertProcessor.convertImagesToPdf(context, uris, pageSize, orientation, margin, maxSizeMb, onProgress)
 
     suspend fun convertPdfToImages(
         context: Context,
         uri: Uri,
         dpi: Int = 150,
+        format: String = "jpg",
+        quality: Int = 85,
+        pageSelection: String = "all",
+        customPageRange: String = "",
         onProgress: ((Float) -> Unit)? = null
-    ): List<Uri> = convertProcessor.convertPdfToImages(context, uri, dpi, onProgress)
+    ): List<Uri> = convertProcessor.convertPdfToImages(context, uri, dpi, format, quality, pageSelection, customPageRange, onProgress)
 
-    suspend fun scanToPdf(context: Context, imageUris: List<Uri>, rotations: List<Int>, filter: String): Uri =
-        convertProcessor.scanToPdf(context, imageUris, rotations, filter)
+    suspend fun scanToPdf(
+        context: Context,
+        imageUris: List<Uri>,
+        rotations: List<Int>,
+        filter: String,
+        pageSize: String = "auto",
+        quality: Int = 85,
+        onProgress: ((Float) -> Unit)? = null
+    ): Uri = convertProcessor.scanToPdf(context, imageUris, rotations, filter, pageSize, quality, onProgress)
 
-    suspend fun convertHtmlToPdf(context: Context, htmlContent: String): Uri =
-        convertProcessor.convertHtmlToPdf(context, htmlContent)
+    suspend fun convertHtmlToPdf(
+        context: Context,
+        htmlContent: String,
+        inputType: String = "html",
+        url: String = "",
+        loadJs: Boolean = true,
+        loadBackgroundGraphics: Boolean = true,
+        pageScale: Float = 1.0f,
+        captureArea: String = "whole_page",
+        selectedAreaSelector: String = ""
+    ): Uri = convertProcessor.convertHtmlToPdf(
+        context, htmlContent, inputType, url, loadJs,
+        loadBackgroundGraphics, pageScale, captureArea, selectedAreaSelector
+    )
 
-    suspend fun convertWordToPdf(context: Context, uri: Uri): Uri =
-        convertProcessor.convertWordToPdf(context, uri)
+    suspend fun convertWordToPdf(
+        context: Context,
+        uri: Uri,
+        maintainLayout: Boolean = true,
+        imageQuality: String = "medium",
+        runOcr: Boolean = false
+    ): Uri = convertProcessor.convertWordToPdf(context, uri, maintainLayout, imageQuality, runOcr)
 
-    suspend fun convertPptToPdf(context: Context, uri: Uri): Uri =
-        convertProcessor.convertPptToPdf(context, uri)
+    suspend fun convertPptToPdf(
+        context: Context,
+        uri: Uri,
+        slideRange: String = "all",
+        customRange: String = "",
+        selectedSlides: Set<Int> = emptySet(),
+        slidesPerPage: Int = 1,
+        includeNotes: Boolean = false,
+        quality: String = "medium"
+    ): Uri = convertProcessor.convertPptToPdf(
+        context, uri, slideRange, customRange, selectedSlides,
+        slidesPerPage, includeNotes, quality
+    )
 
-    suspend fun convertExcelToPdf(context: Context, uri: Uri): Uri =
-        convertProcessor.convertExcelToPdf(context, uri)
+    suspend fun getSlideCount(context: Context, uri: Uri): Int =
+        convertProcessor.getSlideCount(context, uri)
+
+    suspend fun getSlidePreviewTexts(context: Context, uri: Uri): List<String> =
+        convertProcessor.getSlidePreviewTexts(context, uri)
+
+    suspend fun convertExcelToPdf(
+        context: Context,
+        uri: Uri,
+        convertMode: String = "all_sheets",
+        scalingMode: String = "fit_columns",
+        showGridlines: Boolean = true
+    ): Uri = convertProcessor.convertExcelToPdf(context, uri, convertMode, scalingMode, showGridlines)
+
 
     suspend fun convertPdfToWord(context: Context, uri: Uri): Uri =
         convertProcessor.convertPdfToWord(context, uri)
 
-    suspend fun convertPdfToPpt(context: Context, uri: Uri): Uri =
-        convertProcessor.convertPdfToPpt(context, uri)
+    suspend fun convertPdfToPpt(
+        context: Context,
+        uri: Uri,
+        slidesPerPage: Int = 1,
+        includeNotes: Boolean = false,
+        runOcr: Boolean = true,
+        exportFormat: String = "pptx"
+    ): Uri =
+        convertProcessor.convertPdfToPpt(context, uri, slidesPerPage, includeNotes, runOcr, exportFormat)
+
 
     suspend fun convertPdfToExcel(context: Context, uri: Uri): Uri =
         convertProcessor.convertPdfToExcel(context, uri)

@@ -92,12 +92,13 @@ class EditProcessor @Inject constructor() {
                         contentStream.setGraphicsStateParameters(extGS)
                         contentStream.setNonStrokingColor(r, g, b)
                         
+                        val safeText = text.filter { it.code in 32..126 }
                         val font = PDType1Font.HELVETICA_BOLD
                         contentStream.beginText()
                         contentStream.setFont(font, fontSize)
                         
                         // Calculate dimensions for text centering
-                        val textWidth = font.getStringWidth(text) / 1000f * fontSize
+                        val textWidth = font.getStringWidth(safeText) / 1000f * fontSize
                         val textHeight = fontSize
                         
                         // Set text rotation and translation around the center of the page
@@ -113,7 +114,7 @@ class EditProcessor @Inject constructor() {
                         contentStream.setTextMatrix(cos.toDouble(), sin.toDouble(), -sin.toDouble(), cos.toDouble(), cx.toDouble(), cy.toDouble())
                         contentStream.newLineAtOffset(-textWidth / 2f, -textHeight / 4f)
                         
-                        contentStream.showText(text)
+                        contentStream.showText(safeText)
                         contentStream.endText()
                     }
                 }

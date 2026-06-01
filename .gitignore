@@ -13,3 +13,15 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+
+# Local scratch at repo root
+/*.pptx
+/*.ppt
+/*.pdf
+/PROJECT_OUTLINE.txt

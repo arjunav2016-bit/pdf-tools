@@ -82,8 +82,16 @@ data class EditConfig(
     val imageAnnotations: List<ImageAnnotation> = emptyList()
 )
 
+
 data class HtmlConfig(
-    val htmlContent: String = "<html><body><h1>Offline PDF Document</h1><p>Created with Android PDF Tools</p></body></html>"
+    val htmlContent: String = "<html><body><h1>Offline PDF Document</h1><p>Created with Android PDF Tools</p></body></html>",
+    val inputType: String = "url", // "url", "html"
+    val url: String = "https://www.google.com",
+    val loadJs: Boolean = true,
+    val loadBackgroundGraphics: Boolean = true,
+    val pageScale: Float = 1.0f,
+    val captureArea: String = "whole_page", // "whole_page", "selected_area"
+    val selectedAreaSelector: String = ""
 )
 
 data class OcrConfig(
@@ -96,5 +104,70 @@ data class CompareConfig(
 )
 
 data class PdfaConfig(
-    val conformanceLevel: String = "pdfa_1b"
+    val conformanceLevel: String = "pdfa_2b",
+    val embedFonts: Boolean = true,
+    val removeTransparencies: Boolean = false,
+    val convertSrgb: Boolean = true,
+    val title: String = "",
+    val author: String = "",
+    val subject: String = ""
 )
+
+enum class CompressTier {
+    BASIC,
+    RECOMMENDED,
+    EXTREME
+}
+
+data class CompressConfig(
+    val tier: CompressTier = CompressTier.RECOMMENDED
+)
+
+data class JpgToPdfConfig(
+    val pageSize: String = "auto",       // "auto", "a4", "letter"
+    val orientation: String = "portrait", // "portrait", "landscape"
+    val margin: Float = 0f,              // 0f (none), 12f (small), 24f (medium), 36f (large)
+    val maxSizeMb: Int? = null           // null (unlimited), 1, 2, 5
+)
+
+data class WordToPdfConfig(
+    val maintainLayout: Boolean = true,
+    val imageQuality: String = "medium", // "low", "medium", "high"
+    val runOcr: Boolean = false
+)
+
+data class PdfToWordConfig(
+    val conversionMode: String = "standard", // "standard", "ocr"
+    val keepOriginalLayout: Boolean = true
+)
+
+data class PptToPdfConfig(
+    val slideRange: String = "all",          // "all" or "custom"
+    val customRange: String = "",            // e.g. "1-5, 8"
+    val selectedSlides: Set<Int> = emptySet(), // visual selection state (1-indexed)
+    val slidesPerPage: Int = 1,              // 1, 2, or 4
+    val includeNotes: Boolean = false,
+    val quality: String = "medium"           // "low", "medium", "high"
+)
+
+data class ExcelToPdfConfig(
+    val convertMode: String = "all_sheets", // "active_sheet", "all_sheets"
+    val scalingMode: String = "fit_columns", // "no_scaling", "fit_columns", "fit_rows", "fit_all"
+    val showGridlines: Boolean = true
+)
+
+data class PdfToImageConfig(
+    val format: String = "jpg",        // "jpg", "png", "webp"
+    val quality: Int = 85,             // 1-100 (only for jpg/webp, png is lossless)
+    val dpi: Int = 150,                // 72, 150, 200, 300
+    val pageSelection: String = "all", // "all", "custom"
+    val customPageRange: String = ""   // e.g. "1-5, 8"
+)
+
+data class PdfToPptConfig(
+    val slidesPerPage: Int = 1,
+    val includeNotes: Boolean = false,
+    val runOcr: Boolean = true,
+    val exportFormat: String = "pptx"
+)
+
