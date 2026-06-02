@@ -68,4 +68,4 @@ We'll know we're right when:
 | `accentColor` is not the right token for one specific surgical screen and contrast regresses in dark mode for that screen. | Low | Low — `accentColor` is the documented token for tool config UIs (`AGENTS.md:88-92`). | Manual emulator toggle during the Verification Plan; if contrast regresses, escalate to Open Question Q1 with a numerical target. |
 
 ---
-*Status: DRAFT — requirements only. Implementation planning pending via /plan.*
+*Status: COMPLETE — fully implemented, verified, and committed on June 2, 2026.*
