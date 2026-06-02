@@ -2251,7 +2251,6 @@ fun RemovePagesSurgicalScreen(
 ) {
     val context = LocalContext.current
     val selectedFile = selectedFiles.firstOrNull()
-    val removeRed = Color(0xFFC0392B)
 
     LaunchedEffect(selectedFile) {
         selectedFile?.let { viewModel.loadPageCount(context, it) }
@@ -2514,9 +2513,9 @@ fun RemovePagesSurgicalScreen(
                                     .height(56.dp),
                                 shape = RoundedCornerShape(28.dp),
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = removeRed.copy(alpha = 0.4f),
+                                    containerColor = accentColor.copy(alpha = 0.4f),
                                     contentColor = Color.White.copy(alpha = 0.6f),
-                                    disabledContainerColor = removeRed.copy(alpha = 0.4f),
+                                    disabledContainerColor = accentColor.copy(alpha = 0.4f),
                                     disabledContentColor = Color.White.copy(alpha = 0.6f)
                                 )
                             ) {
@@ -2548,9 +2547,9 @@ fun RemovePagesSurgicalScreen(
                                     .height(56.dp),
                                 shape = RoundedCornerShape(28.dp),
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = removeRed,
+                                    containerColor = accentColor,
                                     contentColor = Color.White,
-                                    disabledContainerColor = removeRed.copy(alpha = 0.3f),
+                                    disabledContainerColor = accentColor.copy(alpha = 0.3f),
                                     disabledContentColor = Color.White.copy(alpha = 0.5f)
                                 )
                             ) {
@@ -2606,7 +2605,7 @@ fun RemovePagesSurgicalScreen(
                     ) {
                         androidx.compose.material3.CircularProgressIndicator(
                             modifier = Modifier.size(52.dp),
-                            color = removeRed,
+                            color = accentColor,
                             strokeWidth = 4.dp
                         )
 
@@ -2631,8 +2630,8 @@ fun RemovePagesSurgicalScreen(
                         Spacer(modifier = Modifier.height(24.dp))
 
                         androidx.compose.material3.LinearProgressIndicator(
-                            color = removeRed,
-                            trackColor = removeRed.copy(alpha = 0.15f),
+                            color = accentColor,
+                            trackColor = accentColor.copy(alpha = 0.15f),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(5.dp)
@@ -4570,13 +4569,13 @@ fun OcrPdfSurgicalScreen(
                                     modifier = Modifier
                                         .size(56.dp)
                                         .clip(RoundedCornerShape(12.dp))
-                                        .background(if (isDark) Color(0xFFE67E22).copy(alpha = 0.15f) else Color(0xFFFDF2E9)), // Soft light orange background tint
+                                        .background(if (isDark) accentColor.copy(alpha = 0.15f) else containerColor), // Theme-aware background tint
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Icon(
                                         imageVector = Icons.Filled.PictureAsPdf,
                                         contentDescription = "PDF Icon",
-                                        tint = Color(0xFFE67E22), // Orange tint
+                                        tint = accentColor,
                                         modifier = Modifier.size(28.dp)
                                     )
                                 }
@@ -4605,14 +4604,14 @@ fun OcrPdfSurgicalScreen(
                                         Text(
                                             text = "•",
                                             style = MaterialTheme.typography.bodyMedium,
-                                            color = Color(0xFFE67E22),
+                                            color = accentColor,
                                             fontWeight = FontWeight.Bold
                                         )
                                         Text(
                                             text = "Scanned Image",
                                             style = MaterialTheme.typography.bodyMedium,
                                             fontWeight = FontWeight.Bold,
-                                            color = Color(0xFFE67E22)
+                                            color = accentColor
                                         )
                                     }
                                 }
@@ -5116,13 +5115,13 @@ fun JpgToPdfSurgicalScreen(
                                 modifier = Modifier
                                     .size(56.dp)
                                     .clip(RoundedCornerShape(12.dp))
-                                    .background(if (isDark) Color(0xFFE67E22).copy(alpha = 0.15f) else Color(0xFFFDF2E9)), // soft orange tint
+                                    .background(if (isDark) accentColor.copy(alpha = 0.15f) else containerColor), // theme-aware tint
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     imageVector = Icons.Filled.PictureAsPdf,
                                     contentDescription = "Images to PDF",
-                                    tint = Color(0xFFE67E22), // Keep it orange matching convert to pdf
+                                    tint = accentColor,
                                     modifier = Modifier.size(28.dp)
                                 )
                             }
@@ -6614,14 +6613,14 @@ fun ExcelToPdfSurgicalScreen(
                                         Text(
                                             text = "•",
                                             style = MaterialTheme.typography.bodyMedium,
-                                            color = Color(0xFF217346),
+                                            color = accentColor,
                                             fontWeight = FontWeight.Bold
                                         )
                                         Text(
                                             text = "Microsoft Excel",
                                             style = MaterialTheme.typography.bodyMedium,
                                             fontWeight = FontWeight.Bold,
-                                            color = Color(0xFF217346)
+                                            color = accentColor
                                         )
                                     }
                                 }
@@ -6977,7 +6976,7 @@ fun ExcelToPdfSurgicalScreen(
                     ) {
                         androidx.compose.material3.CircularProgressIndicator(
                             modifier = Modifier.size(52.dp),
-                            color = Color(0xFF217346),
+                            color = accentColor,
                             strokeWidth = 4.dp
                         )
 
@@ -7002,8 +7001,8 @@ fun ExcelToPdfSurgicalScreen(
                         Spacer(modifier = Modifier.height(24.dp))
 
                         androidx.compose.material3.LinearProgressIndicator(
-                            color = Color(0xFF217346),
-                            trackColor = Color(0xFF217346).copy(alpha = 0.15f),
+                            color = accentColor,
+                            trackColor = accentColor.copy(alpha = 0.15f),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(5.dp)
@@ -8013,9 +8012,9 @@ fun PdfToImageSurgicalScreen(
                                     .height(56.dp),
                                 shape = RoundedCornerShape(28.dp),
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFF004B95).copy(alpha = 0.4f),
+                                    containerColor = accentColor.copy(alpha = 0.4f),
                                     contentColor = Color.White.copy(alpha = 0.6f),
-                                    disabledContainerColor = Color(0xFF004B95).copy(alpha = 0.4f),
+                                    disabledContainerColor = accentColor.copy(alpha = 0.4f),
                                     disabledContentColor = Color.White.copy(alpha = 0.6f)
                                 )
                             ) {
@@ -8045,7 +8044,7 @@ fun PdfToImageSurgicalScreen(
                                     .height(56.dp),
                                 shape = RoundedCornerShape(28.dp),
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFF004B95),
+                                    containerColor = accentColor,
                                     contentColor = Color.White
                                 )
                             ) {
@@ -8106,7 +8105,7 @@ fun PdfToImageSurgicalScreen(
                     ) {
                         androidx.compose.material3.CircularProgressIndicator(
                             modifier = Modifier.size(52.dp),
-                            color = Color(0xFF004B95),
+                            color = accentColor,
                             strokeWidth = 4.dp
                         )
 
@@ -8131,8 +8130,8 @@ fun PdfToImageSurgicalScreen(
                         Spacer(modifier = Modifier.height(24.dp))
 
                         androidx.compose.material3.LinearProgressIndicator(
-                            color = Color(0xFF004B95),
-                            trackColor = Color(0xFF004B95).copy(alpha = 0.15f),
+                            color = accentColor,
+                            trackColor = accentColor.copy(alpha = 0.15f),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(5.dp)
@@ -8237,9 +8236,9 @@ fun PdfToPptSurgicalScreen(
                                     .height(56.dp),
                                 shape = RoundedCornerShape(28.dp),
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFF004B95).copy(alpha = 0.4f),
+                                    containerColor = accentColor.copy(alpha = 0.4f),
                                     contentColor = Color.White.copy(alpha = 0.6f),
-                                    disabledContainerColor = Color(0xFF004B95).copy(alpha = 0.4f),
+                                    disabledContainerColor = accentColor.copy(alpha = 0.4f),
                                     disabledContentColor = Color.White.copy(alpha = 0.6f)
                                 )
                             ) {
@@ -8269,7 +8268,7 @@ fun PdfToPptSurgicalScreen(
                                     .height(56.dp),
                                 shape = RoundedCornerShape(28.dp),
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFF004B95),
+                                    containerColor = accentColor,
                                     contentColor = Color.White
                                 )
                             ) {
@@ -8325,7 +8324,7 @@ fun PdfToPptSurgicalScreen(
                     ) {
                         androidx.compose.material3.CircularProgressIndicator(
                             modifier = Modifier.size(52.dp),
-                            color = Color(0xFF004B95),
+                            color = accentColor,
                             strokeWidth = 4.dp
                         )
 
@@ -8350,8 +8349,8 @@ fun PdfToPptSurgicalScreen(
                         Spacer(modifier = Modifier.height(24.dp))
 
                         androidx.compose.material3.LinearProgressIndicator(
-                            color = Color(0xFF004B95),
-                            trackColor = Color(0xFF004B95).copy(alpha = 0.15f),
+                            color = accentColor,
+                            trackColor = accentColor.copy(alpha = 0.15f),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(5.dp)
@@ -8456,9 +8455,9 @@ fun PdfToPdfaSurgicalScreen(
                                     .height(56.dp),
                                 shape = RoundedCornerShape(28.dp),
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFF004B95).copy(alpha = 0.4f),
+                                    containerColor = accentColor.copy(alpha = 0.4f),
                                     contentColor = Color.White.copy(alpha = 0.6f),
-                                    disabledContainerColor = Color(0xFF004B95).copy(alpha = 0.4f),
+                                    disabledContainerColor = accentColor.copy(alpha = 0.4f),
                                     disabledContentColor = Color.White.copy(alpha = 0.6f)
                                 )
                             ) {
@@ -8488,7 +8487,7 @@ fun PdfToPdfaSurgicalScreen(
                                     .height(56.dp),
                                 shape = RoundedCornerShape(28.dp),
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFF004B95),
+                                    containerColor = accentColor,
                                     contentColor = Color.White
                                 )
                             ) {
@@ -8541,7 +8540,7 @@ fun PdfToPdfaSurgicalScreen(
                     ) {
                         androidx.compose.material3.CircularProgressIndicator(
                             modifier = Modifier.size(52.dp),
-                            color = Color(0xFF004B95),
+                            color = accentColor,
                             strokeWidth = 4.dp
                         )
 
@@ -8566,8 +8565,8 @@ fun PdfToPdfaSurgicalScreen(
                         Spacer(modifier = Modifier.height(24.dp))
 
                         androidx.compose.material3.LinearProgressIndicator(
-                            color = Color(0xFF004B95),
-                            trackColor = Color(0xFF004B95).copy(alpha = 0.15f),
+                            color = accentColor,
+                            trackColor = accentColor.copy(alpha = 0.15f),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(5.dp)
