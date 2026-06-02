@@ -467,7 +467,7 @@ private fun ProcessingContent(
     ) {
         if (progress != null) {
             CircularProgressIndicator(
-                progress = { progress },
+                progress = progress,
                 modifier = Modifier.size(80.dp),
                 strokeWidth = 6.dp,
                 color = accentColor,

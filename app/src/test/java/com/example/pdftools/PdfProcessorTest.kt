@@ -1121,6 +1121,41 @@ class PdfProcessorTest {
             excelFile.delete()
         }
     }
+
+    @Test
+    fun testConvertPdfToExcel() = kotlinx.coroutines.test.runTest {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val tempDir = context.cacheDir
+        val dummyPdfFile = File(tempDir, "dummy_excel_${System.currentTimeMillis()}.pdf")
+        
+        try {
+            com.tom_roush.pdfbox.pdmodel.PDDocument().use { doc ->
+                val page = com.tom_roush.pdfbox.pdmodel.PDPage()
+                doc.addPage(page)
+                com.tom_roush.pdfbox.pdmodel.PDPageContentStream(doc, page).use { content ->
+                    content.beginText()
+                    content.setFont(com.tom_roush.pdfbox.pdmodel.font.PDType1Font.HELVETICA, 12f)
+                    content.newLineAtOffset(100f, 700f)
+                    content.showText("Header 1  Header 2")
+                    content.newLineAtOffset(0f, -15f)
+                    content.showText("Val 1  123.45")
+                    content.endText()
+                }
+                doc.save(dummyPdfFile)
+            }
+
+            val outputUri = pdfProcessor.convertPdfToExcel(
+                context = context,
+                uri = Uri.fromFile(dummyPdfFile)
+            )
+            val file = File(outputUri.path ?: "")
+            assertTrue(file.exists())
+            assertTrue(file.name.endsWith(".xlsx"))
+            file.delete()
+        } finally {
+            dummyPdfFile.delete()
+        }
+    }
 }
 
 

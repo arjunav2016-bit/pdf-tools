@@ -482,6 +482,20 @@ fun ToolScreen(
                 accentColor = accentColor,
                 containerColor = containerColor
             )
+        } else if (tool.id == "pdf_to_excel" && selectedFiles.isNotEmpty()) {
+            PdfToExcelSurgicalScreen(
+                tool = tool,
+                viewModel = viewModel,
+                selectedFiles = selectedFiles,
+                pageCount = pageCount,
+                isProcessing = isProcessing,
+                isComplete = isComplete,
+                outputUris = outputUris,
+                progress = progress,
+                innerPadding = innerPadding,
+                accentColor = accentColor,
+                containerColor = containerColor
+            )
         } else if (tool.id == "ppt_to_pdf" && selectedFiles.isNotEmpty()) {
             PptToPdfSurgicalScreen(
                 tool = tool,
@@ -1355,12 +1369,20 @@ fun ExtractPagesSurgicalScreen(
                                 horizontalAlignment = Alignment.CenterHorizontally,
                                 verticalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
-                                androidx.compose.material3.LinearProgressIndicator(
-                                    progress = { progress ?: 0f },
-                                    color = accentColor,
-                                    trackColor = containerColor,
-                                    modifier = Modifier.fillMaxWidth()
-                                )
+                                if (progress != null) {
+                                    androidx.compose.material3.LinearProgressIndicator(
+                                        progress = progress,
+                                        color = accentColor,
+                                        trackColor = containerColor,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                } else {
+                                    androidx.compose.material3.LinearProgressIndicator(
+                                        color = accentColor,
+                                        trackColor = containerColor,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                }
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -6013,15 +6035,26 @@ fun PdfToWordSurgicalScreen(
                             textAlign = TextAlign.Center
                         )
                         Spacer(modifier = Modifier.height(22.dp))
-                        LinearProgressIndicator(
-                            progress = { progress ?: 0.65f },
-                            color = wordBlue,
-                            trackColor = wordBlue.copy(alpha = 0.15f),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(6.dp)
-                                .clip(RoundedCornerShape(3.dp))
-                        )
+                        if (progress != null) {
+                            LinearProgressIndicator(
+                                progress = progress,
+                                color = wordBlue,
+                                trackColor = wordBlue.copy(alpha = 0.15f),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(6.dp)
+                                    .clip(RoundedCornerShape(3.dp))
+                            )
+                        } else {
+                            LinearProgressIndicator(
+                                color = wordBlue,
+                                trackColor = wordBlue.copy(alpha = 0.15f),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(6.dp)
+                                    .clip(RoundedCornerShape(3.dp))
+                            )
+                        }
                     }
                 }
             }
@@ -8572,6 +8605,354 @@ fun PdfToPdfaSurgicalScreen(
                                 .height(5.dp)
                                 .clip(RoundedCornerShape(3.dp))
                         )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun PdfToExcelSurgicalScreen(
+    tool: PdfTool,
+    viewModel: ToolViewModel,
+    selectedFiles: List<Uri>,
+    pageCount: Int?,
+    isProcessing: Boolean,
+    isComplete: Boolean,
+    outputUris: List<Uri>,
+    progress: Float?,
+    innerPadding: PaddingValues,
+    accentColor: Color,
+    containerColor: Color
+) {
+    val context = LocalContext.current
+    val selectedFile = selectedFiles.firstOrNull()
+    val excelGreen = accentColor
+    val panelBackground = MaterialTheme.colorScheme.surfaceContainer
+    val selectedBackground = accentColor.copy(alpha = 0.15f)
+
+    val fileSize = remember(selectedFile) {
+        selectedFile?.let { getFileSize(context, it) } ?: 0L
+    }
+    val fileName = remember(selectedFile) {
+        selectedFile?.let { getFileNameFromUri(context, it) } ?: "Quarterly_Report.pdf"
+    }
+
+    LaunchedEffect(selectedFile) {
+        selectedFile?.let { viewModel.loadPageCount(context, it) }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(innerPadding)
+    ) {
+        if (isComplete) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 20.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                SuccessCard(
+                    tool = tool,
+                    outputUris = outputUris,
+                    onClear = { viewModel.reset() },
+                    accentColor = accentColor,
+                    containerColor = containerColor
+                )
+            }
+        } else {
+            Column(modifier = Modifier.fillMaxSize()) {
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(horizontal = 20.dp)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Text(
+                        text = "Selected File",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    selectedFile?.let {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(14.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(14.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(44.dp)
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.PictureAsPdf,
+                                        contentDescription = "PDF Document",
+                                        tint = MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                }
+
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = fileName,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Spacer(modifier = Modifier.height(3.dp))
+                                    Text(
+                                        text = buildString {
+                                            append(formatFileSize(fileSize))
+                                            append(" - PDF Document")
+                                            pageCount?.takeIf { it > 0 }?.let { append(" - $it pages") }
+                                        },
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+
+                                IconButton(
+                                    onClick = { viewModel.removeFile(0) },
+                                    modifier = Modifier.size(34.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Close,
+                                        contentDescription = "Remove file",
+                                        tint = MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Spreadsheet configuration info card
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(14.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(selectedBackground),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.GridView,
+                                        contentDescription = "Column alignment",
+                                        tint = excelGreen,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                                Text(
+                                    text = "Column Alignment",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+
+                            Text(
+                                text = "Columns are auto-detected using tab and whitespace heuristics. Tabular data is split into separate cells so each value lands in its own column without manual adjustment.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                lineHeight = 18.sp
+                            )
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(panelBackground, RoundedCornerShape(14.dp))
+                                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.GridView,
+                                    contentDescription = null,
+                                    tint = excelGreen,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Text(
+                                    text = "Tab + space detection",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+                    }
+
+                    // Mode guidance card
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = selectedBackground),
+                        border = BorderStroke(1.dp, excelGreen.copy(alpha = 0.25f))
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            verticalAlignment = Alignment.Top,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Info,
+                                contentDescription = "Mode guidance",
+                                tint = excelGreen,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Text(
+                                text = "Structured tabular forms and financial spreadsheets are converted into separate sheets, one per page. Each table is preserved with its header row, so you can sort, filter, and recalculate immediately in Excel.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                lineHeight = 18.sp
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(18.dp))
+                }
+
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = MaterialTheme.colorScheme.surface,
+                    shadowElevation = 8.dp
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp, vertical = 12.dp)
+                    ) {
+                        Button(
+                            onClick = { viewModel.process(tool.id, context) },
+                            enabled = !isProcessing,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(56.dp),
+                            shape = RoundedCornerShape(28.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = excelGreen,
+                                contentColor = Color.White
+                            )
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.GridView,
+                                    contentDescription = "Convert to Excel",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Text(
+                                    text = "Convert to Excel",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (isProcessing) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.35f))
+                    .clickable(enabled = false) {},
+                contentAlignment = Alignment.Center
+            ) {
+                Card(
+                    modifier = Modifier.width(280.dp),
+                    shape = RoundedCornerShape(28.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 12.dp)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 34.dp, horizontal = 26.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        androidx.compose.material3.CircularProgressIndicator(
+                            modifier = Modifier.size(52.dp),
+                            color = excelGreen,
+                            strokeWidth = 4.dp
+                        )
+                        Spacer(modifier = Modifier.height(22.dp))
+                        Text(
+                            text = "Converting to Excel...",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Detecting columns and rebuilding sheets",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(22.dp))
+                        if (progress != null) {
+                            androidx.compose.material3.LinearProgressIndicator(
+                                progress = progress,
+                                color = excelGreen,
+                                trackColor = excelGreen.copy(alpha = 0.15f),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(6.dp)
+                                    .clip(RoundedCornerShape(3.dp))
+                            )
+                        } else {
+                            androidx.compose.material3.LinearProgressIndicator(
+                                color = excelGreen,
+                                trackColor = excelGreen.copy(alpha = 0.15f),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(6.dp)
+                                    .clip(RoundedCornerShape(3.dp))
+                            )
+                        }
                     }
                 }
             }
