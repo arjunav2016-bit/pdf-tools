@@ -8,7 +8,6 @@ import android.content.ClipData
 import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.heightIn
@@ -106,6 +105,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.geometry.CornerRadius
 import com.example.pdftools.data.PdfTool
+import com.example.pdftools.theme.LocalDarkTheme
 import com.example.pdftools.ui.screens.tools.CompareResultDisplayConfig
 import com.example.pdftools.ui.screens.tools.CompressToolConfig
 import com.example.pdftools.ui.screens.tools.MergeToolConfig
@@ -206,7 +206,7 @@ fun ToolScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val isDarkTheme = isSystemInDarkTheme()
+    val isDarkTheme = LocalDarkTheme.current
     val accentColor = if (isDarkTheme) tool.category.darkAccentColor else tool.category.accentColor
     val containerColor = if (isDarkTheme) tool.category.darkContainerColor else tool.category.containerColor
 
@@ -1501,7 +1501,7 @@ fun MergePdfSurgicalScreen(
                                 }
                                 .clip(RoundedCornerShape(16.dp))
                                 .clickable { filePickerLauncher.launch(arrayOf("application/pdf")) }
-                                .background(Color.White)
+                                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                                 .padding(vertical = 24.dp),
                             contentAlignment = Alignment.Center
                         ) {
@@ -3921,16 +3921,15 @@ fun RepairPdfSurgicalScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(16.dp)
                             ) {
-                                // PDF Icon inside state-dependent container color
                                 val iconBg = when {
                                     checkingCorruption -> MaterialTheme.colorScheme.surfaceVariant
-                                    isCorrupted -> Color(0xFFFDEDEB) // Soft light red
-                                    else -> containerColor.copy(alpha = 0.5f) // Soft light green
+                                    isCorrupted -> MaterialTheme.colorScheme.errorContainer
+                                    else -> containerColor.copy(alpha = 0.5f)
                                 }
                                 val iconTint = when {
                                     checkingCorruption -> MaterialTheme.colorScheme.onSurfaceVariant
-                                    isCorrupted -> Color(0xFFE74C3C) // Red
-                                    else -> accentColor // Green
+                                    isCorrupted -> MaterialTheme.colorScheme.error
+                                    else -> accentColor
                                 }
 
                                 Box(
@@ -3972,7 +3971,7 @@ fun RepairPdfSurgicalScreen(
 
                                         val statusColor = when {
                                             checkingCorruption -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                                            isCorrupted -> Color(0xFFE74C3C)
+                                            isCorrupted -> MaterialTheme.colorScheme.error
                                             else -> accentColor
                                         }
                                         val statusText = when {
@@ -4298,6 +4297,7 @@ fun OcrPdfSurgicalScreen(
     containerColor: Color
 ) {
     val context = LocalContext.current
+    val isDark = LocalDarkTheme.current
     val selectedFile = selectedFiles.firstOrNull()
 
     val originalSize = remember(selectedFile) {
@@ -4570,7 +4570,7 @@ fun OcrPdfSurgicalScreen(
                                     modifier = Modifier
                                         .size(56.dp)
                                         .clip(RoundedCornerShape(12.dp))
-                                        .background(Color(0xFFFDF2E9)), // Soft light orange background tint
+                                        .background(if (isDark) Color(0xFFE67E22).copy(alpha = 0.15f) else Color(0xFFFDF2E9)), // Soft light orange background tint
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Icon(
@@ -5043,6 +5043,7 @@ fun JpgToPdfSurgicalScreen(
     containerColor: Color
 ) {
     val context = LocalContext.current
+    val isDark = LocalDarkTheme.current
     val config by viewModel.jpgToPdfConfig.collectAsState()
 
     val combinedSize = remember(selectedFiles) {
@@ -5115,7 +5116,7 @@ fun JpgToPdfSurgicalScreen(
                                 modifier = Modifier
                                     .size(56.dp)
                                     .clip(RoundedCornerShape(12.dp))
-                                    .background(Color(0xFFFDF2E9)), // soft orange tint
+                                    .background(if (isDark) Color(0xFFE67E22).copy(alpha = 0.15f) else Color(0xFFFDF2E9)), // soft orange tint
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
@@ -5639,9 +5640,9 @@ fun PdfToWordSurgicalScreen(
     val selectedFile = selectedFiles.firstOrNull()
     val config by viewModel.pdfToWordConfig.collectAsState()
     val pageCount by viewModel.pageCount.collectAsState()
-    val wordBlue = Color(0xFF0058A8)
-    val panelBackground = Color(0xFFF7F9FC)
-    val selectedBackground = Color(0xFFEAF3FF)
+    val wordBlue = accentColor
+    val panelBackground = MaterialTheme.colorScheme.surfaceContainer
+    val selectedBackground = accentColor.copy(alpha = 0.15f)
 
     val fileSize = remember(selectedFile) {
         selectedFile?.let { getFileSize(context, it) } ?: 0L
@@ -5696,8 +5697,8 @@ fun PdfToWordSurgicalScreen(
                         Card(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color.White),
-                            border = BorderStroke(1.dp, Color(0xFFE2E8F0))
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
                         ) {
                             Row(
                                 modifier = Modifier
@@ -5710,13 +5711,13 @@ fun PdfToWordSurgicalScreen(
                                     modifier = Modifier
                                         .size(44.dp)
                                         .clip(RoundedCornerShape(10.dp))
-                                        .background(Color(0xFFFFEBEE)),
+                                        .background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Icon(
                                         imageVector = Icons.Filled.PictureAsPdf,
                                         contentDescription = "PDF Document",
-                                        tint = Color(0xFFD32F2F),
+                                        tint = MaterialTheme.colorScheme.error,
                                         modifier = Modifier.size(24.dp)
                                     )
                                 }
@@ -5726,7 +5727,7 @@ fun PdfToWordSurgicalScreen(
                                         text = fileName,
                                         style = MaterialTheme.typography.bodyMedium,
                                         fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF172033),
+                                        color = MaterialTheme.colorScheme.onSurface,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
@@ -5738,7 +5739,7 @@ fun PdfToWordSurgicalScreen(
                                             pageCount?.takeIf { it > 0 }?.let { append(" - $it pages") }
                                         },
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = Color(0xFF64748B),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
@@ -5751,7 +5752,7 @@ fun PdfToWordSurgicalScreen(
                                     Icon(
                                         imageVector = Icons.Filled.Close,
                                         contentDescription = "Remove file",
-                                        tint = Color(0xFFD32F2F),
+                                        tint = MaterialTheme.colorScheme.error,
                                         modifier = Modifier.size(18.dp)
                                     )
                                 }
@@ -5762,8 +5763,8 @@ fun PdfToWordSurgicalScreen(
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color.White),
-                        border = BorderStroke(1.dp, Color(0xFFEFF2F6))
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
                     ) {
                         Column(
                             modifier = Modifier.padding(16.dp),
@@ -5791,7 +5792,7 @@ fun PdfToWordSurgicalScreen(
                                     text = "Conversion Quality",
                                     style = MaterialTheme.typography.titleSmall,
                                     fontWeight = FontWeight.Bold,
-                                    color = Color(0xFF172033)
+                                    color = MaterialTheme.colorScheme.onSurface
                                 )
                             }
 
@@ -5819,7 +5820,7 @@ fun PdfToWordSurgicalScreen(
                                             text = label,
                                             style = MaterialTheme.typography.labelLarge,
                                             fontWeight = FontWeight.Bold,
-                                            color = if (selected) Color.White else Color(0xFF475569)
+                                            color = if (selected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
                                 }
@@ -5836,8 +5837,8 @@ fun PdfToWordSurgicalScreen(
                                 )
                             },
                         shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color.White),
-                        border = BorderStroke(1.dp, Color(0xFFEFF2F6))
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
                     ) {
                         Row(
                             modifier = Modifier
@@ -5866,13 +5867,13 @@ fun PdfToWordSurgicalScreen(
                                     text = "Layout Logic",
                                     style = MaterialTheme.typography.titleSmall,
                                     fontWeight = FontWeight.Bold,
-                                    color = Color(0xFF172033)
+                                    color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
                                     text = "Keep Original Layout",
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = Color(0xFF64748B)
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
 
@@ -5884,7 +5885,7 @@ fun PdfToWordSurgicalScreen(
                                 colors = SwitchDefaults.colors(
                                     checkedThumbColor = Color.White,
                                     checkedTrackColor = wordBlue,
-                                    uncheckedBorderColor = Color(0xFFCBD5E1)
+                                    uncheckedBorderColor = MaterialTheme.colorScheme.outline
                                 )
                             )
                         }
@@ -5916,7 +5917,7 @@ fun PdfToWordSurgicalScreen(
                                     "Standard Mode is best for editable forms and text-heavy contracts. It preserves fonts and formatting with high accuracy. For handwritten notes or flat images, switch to OCR."
                                 },
                                 style = MaterialTheme.typography.bodySmall,
-                                color = Color(0xFF174A7C),
+                                color = MaterialTheme.colorScheme.onSurface,
                                 lineHeight = 18.sp
                             )
                         }
@@ -5927,7 +5928,7 @@ fun PdfToWordSurgicalScreen(
 
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
-                    color = Color.White,
+                    color = MaterialTheme.colorScheme.surface,
                     shadowElevation = 8.dp
                 ) {
                     Box(
@@ -6118,13 +6119,13 @@ fun WordToPdfSurgicalScreen(
                                     modifier = Modifier
                                         .size(56.dp)
                                         .clip(RoundedCornerShape(12.dp))
-                                        .background(Color(0xFFEBF5FB)), // light blue tint
+                                        .background(accentColor.copy(alpha = 0.15f)), // light blue tint
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Icon(
                                         imageVector = Icons.Filled.Description,
                                         contentDescription = "Word Document",
-                                        tint = Color(0xFF2980B9), // Word blue
+                                        tint = accentColor, // Word blue
                                         modifier = Modifier.size(28.dp)
                                     )
                                 }
@@ -6151,14 +6152,14 @@ fun WordToPdfSurgicalScreen(
                                         Text(
                                             text = "•",
                                             style = MaterialTheme.typography.bodyMedium,
-                                            color = Color(0xFF2980B9),
+                                            color = accentColor,
                                             fontWeight = FontWeight.Bold
                                         )
                                         Text(
                                             text = "Microsoft Word",
                                             style = MaterialTheme.typography.bodyMedium,
                                             fontWeight = FontWeight.Bold,
-                                            color = Color(0xFF2980B9)
+                                            color = accentColor
                                         )
                                     }
                                 }
@@ -6580,13 +6581,13 @@ fun ExcelToPdfSurgicalScreen(
                                     modifier = Modifier
                                         .size(56.dp)
                                         .clip(RoundedCornerShape(12.dp))
-                                        .background(Color(0xFFE8F5E9)), // light green tint
+                                        .background(accentColor.copy(alpha = 0.15f)), // light green tint
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Icon(
                                         imageVector = Icons.Filled.TableChart,
                                         contentDescription = "Excel Sheet",
-                                        tint = Color(0xFF217346), // Excel green
+                                        tint = accentColor, // Excel green
                                         modifier = Modifier.size(28.dp)
                                     )
                                 }
@@ -6677,17 +6678,17 @@ fun ExcelToPdfSurgicalScreen(
                         ranges.forEach { (mode, title) ->
                             val isSelected = config.convertMode == mode
                             val cardBg = if (isSelected) {
-                                Color(0xFF217346).copy(alpha = 0.12f)
+                                accentColor.copy(alpha = 0.15f)
                             } else {
                                 MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)
                             }
                             val borderCol = if (isSelected) {
-                                Color(0xFF217346)
+                                accentColor
                             } else {
                                 MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
                             }
                             val textCol = if (isSelected) {
-                                Color(0xFF217346)
+                                accentColor
                             } else {
                                 MaterialTheme.colorScheme.onSurface
                             }
@@ -6770,7 +6771,7 @@ fun ExcelToPdfSurgicalScreen(
                                     Icon(
                                         imageVector = Icons.Filled.AspectRatio,
                                         contentDescription = "Scaling",
-                                        tint = Color(0xFF217346),
+                                        tint = accentColor,
                                         modifier = Modifier.size(24.dp)
                                     )
                                     Column {
@@ -6819,7 +6820,7 @@ fun ExcelToPdfSurgicalScreen(
                                             Text(
                                                 text = title,
                                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                                color = if (isSelected) Color(0xFF217346) else MaterialTheme.colorScheme.onSurface,
+                                                color = if (isSelected) accentColor else MaterialTheme.colorScheme.onSurface,
                                                 style = MaterialTheme.typography.bodyLarge
                                             )
                                             Spacer(modifier = Modifier.height(2.dp))
@@ -6835,7 +6836,7 @@ fun ExcelToPdfSurgicalScreen(
                                         dropdownExpanded = false
                                     },
                                     modifier = Modifier.background(
-                                        if (isSelected) Color(0xFF217346).copy(alpha = 0.08f) else Color.Transparent
+                                        if (isSelected) accentColor.copy(alpha = 0.15f) else Color.Transparent
                                     )
                                 )
                             }
@@ -6859,14 +6860,14 @@ fun ExcelToPdfSurgicalScreen(
                         shape = RoundedCornerShape(16.dp),
                         colors = CardDefaults.cardColors(
                             containerColor = if (config.showGridlines) {
-                                Color(0xFF217346).copy(alpha = 0.1f)
+                                accentColor.copy(alpha = 0.15f)
                             } else {
                                 MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)
                             }
                         ),
                         border = BorderStroke(
                             1.dp,
-                            if (config.showGridlines) Color(0xFF217346) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                            if (config.showGridlines) accentColor else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
                         )
                     ) {
                         Row(
@@ -6897,7 +6898,7 @@ fun ExcelToPdfSurgicalScreen(
                                 },
                                 colors = SwitchDefaults.colors(
                                     checkedThumbColor = Color.White,
-                                    checkedTrackColor = Color(0xFF217346),
+                                    checkedTrackColor = accentColor,
                                     uncheckedBorderColor = MaterialTheme.colorScheme.outline
                                 )
                             )
@@ -6926,7 +6927,7 @@ fun ExcelToPdfSurgicalScreen(
                                 .height(56.dp),
                             shape = RoundedCornerShape(28.dp),
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFF217346),
+                                containerColor = accentColor,
                                 contentColor = Color.White
                             )
                         ) {

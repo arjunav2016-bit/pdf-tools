@@ -23,11 +23,11 @@ import com.example.pdftools.ui.viewmodels.ToolViewModel
 import com.example.pdftools.utils.PageRangeUtils
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Info
+import com.example.pdftools.theme.LocalDarkTheme
 import com.example.pdftools.ui.components.PdfPagePreview
 import com.example.pdftools.ui.screens.getFileNameFromUri
 import com.example.pdftools.ui.viewmodels.CompressTier
@@ -267,18 +267,19 @@ fun PdfaToolConfig(
     val selectedFile = selectedFiles.firstOrNull()
     val context = LocalContext.current
 
-    val isDark = isSystemInDarkTheme()
-    val primaryBlue = if (isDark) Color(0xFF64B5F6) else Color(0xFF004B95)
-    
-    // Card background & borders
-    val fileCardBg = if (isDark) Color(0xFF1E293B) else Color(0xFFEBEDF2)
-    val settingsCardBg = if (isDark) Color(0xFF1E293B) else Color(0xFFF1F3F7)
-    
-    // Text colors
-    val textPrimary = if (isDark) Color.White else Color(0xFF1E293B)
-    val textSecondary = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B)
-    val badgeBg = if (isDark) Color(0xFF1E3A8A) else Color(0xFFD3E2F4)
-    val badgeText = if (isDark) Color(0xFF90CAF9) else Color(0xFF0D47A1)
+    val isDark = LocalDarkTheme.current
+    val primaryBlue = accentColor
+
+    // Card background & borders – use Material theme tokens for proper dark/light adaptation
+    val fileCardBg = MaterialTheme.colorScheme.surfaceContainerLow
+    val settingsCardBg = MaterialTheme.colorScheme.surfaceContainer
+
+    // Text colors – driven by Material theme tokens
+    val textPrimary = MaterialTheme.colorScheme.onSurface
+    val textSecondary = MaterialTheme.colorScheme.onSurfaceVariant
+    val badgeBg = accentColor.copy(alpha = 0.15f)
+    val badgeText = accentColor
+    val dividerCol = MaterialTheme.colorScheme.outlineVariant
 
     Column(
         modifier = Modifier
@@ -417,11 +418,11 @@ fun PdfaToolConfig(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = if (isSelected) (if (isDark) Color(0xFF1E293B) else Color.White) else (if (isDark) Color(0xFF0F172A) else Color(0xFFEFF2F6))
+                        containerColor = if (isSelected) accentColor.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceContainerLow
                     ),
                     border = BorderStroke(
                         if (isSelected) 2.dp else 1.dp,
-                        if (isSelected) primaryBlue else (if (isDark) Color(0xFF334155) else Color(0xFFE2E8F0))
+                        if (isSelected) accentColor else MaterialTheme.colorScheme.outlineVariant
                     )
                 ) {
                     Column(
@@ -458,7 +459,7 @@ fun PdfaToolConfig(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(containerColor = settingsCardBg),
-            border = BorderStroke(1.dp, if (isDark) Color(0xFF334155) else Color(0xFFE2E8F0).copy(alpha = 0.8f))
+            border = BorderStroke(1.dp, dividerCol)
         ) {
             Column(
                 modifier = Modifier.padding(16.dp),
@@ -491,12 +492,12 @@ fun PdfaToolConfig(
                         colors = SwitchDefaults.colors(
                             checkedThumbColor = Color.White,
                             checkedTrackColor = primaryBlue,
-                            uncheckedBorderColor = if (isDark) Color(0xFF475569) else Color(0xFFCBD5E1)
+                            uncheckedBorderColor = MaterialTheme.colorScheme.outline
                         )
                     )
                 }
 
-                HorizontalDivider(color = if (isDark) Color(0xFF334155) else Color(0xFFE2E8F0))
+                HorizontalDivider(color = dividerCol)
 
                 // Remove transparent objects switch
                 Row(
@@ -525,12 +526,12 @@ fun PdfaToolConfig(
                         colors = SwitchDefaults.colors(
                             checkedThumbColor = Color.White,
                             checkedTrackColor = primaryBlue,
-                            uncheckedBorderColor = if (isDark) Color(0xFF475569) else Color(0xFFCBD5E1)
+                            uncheckedBorderColor = MaterialTheme.colorScheme.outline
                         )
                     )
                 }
 
-                HorizontalDivider(color = if (isDark) Color(0xFF334155) else Color(0xFFE2E8F0))
+                HorizontalDivider(color = dividerCol)
 
                 // Standardize color profile (sRGB) switch
                 Row(
@@ -559,7 +560,7 @@ fun PdfaToolConfig(
                         colors = SwitchDefaults.colors(
                             checkedThumbColor = Color.White,
                             checkedTrackColor = primaryBlue,
-                            uncheckedBorderColor = if (isDark) Color(0xFF475569) else Color(0xFFCBD5E1)
+                            uncheckedBorderColor = MaterialTheme.colorScheme.outline
                         )
                     )
                 }
@@ -580,7 +581,7 @@ fun PdfaToolConfig(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(containerColor = settingsCardBg),
-            border = BorderStroke(1.dp, if (isDark) Color(0xFF334155) else Color(0xFFE2E8F0).copy(alpha = 0.8f))
+            border = BorderStroke(1.dp, dividerCol)
         ) {
             Column(
                 modifier = Modifier.padding(16.dp),
@@ -626,9 +627,9 @@ fun PdfaToolConfig(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(
-                containerColor = if (isDark) Color(0xFF1E293B) else Color(0xFFEFF1F4)
+                containerColor = MaterialTheme.colorScheme.surfaceContainerLow
             ),
-            border = BorderStroke(1.dp, if (isDark) Color(0xFF334155) else Color(0xFFE2E8F0))
+            border = BorderStroke(1.dp, dividerCol)
         ) {
             Row(
                 modifier = Modifier.padding(16.dp),

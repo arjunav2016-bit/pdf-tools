@@ -6,7 +6,6 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -42,6 +41,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.pdftools.R
 import com.example.pdftools.data.PdfTool
+import com.example.pdftools.theme.LocalDarkTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -50,7 +50,7 @@ fun ComingSoonScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val isDarkTheme = isSystemInDarkTheme()
+    val isDarkTheme = LocalDarkTheme.current
     val accentColor = if (isDarkTheme) tool.category.darkAccentColor else tool.category.accentColor
     val containerColor = if (isDarkTheme) tool.category.darkContainerColor else tool.category.containerColor
 

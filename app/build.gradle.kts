@@ -62,7 +62,10 @@ kotlin {
 }
 
 dependencies {
+  implementation(project(":print-helper"))
   val composeBom = platform(libs.androidx.compose.bom)
+
+
   implementation(composeBom)
   androidTestImplementation(composeBom)
 

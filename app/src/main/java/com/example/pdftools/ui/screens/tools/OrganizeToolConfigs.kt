@@ -1254,13 +1254,13 @@ fun MergeToolConfig(
                             modifier = Modifier
                                 .size(44.dp)
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(Color(0xFFFBE9E7)),
+                                .background(accentColor.copy(alpha = 0.15f)),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = Icons.Default.InsertDriveFile,
                                 contentDescription = null,
-                                tint = Color(0xFFC62828),
+                                tint = accentColor,
                                 modifier = Modifier.size(24.dp)
                             )
                         }

@@ -8,8 +8,20 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.platform.LocalContext
 import com.example.pdftools.data.ThemeMode
+
+/**
+ * CompositionLocal that tracks whether the current theme is dark.
+ *
+ * This is the source of truth for the resolved dark/light state across the app.
+ * UI components should read [LocalDarkTheme] instead of calling
+ * [isSystemInDarkTheme] directly, so that the user-selected theme mode
+ * (system / light / dark) is honored everywhere.
+ */
+val LocalDarkTheme = staticCompositionLocalOf { false }
 
 private val LightColorScheme = lightColorScheme(
     primary = LightPrimary,
@@ -82,9 +94,11 @@ fun PDFToolsTheme(
         else -> LightColorScheme
     }
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = Typography,
-        content = content
-    )
+    CompositionLocalProvider(LocalDarkTheme provides darkTheme) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = Typography,
+            content = content
+        )
+    }
 }

@@ -5,7 +5,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -43,6 +42,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.pdftools.data.PdfTool
 import com.example.pdftools.data.ToolCategory
+import com.example.pdftools.theme.LocalDarkTheme
 import kotlinx.coroutines.delay
 
 @Composable
@@ -68,8 +68,8 @@ fun CategorySection(
         ToolCategory.PDF_SECURITY -> Icons.Filled.Security
     }
 
-    val accentColor = if (isSystemInDarkTheme()) category.darkAccentColor else category.accentColor
-    val containerColor = if (isSystemInDarkTheme()) category.darkContainerColor else category.containerColor
+    val accentColor = if (LocalDarkTheme.current) category.darkAccentColor else category.accentColor
+    val containerColor = if (LocalDarkTheme.current) category.darkContainerColor else category.containerColor
 
     AnimatedVisibility(
         visible = visible,

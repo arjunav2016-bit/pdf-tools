@@ -30,4 +30,6 @@ plugins {
 }
 
 rootProject.name = "PDF Tools"
-include(":app")
+include(":app", ":stubs", ":print-helper")
+
+

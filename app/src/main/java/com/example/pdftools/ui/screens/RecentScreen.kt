@@ -9,7 +9,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.scaleIn
 import androidx.compose.foundation.background
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -58,6 +57,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.pdftools.R
+import com.example.pdftools.theme.LocalDarkTheme
 import com.example.pdftools.ui.viewmodels.RecentViewModel
 import com.example.pdftools.data.RecentFile
 import java.io.File
@@ -152,8 +152,8 @@ private fun RecentFileItem(
     onShare: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val isDarkTheme = isSystemInDarkTheme()
-    val accentColor = tool?.category?.let { if (isDarkTheme) it.darkAccentColor else it.accentColor } 
+    val isDarkTheme = LocalDarkTheme.current
+    val accentColor = tool?.category?.let { if (isDarkTheme) it.darkAccentColor else it.accentColor }
         ?: MaterialTheme.colorScheme.primary
     val containerColor = tool?.category?.let { if (isDarkTheme) it.darkContainerColor else it.containerColor }
         ?: MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f)

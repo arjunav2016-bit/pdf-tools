@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.pdftools.R
+import com.example.pdftools.theme.LocalDarkTheme
 import com.example.pdftools.ui.screens.rememberThumbnailBitmap
 import com.example.pdftools.ui.viewmodels.ScanFlowState
 import com.example.pdftools.ui.viewmodels.ScanViewModel
@@ -60,7 +61,7 @@ fun ScanFlowScreen(
     val flowState by viewModel.flowState.collectAsState()
     val context = LocalContext.current
 
-    val isDark = isSystemInDarkTheme()
+    val isDark = LocalDarkTheme.current
     val accentColor = if (isDark) ScanAccentDark else ScanAccentLight
     val containerColor = if (isDark) ScanContainerDark else ScanContainerLight
 

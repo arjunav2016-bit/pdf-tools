@@ -9,6 +9,8 @@ import com.example.pdftools.data.PdfPreviewRepository
 import com.example.pdftools.data.PdfProcessor
 import com.example.pdftools.data.RecentFilesRepository
 import com.example.pdftools.data.UserPreferencesRepository
+import com.example.pdftools.data.UserPreferences
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
@@ -135,6 +137,8 @@ class ToolViewModelTest {
         val input = Uri.parse("file:///tmp/input.pdf")
         val output = Uri.parse("file:///tmp/output.pdf")
         viewModel.addFiles(listOf(input))
+
+        whenever(preferencesRepository.preferences).thenReturn(flowOf(UserPreferences(compressionQuality = 40)))
 
         whenever(pdfProcessor.compressPdf(
             context = org.mockito.kotlin.eq(context),

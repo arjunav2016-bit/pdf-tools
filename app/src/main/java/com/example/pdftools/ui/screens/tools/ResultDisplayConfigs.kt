@@ -32,6 +32,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.pdftools.R
+import com.example.pdftools.theme.LocalDarkTheme
 import com.example.pdftools.ui.viewmodels.CompareConfig
 import com.example.pdftools.ui.viewmodels.OcrConfig
 import com.example.pdftools.ui.viewmodels.ToolViewModel
@@ -172,6 +173,13 @@ fun CompareResultDisplayConfig(
     val config by viewModel.compareConfig.collectAsState()
     val comparePdfFileB = config.fileBUri
     val comparisonDiffResults = config.diffLines
+    val isDark = LocalDarkTheme.current
+
+    // Theme-aware diff palette – ensures high contrast and accessibility in both modes
+    val addedBg = if (isDark) Color(0xFF1A3822) else Color(0xFFE8F5E9)
+    val addedText = if (isDark) Color(0xFF81C784) else Color(0xFF2E7D32)
+    val deletedBg = if (isDark) Color(0xFF3E1F24) else Color(0xFFFFEBEE)
+    val deletedText = if (isDark) Color(0xFFE57373) else Color(0xFFC62828)
 
     val comparePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -231,13 +239,13 @@ fun CompareResultDisplayConfig(
                         comparisonDiffResults.forEach { line ->
                             val (bg, tc, prefix) = when (line.type) {
                                 com.example.pdftools.data.DiffType.ADDED -> Triple(
-                                    Color(0xFFE8F5E9),
-                                    Color(0xFF2E7D32),
+                                    addedBg,
+                                    addedText,
                                     "+ "
                                 )
                                 com.example.pdftools.data.DiffType.DELETED -> Triple(
-                                    Color(0xFFFFEBEE),
-                                    Color(0xFFC62828),
+                                    deletedBg,
+                                    deletedText,
                                     "- "
                                 )
                                 com.example.pdftools.data.DiffType.EQUAL -> Triple(
@@ -274,20 +282,20 @@ fun CompareResultDisplayConfig(
                 ) {
                     Text(
                         text = stringResource(R.string.tool_compare_additions, addedCount),
-                        color = Color(0xFF2E7D32),
+                        color = addedText,
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier
-                            .background(Color(0xFFE8F5E9), RoundedCornerShape(8.dp))
+                            .background(addedBg, RoundedCornerShape(8.dp))
                             .padding(horizontal = 12.dp, vertical = 6.dp)
                     )
                     Text(
                         text = stringResource(R.string.tool_compare_deletions, deletedCount),
-                        color = Color(0xFFC62828),
+                        color = deletedText,
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier
-                            .background(Color(0xFFFFEBEE), RoundedCornerShape(8.dp))
+                            .background(deletedBg, RoundedCornerShape(8.dp))
                             .padding(horizontal = 12.dp, vertical = 6.dp)
                     )
                 }

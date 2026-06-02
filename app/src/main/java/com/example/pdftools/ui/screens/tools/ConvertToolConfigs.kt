@@ -43,6 +43,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.pdftools.R
+import com.example.pdftools.theme.LocalDarkTheme
 import com.example.pdftools.ui.screens.rememberThumbnailBitmap
 import com.example.pdftools.ui.screens.getFileNameFromUri
 import com.example.pdftools.ui.viewmodels.HtmlConfig
@@ -53,7 +54,6 @@ import com.example.pdftools.ui.viewmodels.PdfToPptConfig
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Edit
 import com.example.pdftools.ui.components.PdfPagePreview
-import androidx.compose.foundation.isSystemInDarkTheme
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -1453,20 +1453,21 @@ fun PdfToPptToolConfig(
     val pageCount by viewModel.pageCount.collectAsState()
     val context = LocalContext.current
 
-    val isDark = isSystemInDarkTheme()
-    val primaryBlue = if (isDark) Color(0xFF64B5F6) else Color(0xFF004B95)
-    
-    // Card background & borders
-    val fileCardBg = if (isDark) Color(0xFF1E293B) else Color(0xFFEBEDF2)
-    val settingsCardBg = if (isDark) Color(0xFF1E293B) else Color(0xFFF1F3F7)
-    val innerSelectorBg = if (isDark) Color(0xFF0F172A) else Color(0xFFE8EBF0)
-    val selectorItemActiveBg = if (isDark) Color(0xFF1E3A8A) else Color(0xFFC4DFFF)
-    
-    // Text colors
-    val textPrimary = if (isDark) Color.White else Color(0xFF1E293B)
-    val textSecondary = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B)
-    val badgeBg = if (isDark) Color(0xFF1E3A8A) else Color(0xFFD3E2F4)
-    val badgeText = if (isDark) Color(0xFF90CAF9) else Color(0xFF0D47A1)
+    val isDark = LocalDarkTheme.current
+    val primaryBlue = accentColor
+
+    // Card background & borders – use Material theme tokens for proper dark/light adaptation
+    val fileCardBg = MaterialTheme.colorScheme.surfaceContainerLow
+    val settingsCardBg = MaterialTheme.colorScheme.surfaceContainer
+    val innerSelectorBg = MaterialTheme.colorScheme.surfaceContainerHighest
+    val selectorItemActiveBg = accentColor.copy(alpha = 0.15f)
+
+    // Text colors – driven by Material theme tokens
+    val textPrimary = MaterialTheme.colorScheme.onSurface
+    val textSecondary = MaterialTheme.colorScheme.onSurfaceVariant
+    val badgeBg = accentColor.copy(alpha = 0.15f)
+    val badgeText = accentColor
+    val dividerCol = MaterialTheme.colorScheme.outlineVariant
 
     Column(
         modifier = Modifier
@@ -1589,7 +1590,7 @@ fun PdfToPptToolConfig(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(containerColor = settingsCardBg),
-            border = BorderStroke(1.dp, if (isDark) Color(0xFF334155) else Color(0xFFE2E8F0).copy(alpha = 0.8f))
+            border = BorderStroke(1.dp, dividerCol)
         ) {
             Column(
                 modifier = Modifier.padding(16.dp),
@@ -1640,7 +1641,7 @@ fun PdfToPptToolConfig(
                     }
                 }
 
-                HorizontalDivider(color = if (isDark) Color(0xFF334155) else Color(0xFFE2E8F0))
+                HorizontalDivider(color = dividerCol)
 
                 // Include Notes Switch
                 Row(
@@ -1669,12 +1670,12 @@ fun PdfToPptToolConfig(
                         colors = SwitchDefaults.colors(
                             checkedThumbColor = Color.White,
                             checkedTrackColor = primaryBlue,
-                            uncheckedBorderColor = if (isDark) Color(0xFF475569) else Color(0xFFCBD5E1)
+                            uncheckedBorderColor = MaterialTheme.colorScheme.outline
                         )
                     )
                 }
 
-                HorizontalDivider(color = if (isDark) Color(0xFF334155) else Color(0xFFE2E8F0))
+                HorizontalDivider(color = dividerCol)
 
                 // OCR Switch
                 Row(
@@ -1703,7 +1704,7 @@ fun PdfToPptToolConfig(
                         colors = SwitchDefaults.colors(
                             checkedThumbColor = Color.White,
                             checkedTrackColor = primaryBlue,
-                            uncheckedBorderColor = if (isDark) Color(0xFF475569) else Color(0xFFCBD5E1)
+                            uncheckedBorderColor = MaterialTheme.colorScheme.outline
                         )
                     )
                 }
@@ -1736,11 +1737,11 @@ fun PdfToPptToolConfig(
                     },
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = if (isPptxSelected) (if (isDark) Color(0xFF1E293B) else Color.White) else (if (isDark) Color(0xFF0F172A) else Color(0xFFEFF2F6))
+                    containerColor = if (isPptxSelected) accentColor.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceContainerLow
                 ),
                 border = BorderStroke(
                     if (isPptxSelected) 2.dp else 1.dp,
-                    if (isPptxSelected) primaryBlue else (if (isDark) Color(0xFF334155) else Color(0xFFE2E8F0))
+                    if (isPptxSelected) accentColor else MaterialTheme.colorScheme.outlineVariant
                 )
             ) {
                 Column(
@@ -1782,11 +1783,11 @@ fun PdfToPptToolConfig(
                     },
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = if (isOtpSelected) (if (isDark) Color(0xFF1E293B) else Color.White) else (if (isDark) Color(0xFF0F172A) else Color(0xFFEFF2F6))
+                    containerColor = if (isOtpSelected) accentColor.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceContainerLow
                 ),
                 border = BorderStroke(
                     if (isOtpSelected) 2.dp else 1.dp,
-                    if (isOtpSelected) primaryBlue else (if (isDark) Color(0xFF334155) else Color(0xFFE2E8F0))
+                    if (isOtpSelected) accentColor else MaterialTheme.colorScheme.outlineVariant
                 )
             ) {
                 Column(
@@ -1843,7 +1844,7 @@ fun PdfToPptToolConfig(
                 Text(
                     text = stringResource(R.string.tool_pdf_to_ppt_help_text),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = if (isDark) Color.White.copy(alpha = 0.9f) else Color(0xFF334155),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     lineHeight = 18.sp
                 )
             }

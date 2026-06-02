@@ -15,7 +15,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -50,6 +49,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.pdftools.data.PdfTool
+import com.example.pdftools.theme.LocalDarkTheme
 import kotlinx.coroutines.delay
 
 @Composable
@@ -79,7 +79,7 @@ fun ToolCard(
         label = "cardElevation"
     )
 
-    val isDarkTheme = isSystemInDarkTheme()
+    val isDarkTheme = LocalDarkTheme.current
     val accentColor = if (isDarkTheme) tool.category.darkAccentColor else tool.category.accentColor
     val containerColor = if (isDarkTheme) tool.category.darkContainerColor else tool.category.containerColor
 

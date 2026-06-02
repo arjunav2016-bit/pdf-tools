@@ -15,6 +15,11 @@ import android.os.ParcelFileDescriptor
 import android.os.CancellationSignal
 import android.print.PrintAttributes
 import android.print.PageRange
+import android.print.PrintDocumentInfo
+import android.print.PrintDocumentAdapter
+import com.example.pdftools.print.PrintCallbacks
+
+
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import com.tom_roush.pdfbox.pdmodel.PDDocument
@@ -576,13 +581,13 @@ class ConvertProcessor @Inject constructor() {
                             printAttributes,
                             printAttributes,
                             cancellationSignal,
-                            android.print.PrintHelper.createLayoutCallback(object : android.print.PrintHelper.LayoutCallback {
-                                override fun onLayoutFinished(info: android.print.PrintDocumentInfo?, changed: Boolean) {
+                            PrintCallbacks.MyLayoutResultCallback(object : PrintCallbacks.LayoutCallback {
+                                override fun onLayoutFinished(info: PrintDocumentInfo?, changed: Boolean) {
                                     printAdapter.onWrite(
                                         arrayOf(PageRange.ALL_PAGES),
                                         fileDescriptor,
                                         cancellationSignal,
-                                        android.print.PrintHelper.createWriteCallback(object : android.print.PrintHelper.WriteCallback {
+                                        PrintCallbacks.MyWriteResultCallback(object : PrintCallbacks.WriteCallback {
                                             override fun onWriteFinished(pages: Array<out PageRange>?) {
                                                 try {
                                                     fileDescriptor.close()
