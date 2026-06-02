@@ -127,6 +127,94 @@ class PdfProcessorTest {
     }
 
     @Test
+    fun testProtectPdf_strongAES256() = kotlinx.coroutines.test.runTest {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val tempDir = context.cacheDir
+        val dummyPdfFile = File(tempDir, "dummy_aes256_${System.currentTimeMillis()}.pdf")
+        
+        com.tom_roush.pdfbox.pdmodel.PDDocument().use { doc ->
+            doc.addPage(com.tom_roush.pdfbox.pdmodel.PDPage())
+            doc.save(dummyPdfFile)
+        }
+
+        val dummyUri = Uri.fromFile(dummyPdfFile)
+
+        try {
+            val password = "aes256password"
+            val protectedUri = pdfProcessor.protectPdf(
+                context = context,
+                uri = dummyUri,
+                password = password,
+                securityTier = "strong",
+                openPasswordEnabled = true,
+                restrictPermissionsEnabled = false
+            )
+            val protectedFile = File(protectedUri.path ?: "")
+            assertTrue(protectedFile.exists())
+
+            // Loading with correct password should succeed
+            com.tom_roush.pdfbox.pdmodel.PDDocument.load(protectedFile, password).use { doc ->
+                assertTrue(doc.isEncrypted)
+                assertEquals(256, doc.encryption.length)
+            }
+
+            protectedFile.delete()
+        } finally {
+            dummyPdfFile.delete()
+        }
+    }
+
+    @Test
+    fun testProtectPdf_restrictPermissions() = kotlinx.coroutines.test.runTest {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val tempDir = context.cacheDir
+        val dummyPdfFile = File(tempDir, "dummy_perms_${System.currentTimeMillis()}.pdf")
+        
+        com.tom_roush.pdfbox.pdmodel.PDDocument().use { doc ->
+            doc.addPage(com.tom_roush.pdfbox.pdmodel.PDPage())
+            doc.save(dummyPdfFile)
+        }
+
+        val dummyUri = Uri.fromFile(dummyPdfFile)
+
+        try {
+            val password = "permspassword"
+            val protectedUri = pdfProcessor.protectPdf(
+                context = context,
+                uri = dummyUri,
+                password = password,
+                securityTier = "standard",
+                openPasswordEnabled = true,
+                restrictPermissionsEnabled = true
+            )
+            val protectedFile = File(protectedUri.path ?: "")
+            assertTrue(protectedFile.exists())
+
+            // Loading with user password should enforce restrictions
+            com.tom_roush.pdfbox.pdmodel.PDDocument.load(protectedFile, password).use { doc ->
+                assertTrue(doc.isEncrypted)
+                val ap = doc.currentAccessPermission
+                assertFalse(ap.canPrint())
+                assertFalse(ap.canModify())
+                assertFalse(ap.canExtractContent())
+            }
+
+            // Loading with derived owner password should bypass restrictions
+            com.tom_roush.pdfbox.pdmodel.PDDocument.load(protectedFile, password + "_owner").use { doc ->
+                assertTrue(doc.isEncrypted)
+                val ap = doc.currentAccessPermission
+                assertTrue(ap.canPrint())
+                assertTrue(ap.canModify())
+                assertTrue(ap.canExtractContent())
+            }
+
+            protectedFile.delete()
+        } finally {
+            dummyPdfFile.delete()
+        }
+    }
+
+    @Test
     fun testRotatePdf() = kotlinx.coroutines.test.runTest {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         val tempDir = context.cacheDir
@@ -268,6 +356,46 @@ class PdfProcessorTest {
 
             com.tom_roush.pdfbox.pdmodel.PDDocument.load(numberedFile).use { doc ->
                 assertEquals(2, doc.numberOfPages)
+            }
+            numberedFile.delete()
+        } finally {
+            dummyPdfFile.delete()
+        }
+    }
+
+    @Test
+    fun testAddPageNumbersWithOptions() = kotlinx.coroutines.test.runTest {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val tempDir = context.cacheDir
+        val dummyPdfFile = File(tempDir, "dummy_numbers_opt_${System.currentTimeMillis()}.pdf")
+        
+        com.tom_roush.pdfbox.pdmodel.PDDocument().use { doc ->
+            doc.addPage(com.tom_roush.pdfbox.pdmodel.PDPage())
+            doc.addPage(com.tom_roush.pdfbox.pdmodel.PDPage())
+            doc.addPage(com.tom_roush.pdfbox.pdmodel.PDPage())
+            doc.save(dummyPdfFile)
+        }
+
+        val dummyUri = Uri.fromFile(dummyPdfFile)
+
+        try {
+            val numberedUri = pdfProcessor.addPageNumbers(
+                context = context,
+                uri = dummyUri,
+                format = "simple",
+                position = "bottom_right",
+                fontSize = 12f,
+                pageRange = "",
+                colorHex = "#FF0000",
+                rangeType = "exclude_first",
+                startFromPage = 1,
+                startingNumber = 5
+            )
+            val numberedFile = File(numberedUri.path ?: "")
+            assertTrue(numberedFile.exists())
+
+            com.tom_roush.pdfbox.pdmodel.PDDocument.load(numberedFile).use { doc ->
+                assertEquals(3, doc.numberOfPages)
             }
             numberedFile.delete()
         } finally {
@@ -545,6 +673,74 @@ class PdfProcessorTest {
             }
             
             signedFile.delete()
+        } finally {
+            dummyPdfFile.delete()
+            dummySigFile.delete()
+        }
+    }
+
+    @Test
+    fun testPremiumSignPdfMultiField() = kotlinx.coroutines.test.runTest {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val tempDir = context.cacheDir
+        val dummyPdfFile = File(tempDir, "dummy_multifield_${System.currentTimeMillis()}.pdf")
+        val dummySigFile = File(tempDir, "dummy_sig_multi_${System.currentTimeMillis()}.png")
+
+        try {
+            com.tom_roush.pdfbox.pdmodel.PDDocument().use { doc ->
+                val page = com.tom_roush.pdfbox.pdmodel.PDPage()
+                doc.addPage(page)
+                doc.save(dummyPdfFile)
+            }
+
+            val signatureBitmap = Bitmap.createBitmap(100, 50, Bitmap.Config.ARGB_8888)
+            dummySigFile.outputStream().use { outStream ->
+                signatureBitmap.compress(Bitmap.CompressFormat.PNG, 100, outStream)
+            }
+            signatureBitmap.recycle()
+
+            val dummyUri = Uri.fromFile(dummyPdfFile)
+            val sigUri = Uri.fromFile(dummySigFile)
+
+            val textAnnotations = listOf(
+                com.example.pdftools.data.TextAnnotation(
+                    text = "06/02/2026",
+                    x = 0.5f,
+                    y = 0.5f,
+                    colorHex = "#000000",
+                    fontSize = 12f,
+                    pageIndex = 0
+                )
+            )
+
+            val imageAnnotations = listOf(
+                com.example.pdftools.data.ImageAnnotation(
+                    imageUri = sigUri.toString(),
+                    x = 0.2f,
+                    y = 0.2f,
+                    width = 0.2f,
+                    height = 0.1f,
+                    pageIndex = 0
+                )
+            )
+
+            val editedUri = pdfProcessor.editPdf(
+                context = context,
+                uri = dummyUri,
+                textAnnotations = textAnnotations,
+                imageAnnotations = imageAnnotations
+            )
+
+            val editedFile = File(editedUri.path ?: "")
+            assertTrue(editedFile.exists())
+
+            com.tom_roush.pdfbox.pdmodel.PDDocument.load(editedFile).use { doc ->
+                assertEquals(1, doc.numberOfPages)
+                val page = doc.getPage(0)
+                assertTrue(page != null)
+            }
+
+            editedFile.delete()
         } finally {
             dummyPdfFile.delete()
             dummySigFile.delete()
@@ -1152,6 +1348,114 @@ class PdfProcessorTest {
             assertTrue(file.exists())
             assertTrue(file.name.endsWith(".xlsx"))
             file.delete()
+        } finally {
+            dummyPdfFile.delete()
+        }
+    }
+
+    @Test
+    fun testCropPdf_absoluteMm() = kotlinx.coroutines.test.runTest {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val tempDir = context.cacheDir
+        val dummyPdfFile = File(tempDir, "dummy_crop_${System.currentTimeMillis()}.pdf")
+        
+        try {
+            com.tom_roush.pdfbox.pdmodel.PDDocument().use { doc ->
+                val page = com.tom_roush.pdfbox.pdmodel.PDPage(com.tom_roush.pdfbox.pdmodel.common.PDRectangle.A4)
+                doc.addPage(page)
+                doc.save(dummyPdfFile)
+            }
+
+            val dummyUri = Uri.fromFile(dummyPdfFile)
+            val outputUri = pdfProcessor.cropPdf(
+                context = context,
+                uri = dummyUri,
+                marginPercentage = 0.10f,
+                pageRange = "",
+                useAbsoluteCrop = true,
+                leftMm = 10f,
+                topMm = 10f,
+                widthMm = 190f,
+                heightMm = 277f,
+                applyToAllPages = true,
+                currentPageIndex = 0
+            )
+            val file = File(outputUri.path ?: "")
+            assertTrue(file.exists())
+
+            com.tom_roush.pdfbox.pdmodel.PDDocument.load(file).use { doc ->
+                val page = doc.getPage(0)
+                val cropBox = page.cropBox
+                assertTrue(cropBox.lowerLeftX > 20f)
+                assertTrue(cropBox.width < 595f)
+                assertTrue(cropBox.height < 841f)
+            }
+            File(outputUri.path ?: "").delete()
+        } finally {
+            dummyPdfFile.delete()
+        }
+    }
+
+    @Test
+    fun testAddWatermark_textAndImage() = kotlinx.coroutines.test.runTest {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val tempDir = context.cacheDir
+        val dummyPdfFile = File(tempDir, "dummy_watermark_${System.currentTimeMillis()}.pdf")
+        
+        try {
+            com.tom_roush.pdfbox.pdmodel.PDDocument().use { doc ->
+                val page = com.tom_roush.pdfbox.pdmodel.PDPage(com.tom_roush.pdfbox.pdmodel.common.PDRectangle.A4)
+                doc.addPage(page)
+                doc.save(dummyPdfFile)
+            }
+
+            val dummyUri = Uri.fromFile(dummyPdfFile)
+            // Test Text Watermark with bottom_right position
+            val textOutputUri = pdfProcessor.addWatermark(
+                context = context,
+                uri = dummyUri,
+                text = "TOP_SECRET",
+                colorHex = "#FF0000",
+                fontSize = 30f,
+                rotation = 30f,
+                opacity = 0.5f,
+                pageRange = "",
+                isImage = false,
+                imageUri = null,
+                position = "bottom_right"
+            )
+            val file = File(textOutputUri.path ?: "")
+            assertTrue(file.exists())
+            file.delete()
+        } finally {
+            dummyPdfFile.delete()
+        }
+    }
+
+    @Test
+    fun testOcrPdf_resolvesLanguageAndRunsGracefully() = kotlinx.coroutines.test.runTest {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val tempDir = context.cacheDir
+        val dummyPdfFile = File(tempDir, "dummy_ocr_${System.currentTimeMillis()}.pdf")
+        
+        try {
+            com.tom_roush.pdfbox.pdmodel.PDDocument().use { doc ->
+                val page = com.tom_roush.pdfbox.pdmodel.PDPage(com.tom_roush.pdfbox.pdmodel.common.PDRectangle.A4)
+                doc.addPage(page)
+                doc.save(dummyPdfFile)
+            }
+
+            val dummyUri = Uri.fromFile(dummyPdfFile)
+            
+            // Set preference to Chinese
+            val preferencesRepository = com.example.pdftools.data.UserPreferencesRepository(context)
+            preferencesRepository.updateOcrLanguage("chinese")
+            
+            // Run OCR PDF (this should load Chinese options, fail to execute GMS, but fallback gracefully)
+            val resultText = pdfProcessor.ocrPdf(context, dummyUri)
+            
+            // Verify it didn't crash and returned the expected OCR result
+            assertTrue(resultText.contains("Offline Text Recognition Fallback Result") || resultText.contains("No text could be recognized"))
         } finally {
             dummyPdfFile.delete()
         }

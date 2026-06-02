@@ -9,6 +9,7 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -188,6 +189,13 @@ fun CompareResultDisplayConfig(
             viewModel.compareConfig.value = config.copy(fileBUri = uri)
         }
     }
+    val primaryPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            viewModel.updateSelectedFiles(listOf(uri))
+        }
+    }
 
     if (comparisonDiffResults.isNotEmpty()) {
         Card(
@@ -302,121 +310,301 @@ fun CompareResultDisplayConfig(
             }
         }
     } else {
-        // Render comparison document picker
+        val primaryFile = selectedFiles.firstOrNull()
+        val surface = MaterialTheme.colorScheme.surfaceContainer
+        val elevatedSurface = MaterialTheme.colorScheme.surfaceContainerHigh
+        val outline = MaterialTheme.colorScheme.outlineVariant
+        val primaryText = MaterialTheme.colorScheme.onSurface
+        val secondaryText = MaterialTheme.colorScheme.onSurfaceVariant
+
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text(
-                text = stringResource(R.string.tool_documents_compare),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    text = "Compare PDF",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = primaryText
+                )
+                Text(
+                    text = "Select two PDFs and tune how changes should be detected.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = secondaryText
+                )
+            }
+
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                CompareDocumentSelector(
+                    label = "Document A",
+                    fileName = primaryFile?.lastPathSegment,
+                    helperText = "Original or baseline PDF",
+                    marker = "A",
+                    accentColor = accentColor,
+                    onClick = { primaryPickerLauncher.launch(arrayOf("application/pdf")) }
+                )
+                CompareDocumentSelector(
+                    label = "Document B",
+                    fileName = comparePdfFileB?.lastPathSegment,
+                    helperText = "Updated PDF to compare against A",
+                    marker = "B",
+                    accentColor = accentColor,
+                    onClick = { comparePickerLauncher.launch(arrayOf("application/pdf")) }
+                )
+            }
 
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = accentColor.copy(alpha = 0.08f)
-                )
+                shape = RoundedCornerShape(8.dp),
+                colors = CardDefaults.cardColors(containerColor = surface),
+                border = androidx.compose.foundation.BorderStroke(1.dp, outline)
             ) {
-                Row(
+                Column(
                     modifier = Modifier.padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    Box(
+                    Text(
+                        text = "Comparison Mode",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = primaryText
+                    )
+                    Row(
                         modifier = Modifier
-                            .size(40.dp)
-                            .clip(CircleShape)
-                            .background(accentColor.copy(alpha = 0.2f)),
-                        contentAlignment = Alignment.Center
+                            .fillMaxWidth()
+                            .background(elevatedSurface, RoundedCornerShape(8.dp))
+                            .padding(4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        Text(
-                            text = "A",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = accentColor
+                        val modes = listOf(
+                            "side_by_side" to "Side-by-Side",
+                            "highlight_differences" to "Highlight Differences"
                         )
-                    }
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = stringResource(R.string.tool_primary_pdf),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            text = selectedFiles.firstOrNull()?.lastPathSegment
-                                ?: stringResource(R.string.tool_no_file_chosen),
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
+                        modes.forEach { (mode, label) ->
+                            val selected = config.comparisonMode == mode
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(44.dp)
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(
+                                        if (selected) accentColor.copy(alpha = 0.15f) else Color.Transparent
+                                    )
+                                    .clickable {
+                                        viewModel.compareConfig.value = config.copy(comparisonMode = mode)
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = label,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (selected) accentColor else secondaryText,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
                     }
                 }
             }
 
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = if (comparePdfFileB != null) accentColor.copy(alpha = 0.08f) else MaterialTheme.colorScheme.surfaceContainerLow
-                ),
-                border = if (comparePdfFileB == null) androidx.compose.foundation.BorderStroke(
-                    1.dp,
-                    MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                ) else null,
-                onClick = {
-                    comparePickerLauncher.launch(arrayOf("application/pdf"))
+                shape = RoundedCornerShape(8.dp),
+                colors = CardDefaults.cardColors(containerColor = surface),
+                border = androidx.compose.foundation.BorderStroke(1.dp, outline)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Text(
+                        text = "Precision Controls",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = primaryText
+                    )
+
+                    CompareToggleRow(
+                        title = "Text Comparison",
+                        description = "Detect inserted, removed, and changed phrasing.",
+                        checked = config.compareText,
+                        accentColor = accentColor,
+                        onCheckedChange = {
+                            viewModel.compareConfig.value = config.copy(compareText = it)
+                        }
+                    )
+
+                    HorizontalDivider(color = outline)
+
+                    CompareToggleRow(
+                        title = "Visual Comparison",
+                        description = "Track layout, spacing, and font-level changes.",
+                        checked = config.compareVisual,
+                        accentColor = accentColor,
+                        onCheckedChange = {
+                            viewModel.compareConfig.value = config.copy(compareVisual = it)
+                        }
+                    )
                 }
+            }
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(8.dp),
+                colors = CardDefaults.cardColors(containerColor = accentColor.copy(alpha = 0.10f)),
+                border = androidx.compose.foundation.BorderStroke(1.dp, accentColor.copy(alpha = 0.25f))
             ) {
                 Row(
-                    modifier = Modifier.padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    modifier = Modifier.padding(14.dp),
+                    verticalAlignment = Alignment.Top,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(CircleShape)
-                            .background(if (comparePdfFileB != null) accentColor.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surfaceVariant),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "B",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = if (comparePdfFileB != null) accentColor else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = stringResource(R.string.tool_secondary_pdf),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            text = comparePdfFileB?.lastPathSegment
-                                ?: stringResource(R.string.tool_choose_pdf_b),
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                    if (comparePdfFileB == null) {
-                        Icon(
-                            imageVector = Icons.Filled.Add,
-                            contentDescription = stringResource(R.string.tool_choose_file),
-                            tint = accentColor
-                        )
-                    }
+                    Icon(
+                        imageVector = Icons.Filled.InsertDriveFile,
+                        contentDescription = null,
+                        tint = accentColor,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Text(
+                        text = "Use Document A as the baseline. Run comparison after both selectors show a PDF.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = secondaryText
+                    )
                 }
             }
         }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CompareDocumentSelector(
+    label: String,
+    fileName: String?,
+    helperText: String,
+    marker: String,
+    accentColor: Color,
+    onClick: () -> Unit
+) {
+    val selected = fileName != null
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 88.dp),
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (selected) {
+                accentColor.copy(alpha = 0.10f)
+            } else {
+                MaterialTheme.colorScheme.surfaceContainer
+            }
+        ),
+        border = androidx.compose.foundation.BorderStroke(
+            if (selected) 2.dp else 1.dp,
+            if (selected) accentColor else MaterialTheme.colorScheme.outlineVariant
+        ),
+        onClick = onClick
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(46.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(
+                        if (selected) accentColor.copy(alpha = 0.18f)
+                        else MaterialTheme.colorScheme.surfaceContainerHigh
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = marker,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = if (selected) accentColor else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(3.dp)
+            ) {
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = if (selected) accentColor else MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = fileName ?: helperText,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = if (selected) "Tap to replace" else "Tap to select PDF",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            Icon(
+                imageVector = if (selected) Icons.Filled.InsertDriveFile else Icons.Filled.Add,
+                contentDescription = null,
+                tint = accentColor,
+                modifier = Modifier.size(24.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun CompareToggleRow(
+    title: String,
+    description: String,
+    checked: Boolean,
+    accentColor: Color,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            colors = SwitchDefaults.colors(
+                checkedTrackColor = accentColor,
+                checkedThumbColor = MaterialTheme.colorScheme.onPrimary
+            )
+        )
     }
 }

@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.IOException
@@ -35,7 +36,9 @@ data class UserPreferences(
     val compressionQuality: Int = 70,
     val exportDpi: Int = 150,
     val defaultSaveLocation: SaveLocation = SaveLocation.INTERNAL,
-    val onboardingCompleted: Boolean = false
+    val onboardingCompleted: Boolean = false,
+    val savedSignatures: Set<String> = emptySet(),
+    val ocrLanguage: String = "latin"
 )
 
 @Singleton
@@ -51,6 +54,8 @@ class UserPreferencesRepository internal constructor(
         val exportDpi = intPreferencesKey("export_dpi")
         val defaultSaveLocation = stringPreferencesKey("default_save_location")
         val onboardingCompleted = booleanPreferencesKey("onboarding_completed")
+        val savedSignatures = stringSetPreferencesKey("saved_signatures")
+        val ocrLanguage = stringPreferencesKey("ocr_language")
     }
 
     val preferences: Flow<UserPreferences> = dataStore.data
@@ -93,6 +98,26 @@ class UserPreferencesRepository internal constructor(
         }
     }
 
+    suspend fun addSavedSignature(path: String) {
+        dataStore.edit { preferences ->
+            val current = preferences[Keys.savedSignatures] ?: emptySet()
+            preferences[Keys.savedSignatures] = current + path
+        }
+    }
+
+    suspend fun removeSavedSignature(path: String) {
+        dataStore.edit { preferences ->
+            val current = preferences[Keys.savedSignatures] ?: emptySet()
+            preferences[Keys.savedSignatures] = current - path
+        }
+    }
+
+    suspend fun updateOcrLanguage(languageCode: String) {
+        dataStore.edit { preferences ->
+            preferences[Keys.ocrLanguage] = languageCode
+        }
+    }
+
     private fun mapPreferences(preferences: Preferences): UserPreferences {
         return UserPreferences(
             themeMode = preferences[Keys.themeMode].toEnumOrDefault(ThemeMode.SYSTEM),
@@ -102,7 +127,9 @@ class UserPreferencesRepository internal constructor(
                 ?: UserPreferences().exportDpi,
             defaultSaveLocation = preferences[Keys.defaultSaveLocation]
                 .toEnumOrDefault(SaveLocation.INTERNAL),
-            onboardingCompleted = preferences[Keys.onboardingCompleted] ?: false
+            onboardingCompleted = preferences[Keys.onboardingCompleted] ?: false,
+            savedSignatures = preferences[Keys.savedSignatures] ?: emptySet(),
+            ocrLanguage = preferences[Keys.ocrLanguage] ?: "latin"
         )
     }
 }

@@ -266,6 +266,336 @@ fun HtmlToolConfig(
     accentColor: Color
 ) {
     val config by viewModel.htmlConfig.collectAsState()
+    val surface = MaterialTheme.colorScheme.surfaceContainer
+    val elevatedSurface = MaterialTheme.colorScheme.surfaceContainerHigh
+    val outline = MaterialTheme.colorScheme.outlineVariant
+    val primaryText = MaterialTheme.colorScheme.onSurface
+    val secondaryText = MaterialTheme.colorScheme.onSurfaceVariant
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                text = "ProForma PDF",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = primaryText
+            )
+            Text(
+                text = "Capture web pages as precise, print-ready PDF documents.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = secondaryText
+            )
+        }
+
+        OutlinedTextField(
+            value = config.url,
+            onValueChange = {
+                viewModel.htmlConfig.value = config.copy(
+                    inputType = "url",
+                    url = it
+                )
+            },
+            label = { Text("Web page URL") },
+            placeholder = { Text("https://example.com/report") },
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Filled.Language,
+                    contentDescription = null,
+                    tint = accentColor
+                )
+            },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(8.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = accentColor,
+                focusedLabelColor = accentColor,
+                cursorColor = accentColor,
+                unfocusedBorderColor = MaterialTheme.colorScheme.outline
+            )
+        )
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(8.dp),
+            colors = CardDefaults.cardColors(containerColor = surface),
+            border = BorderStroke(1.dp, outline)
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Tune,
+                        contentDescription = null,
+                        tint = accentColor,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Text(
+                        text = "Web Page Options",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = primaryText
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        Text(
+                            text = "Load JavaScript",
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Medium,
+                            color = primaryText
+                        )
+                        Text(
+                            text = "Render dynamic content before capture.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = secondaryText
+                        )
+                    }
+                    Switch(
+                        checked = config.loadJs,
+                        onCheckedChange = {
+                            viewModel.htmlConfig.value = config.copy(loadJs = it)
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedTrackColor = accentColor,
+                            checkedThumbColor = MaterialTheme.colorScheme.onPrimary
+                        )
+                    )
+                }
+
+                HorizontalDivider(color = outline)
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        Text(
+                            text = "Background Graphics",
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Medium,
+                            color = primaryText
+                        )
+                        Text(
+                            text = "Keep colors, images, and print backgrounds.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = secondaryText
+                        )
+                    }
+                    Switch(
+                        checked = config.loadBackgroundGraphics,
+                        onCheckedChange = {
+                            viewModel.htmlConfig.value = config.copy(loadBackgroundGraphics = it)
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedTrackColor = accentColor,
+                            checkedThumbColor = MaterialTheme.colorScheme.onPrimary
+                        )
+                    )
+                }
+            }
+        }
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(8.dp),
+            colors = CardDefaults.cardColors(containerColor = surface),
+            border = BorderStroke(1.dp, outline)
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.CropFree,
+                        contentDescription = null,
+                        tint = accentColor,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Text(
+                        text = "PDF Layout",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = primaryText
+                    )
+                }
+
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "Page Scale",
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Medium,
+                            color = primaryText
+                        )
+                        Text(
+                            text = "${(config.pageScale * 100).toInt()}%",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = accentColor
+                        )
+                    }
+                    Slider(
+                        value = config.pageScale,
+                        onValueChange = {
+                            viewModel.htmlConfig.value = config.copy(pageScale = it)
+                        },
+                        valueRange = 0.6f..1.4f,
+                        steps = 7,
+                        colors = SliderDefaults.colors(
+                            thumbColor = accentColor,
+                            activeTrackColor = accentColor,
+                            inactiveTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest
+                        )
+                    )
+                    Text(
+                        text = "Adjust web zoom to fit the page width without clipping.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = secondaryText
+                    )
+                }
+
+                HorizontalDivider(color = outline)
+
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = "Capture Mode",
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Medium,
+                        color = primaryText
+                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(elevatedSurface, RoundedCornerShape(8.dp))
+                            .padding(4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        val modes = listOf(
+                            "whole_page" to "Whole Page",
+                            "selected_area" to "Selected Area"
+                        )
+                        modes.forEach { (mode, label) ->
+                            val selected = config.captureArea == mode
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(42.dp)
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(
+                                        if (selected) accentColor.copy(alpha = 0.15f) else Color.Transparent
+                                    )
+                                    .clickable {
+                                        viewModel.htmlConfig.value = config.copy(captureArea = mode)
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = label,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (selected) accentColor else secondaryText,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+                }
+
+                if (config.captureArea == "selected_area") {
+                    OutlinedTextField(
+                        value = config.selectedAreaSelector,
+                        onValueChange = {
+                            viewModel.htmlConfig.value = config.copy(selectedAreaSelector = it)
+                        },
+                        label = { Text("CSS selector") },
+                        placeholder = { Text("#invoice, main, .article-body") },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Filled.SelectAll,
+                                contentDescription = null,
+                                tint = accentColor
+                            )
+                        },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = accentColor,
+                            focusedLabelColor = accentColor,
+                            cursorColor = accentColor,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                        )
+                    )
+                }
+            }
+        }
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(8.dp),
+            colors = CardDefaults.cardColors(containerColor = accentColor.copy(alpha = 0.10f)),
+            border = BorderStroke(1.dp, accentColor.copy(alpha = 0.25f))
+        ) {
+            Row(
+                modifier = Modifier.padding(14.dp),
+                verticalAlignment = Alignment.Top,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Info,
+                    contentDescription = null,
+                    tint = accentColor,
+                    modifier = Modifier.size(20.dp)
+                )
+                Text(
+                    text = "Best for dashboards, invoices, reports, and responsive pages that need to become portable documents.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = secondaryText
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun LegacyHtmlToolConfig(
+    viewModel: ToolViewModel,
+    accentColor: Color
+) {
+    val config by viewModel.htmlConfig.collectAsState()
 
     // HTML accent color - web-themed teal/cyan
     val htmlAccent = Color(0xFF0097A7)

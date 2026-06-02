@@ -74,8 +74,23 @@ class PdfProcessor @Inject constructor(
     suspend fun repairPdf(context: Context, uri: Uri): Uri =
         optimizeProcessor.repairPdf(context, uri)
 
-    suspend fun cropPdf(context: Context, uri: Uri, marginPercentage: Float, pageRange: String): Uri =
-        optimizeProcessor.cropPdf(context, uri, marginPercentage, pageRange)
+    suspend fun cropPdf(
+        context: Context,
+        uri: Uri,
+        marginPercentage: Float,
+        pageRange: String,
+        useAbsoluteCrop: Boolean = false,
+        leftMm: Float = 0f,
+        topMm: Float = 0f,
+        widthMm: Float = 0f,
+        heightMm: Float = 0f,
+        applyToAllPages: Boolean = true,
+        currentPageIndex: Int = 0
+    ): Uri = optimizeProcessor.cropPdf(
+        context, uri, marginPercentage, pageRange,
+        useAbsoluteCrop, leftMm, topMm, widthMm, heightMm,
+        applyToAllPages, currentPageIndex
+    )
 
     suspend fun convertToPdfA(
         context: Context,
@@ -155,10 +170,11 @@ class PdfProcessor @Inject constructor(
         selectedSlides: Set<Int> = emptySet(),
         slidesPerPage: Int = 1,
         includeNotes: Boolean = false,
-        quality: String = "medium"
+        quality: String = "medium",
+        onProgress: ((Float) -> Unit)? = null
     ): Uri = convertProcessor.convertPptToPdf(
         context, uri, slideRange, customRange, selectedSlides,
-        slidesPerPage, includeNotes, quality
+        slidesPerPage, includeNotes, quality, onProgress
     )
 
     suspend fun getSlideCount(context: Context, uri: Uri): Int =
@@ -197,13 +213,21 @@ class PdfProcessor @Inject constructor(
 
     suspend fun addWatermark(
         context: Context, uri: Uri, text: String, colorHex: String,
-        fontSize: Float, rotation: Float, opacity: Float, pageRange: String
-    ): Uri = editProcessor.addWatermark(context, uri, text, colorHex, fontSize, rotation, opacity, pageRange)
+        fontSize: Float, rotation: Float, opacity: Float, pageRange: String,
+        isImage: Boolean = false, imageUri: Uri? = null, position: String = "center"
+    ): Uri = editProcessor.addWatermark(
+        context, uri, text, colorHex, fontSize, rotation, opacity, pageRange,
+        isImage, imageUri, position
+    )
 
     suspend fun addPageNumbers(
         context: Context, uri: Uri, format: String, position: String,
-        fontSize: Float, pageRange: String
-    ): Uri = editProcessor.addPageNumbers(context, uri, format, position, fontSize, pageRange)
+        fontSize: Float, pageRange: String = "", colorHex: String = "#80488D",
+        rangeType: String = "all", startFromPage: Int = 1, startingNumber: Int = 1
+    ): Uri = editProcessor.addPageNumbers(
+        context, uri, format, position, fontSize, pageRange,
+        colorHex, rangeType, startFromPage, startingNumber
+    )
 
     suspend fun signPdf(
         context: Context, uri: Uri, signatureUri: Uri,
@@ -229,16 +253,27 @@ class PdfProcessor @Inject constructor(
 
     // ===== Security Operations (SecurityProcessor) =====
 
-    suspend fun protectPdf(context: Context, uri: Uri, password: String): Uri =
-        securityProcessor.protectPdf(context, uri, password)
+    suspend fun protectPdf(
+        context: Context,
+        uri: Uri,
+        password: String,
+        securityTier: String = "standard",
+        openPasswordEnabled: Boolean = true,
+        restrictPermissionsEnabled: Boolean = false
+    ): Uri =
+        securityProcessor.protectPdf(context, uri, password, securityTier, openPasswordEnabled, restrictPermissionsEnabled)
 
     suspend fun unlockPdf(context: Context, uri: Uri, password: String): Uri =
         securityProcessor.unlockPdf(context, uri, password)
 
     suspend fun redactPdf(
         context: Context, uri: Uri, pageIndex: Int,
-        x: Float, y: Float, width: Float, height: Float, textToRedact: String?
-    ): Uri = securityProcessor.redactPdf(context, uri, pageIndex, x, y, width, height, textToRedact)
+        x: Float, y: Float, width: Float, height: Float, textToRedact: String?,
+        redactionStyle: String = "black",
+        sanitizeMetadata: Boolean = true
+    ): Uri = securityProcessor.redactPdf(
+        context, uri, pageIndex, x, y, width, height, textToRedact, redactionStyle, sanitizeMetadata
+    )
 }
 
 /**

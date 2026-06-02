@@ -11,6 +11,7 @@ import com.example.pdftools.data.FavoritesRepository
 import com.example.pdftools.data.RecentFilesRepository
 import com.example.pdftools.data.FormFieldInfo
 import com.example.pdftools.data.UserPreferencesRepository
+import com.example.pdftools.data.OcrModelManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -37,7 +38,8 @@ class ToolViewModel @Inject constructor(
     private val pdfPreviewRepository: PdfPreviewRepository,
     private val userPreferencesRepository: UserPreferencesRepository,
     private val favoritesRepository: FavoritesRepository,
-    private val recentFilesRepository: RecentFilesRepository
+    private val recentFilesRepository: RecentFilesRepository,
+    private val ocrModelManager: OcrModelManager
 ) : ViewModel() {
 
     // Core state
@@ -84,9 +86,43 @@ class ToolViewModel @Inject constructor(
     val excelToPdfConfig = MutableStateFlow(ExcelToPdfConfig())
     val pptToPdfConfig = MutableStateFlow(PptToPdfConfig())
 
+    init {
+        viewModelScope.launch {
+            userPreferencesRepository.preferences.collect { prefs ->
+                ocrConfig.value = ocrConfig.value.copy(
+                    ocrLanguage = prefs.ocrLanguage
+                )
+            }
+        }
+        viewModelScope.launch {
+            ocrModelManager.statuses.collect { statuses ->
+                ocrConfig.value = ocrConfig.value.copy(
+                    moduleStatuses = statuses
+                )
+            }
+        }
+    }
+
+    fun downloadOcrLanguage(languageCode: String) {
+        ocrModelManager.downloadLanguage(languageCode)
+    }
+
+    fun updateOcrLanguage(languageCode: String) {
+        viewModelScope.launch {
+            userPreferencesRepository.updateOcrLanguage(languageCode)
+        }
+    }
+
+    fun checkOcrStatuses() {
+        ocrModelManager.checkAllStatuses()
+    }
+
     // PPT preview state
     private val _pptPreviewPdfUri = MutableStateFlow<Uri?>(null)
     val pptPreviewPdfUri: StateFlow<Uri?> = _pptPreviewPdfUri.asStateFlow()
+
+    private val _pptPreviewProgress = MutableStateFlow<Float?>(null)
+    val pptPreviewProgress: StateFlow<Float?> = _pptPreviewProgress.asStateFlow()
 
     // Actions
     fun addFiles(uris: List<Uri>) {
@@ -139,6 +175,7 @@ class ToolViewModel @Inject constructor(
         excelToPdfConfig.value = ExcelToPdfConfig()
         pptToPdfConfig.value = PptToPdfConfig()
         _pptPreviewPdfUri.value = null
+        _pptPreviewProgress.value = null
     }
 
     fun isFavorite(toolId: String): Boolean {
@@ -165,6 +202,10 @@ class ToolViewModel @Inject constructor(
         return pdfPreviewRepository.renderPage(context, uri, pageIndex, width)
     }
 
+    suspend fun getPageSize(context: Context, uri: Uri, pageIndex: Int): Pair<Float, Float> {
+        return pdfPreviewRepository.getPageSize(context, uri, pageIndex)
+    }
+
     fun updateSelectedFiles(uris: List<Uri>) {
         _selectedFiles.value = uris
     }
@@ -185,10 +226,19 @@ class ToolViewModel @Inject constructor(
     fun preparePptPreview(context: Context, uri: Uri) {
         viewModelScope.launch {
             try {
-                val previewUri = pdfProcessor.convertPptToPdf(context, uri)
+                _pptPreviewProgress.value = 0f
+                val previewUri = pdfProcessor.convertPptToPdf(
+                    context = context,
+                    uri = uri,
+                    onProgress = { progress ->
+                        _pptPreviewProgress.value = progress
+                    }
+                )
                 _pptPreviewPdfUri.value = previewUri
             } catch (_: Exception) {
                 _pptPreviewPdfUri.value = null
+            } finally {
+                _pptPreviewProgress.value = null
             }
         }
     }
@@ -261,7 +311,15 @@ class ToolViewModel @Inject constructor(
                         onProcessingSuccess(toolId, context, result)
                     }
                     "protect_pdf" -> {
-                        val result = pdfProcessor.protectPdf(context, files.first(), passwordConfig.value.password)
+                        val c = passwordConfig.value
+                        val result = pdfProcessor.protectPdf(
+                            context = context,
+                            uri = files.first(),
+                            password = c.password,
+                            securityTier = c.securityTier,
+                            openPasswordEnabled = c.openPasswordEnabled,
+                            restrictPermissionsEnabled = c.restrictPermissionsEnabled
+                        )
                         onProcessingSuccess(toolId, context, result)
                     }
                     "unlock_pdf" -> {
@@ -273,14 +331,18 @@ class ToolViewModel @Inject constructor(
                         onProcessingSuccess(toolId, context, result)
                     }
                     "rotate_pdf" -> {
-                        val result = pdfProcessor.rotatePdf(context, files.first(), rotateConfig.value.degrees, rotateConfig.value.pageRange)
+                        val c = rotateConfig.value
+                        val degrees = c.previewRotation
+                        val pageRange = if (c.applyTo == "current") "${c.currentPageIndex + 1}" else ""
+                        val result = pdfProcessor.rotatePdf(context, files.first(), degrees, pageRange)
                         onProcessingSuccess(toolId, context, result)
                     }
                     "add_watermark" -> {
                         val c = watermarkConfig.value
                         val result = pdfProcessor.addWatermark(
                             context, files.first(), c.text, c.colorHex,
-                            c.fontSize, c.rotation, c.opacity, c.pageRange
+                            c.fontSize, c.rotation, c.opacity, c.pageRange,
+                            c.isImage, c.imageUri, c.position
                         )
                         onProcessingSuccess(toolId, context, result)
                     }
@@ -288,13 +350,27 @@ class ToolViewModel @Inject constructor(
                         val c = pageNumberConfig.value
                         val result = pdfProcessor.addPageNumbers(
                             context, files.first(), c.format, c.position,
-                            c.fontSize, c.pageRange
+                            c.fontSize, c.pageRange, c.colorHex, c.rangeType,
+                            c.startFromPage.toIntOrNull() ?: 1,
+                            c.startingNumber.toIntOrNull() ?: 1
                         )
                         onProcessingSuccess(toolId, context, result)
                     }
                     "crop_pdf" -> {
                         val c = cropConfig.value
-                        val result = pdfProcessor.cropPdf(context, files.first(), c.marginPercentage, c.pageRange)
+                        val result = pdfProcessor.cropPdf(
+                            context = context,
+                            uri = files.first(),
+                            marginPercentage = c.marginPercentage,
+                            pageRange = c.pageRange,
+                            useAbsoluteCrop = c.useAbsoluteCrop,
+                            leftMm = c.leftMm,
+                            topMm = c.topMm,
+                            widthMm = c.widthMm,
+                            heightMm = c.heightMm,
+                            applyToAllPages = c.applyToAllPages,
+                            currentPageIndex = c.currentPageIndex
+                        )
                         onProcessingSuccess(toolId, context, result)
                     }
                     "organize_pdf" -> {
@@ -323,12 +399,37 @@ class ToolViewModel @Inject constructor(
                     }
                     "sign_pdf" -> {
                         val c = signConfig.value
-                        val sigUri = c.signatureUri ?: throw IllegalArgumentException("No signature selected")
-                        val result = pdfProcessor.signPdf(
-                            context, files.first(), sigUri,
-                            c.pageIndex, c.x, c.y, c.width, c.height
-                        )
-                        onProcessingSuccess(toolId, context, result)
+                        if (c.fields.isNotEmpty()) {
+                            val textAnnotations = c.fields.filter { it.type == FieldType.DATE || it.type == FieldType.TEXT }.map { field ->
+                                com.example.pdftools.data.TextAnnotation(
+                                    text = field.value,
+                                    x = field.x,
+                                    y = field.y,
+                                    colorHex = "#000000",
+                                    fontSize = 16f,
+                                    pageIndex = field.pageIndex
+                                )
+                            }
+                            val imageAnnotations = c.fields.filter { (it.type == FieldType.SIGNATURE || it.type == FieldType.INITIAL) && it.signatureUri != null }.map { field ->
+                                com.example.pdftools.data.ImageAnnotation(
+                                    imageUri = field.signatureUri.toString(),
+                                    x = field.x,
+                                    y = field.y,
+                                    width = field.width,
+                                    height = field.height,
+                                    pageIndex = field.pageIndex
+                                )
+                            }
+                            val result = pdfProcessor.editPdf(context, files.first(), textAnnotations, imageAnnotations)
+                            onProcessingSuccess(toolId, context, result)
+                        } else {
+                            val sigUri = c.signatureUri ?: throw IllegalArgumentException("No signature selected")
+                            val result = pdfProcessor.signPdf(
+                                context, files.first(), sigUri,
+                                c.pageIndex, c.x, c.y, c.width, c.height
+                            )
+                            onProcessingSuccess(toolId, context, result)
+                        }
                     }
                     "redact_pdf" -> {
                         val c = redactConfig.value
@@ -387,7 +488,8 @@ class ToolViewModel @Inject constructor(
                             selectedSlides = c.selectedSlides,
                             slidesPerPage = c.slidesPerPage,
                             includeNotes = c.includeNotes,
-                            quality = c.quality
+                            quality = c.quality,
+                            onProgress = progressReporter("Converting slides")
                         )
                         onProcessingSuccess(toolId, context, result)
                     }

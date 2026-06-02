@@ -7,6 +7,7 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.net.Uri
 import com.tom_roush.pdfbox.pdmodel.PDDocument
+import com.tom_roush.pdfbox.pdmodel.PDDocumentInformation
 import com.tom_roush.pdfbox.pdmodel.PDPageContentStream
 import com.tom_roush.pdfbox.pdmodel.common.PDRectangle
 import com.tom_roush.pdfbox.pdmodel.encryption.AccessPermission
@@ -34,9 +35,16 @@ class SecurityProcessor @Inject constructor() {
     }
 
     /**
-     * Encrypts/Protects a PDF document using standard 128-bit security.
+     * Encrypts/Protects a PDF document using standard 128-bit or strong 256-bit AES security.
      */
-    suspend fun protectPdf(context: Context, uri: Uri, password: String): Uri = withContext(Dispatchers.IO) {
+    suspend fun protectPdf(
+        context: Context,
+        uri: Uri,
+        password: String,
+        securityTier: String = "standard",
+        openPasswordEnabled: Boolean = true,
+        restrictPermissionsEnabled: Boolean = false
+    ): Uri = withContext(Dispatchers.IO) {
         val tempInputFile = File.createTempFile("protect_input_", ".pdf", context.cacheDir)
         val outputFile = File(context.cacheDir, "Protected_${System.currentTimeMillis()}.pdf")
         
@@ -49,9 +57,23 @@ class SecurityProcessor @Inject constructor() {
             
             PDDocument.load(tempInputFile).use { doc ->
                 val ap = AccessPermission()
-                // Set the StandardProtectionPolicy: user password, owner password (same), access permission
-                val spp = StandardProtectionPolicy(password, password, ap)
-                spp.encryptionKeyLength = 128
+                if (restrictPermissionsEnabled) {
+                    ap.setCanPrint(false)
+                    ap.setCanModify(false)
+                    ap.setCanExtractContent(false)
+                    ap.setCanModifyAnnotations(false)
+                    ap.setCanFillInForm(false)
+                }
+                
+                val userPassword = if (openPasswordEnabled) password else ""
+                val ownerPassword = if (restrictPermissionsEnabled) {
+                    if (userPassword.isEmpty()) password else password + "_owner"
+                } else {
+                    password
+                }
+                
+                val spp = StandardProtectionPolicy(ownerPassword, userPassword, ap)
+                spp.encryptionKeyLength = if (securityTier == "strong") 256 else 128
                 doc.protect(spp)
                 doc.save(outputFile)
             }
@@ -112,7 +134,9 @@ class SecurityProcessor @Inject constructor() {
         y: Float,
         width: Float,
         height: Float,
-        textToRedact: String?
+        textToRedact: String?,
+        redactionStyle: String = "black",
+        sanitizeMetadata: Boolean = true
     ): Uri = withContext(Dispatchers.IO) {
         val tempInputFile = File.createTempFile("redact_input_", ".pdf", context.cacheDir)
         val outputFile = File(context.cacheDir, "Redacted_${System.currentTimeMillis()}.pdf")
@@ -145,7 +169,7 @@ class SecurityProcessor @Inject constructor() {
                     ImageType.RGB
                 )
                 try {
-                    paintRedactionAreas(bitmap, page.cropBox, redactionAreas)
+                    paintRedactionAreas(bitmap, page.cropBox, redactionAreas, redactionStyle)
                     val redactedPageImage = JPEGFactory.createFromImage(doc, bitmap, 0.98f)
 
                     // Overwriting the content stream destroys selectable text on this page.
@@ -168,6 +192,10 @@ class SecurityProcessor @Inject constructor() {
                     bitmap.recycle()
                 }
 
+                if (sanitizeMetadata) {
+                    sanitizeDocumentMetadata(doc)
+                }
+
                 doc.save(outputFile)
             }
             Uri.fromFile(outputFile)
@@ -182,13 +210,23 @@ class SecurityProcessor @Inject constructor() {
     private fun paintRedactionAreas(
         bitmap: Bitmap,
         cropBox: PDRectangle,
-        areas: List<PDRectangle>
+        areas: List<PDRectangle>,
+        redactionStyle: String
     ) {
         val scaleX = bitmap.width / cropBox.width
         val scaleY = bitmap.height / cropBox.height
         val paint = Paint().apply {
-            color = android.graphics.Color.BLACK
+            color = if (redactionStyle == "white") {
+                android.graphics.Color.WHITE
+            } else {
+                android.graphics.Color.BLACK
+            }
             style = Paint.Style.FILL
+        }
+        val patternPaint = Paint().apply {
+            color = android.graphics.Color.WHITE
+            style = Paint.Style.STROKE
+            strokeWidth = 6f
         }
         val canvas = Canvas(bitmap)
 
@@ -197,7 +235,24 @@ class SecurityProcessor @Inject constructor() {
             val top = (cropBox.upperRightY - area.upperRightY) * scaleY
             val right = (area.upperRightX - cropBox.lowerLeftX) * scaleX
             val bottom = (cropBox.upperRightY - area.lowerLeftY) * scaleY
-            canvas.drawRect(RectF(left, top, right, bottom), paint)
+            val rect = RectF(left, top, right, bottom)
+            canvas.drawRect(rect, paint)
+            if (redactionStyle == "patterned") {
+                var x = rect.left - rect.height()
+                while (x < rect.right) {
+                    canvas.drawLine(x, rect.bottom, x + rect.height(), rect.top, patternPaint)
+                    x += 24f
+                }
+            }
+        }
+    }
+
+    private fun sanitizeDocumentMetadata(doc: PDDocument) {
+        doc.documentInformation = PDDocumentInformation()
+        doc.documentCatalog.metadata = null
+        doc.documentCatalog.acroForm = null
+        for (page in doc.pages) {
+            page.annotations.clear()
         }
     }
 

@@ -50,4 +50,17 @@ class PdfPreviewRepository @Inject constructor() {
             } ?: throw IllegalArgumentException("Unable to render PDF preview.")
         }
     }
+
+    suspend fun getPageSize(context: Context, uri: Uri, pageIndex: Int): Pair<Float, Float> = withContext(Dispatchers.IO) {
+        context.contentResolver.openInputStream(uri)?.use { input ->
+            PDDocument.load(input).use { doc ->
+                if (pageIndex in 0 until doc.numberOfPages) {
+                    val box = doc.getPage(pageIndex).cropBox ?: doc.getPage(pageIndex).mediaBox
+                    box.width to box.height
+                } else {
+                    0f to 0f
+                }
+            }
+        } ?: (0f to 0f)
+    }
 }

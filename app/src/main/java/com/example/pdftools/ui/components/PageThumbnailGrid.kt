@@ -758,7 +758,7 @@ fun RemovePageThumbnail(
 @Composable
 fun DragHandleIndicator(
     modifier: Modifier = Modifier,
-    color: Color = Color.Gray
+    color: Color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
 ) {
     Canvas(modifier = modifier.size(12.dp, 18.dp)) {
         val dotRadius = 2.dp.toPx()

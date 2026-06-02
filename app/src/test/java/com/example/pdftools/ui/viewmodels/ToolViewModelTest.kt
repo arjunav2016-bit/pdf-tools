@@ -10,8 +10,12 @@ import com.example.pdftools.data.PdfProcessor
 import com.example.pdftools.data.RecentFilesRepository
 import com.example.pdftools.data.UserPreferencesRepository
 import com.example.pdftools.data.UserPreferences
+import com.example.pdftools.data.OcrModelManager
+import com.example.pdftools.data.OcrModuleStatus
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -39,6 +43,7 @@ class ToolViewModelTest {
     private lateinit var preferencesRepository: UserPreferencesRepository
     private lateinit var favoritesRepository: FavoritesRepository
     private lateinit var recentFilesRepository: RecentFilesRepository
+    private lateinit var ocrModelManager: OcrModelManager
     private lateinit var viewModel: ToolViewModel
 
     @Before
@@ -49,12 +54,19 @@ class ToolViewModelTest {
         preferencesRepository = mock()
         favoritesRepository = mock()
         recentFilesRepository = mock()
+        ocrModelManager = mock()
+
+        // Stub the flows required by ToolViewModel init block
+        whenever(preferencesRepository.preferences).thenReturn(flowOf(UserPreferences()))
+        whenever(ocrModelManager.statuses).thenReturn(MutableStateFlow(emptyMap()))
+
         viewModel = ToolViewModel(
             pdfProcessor,
             previewRepository,
             preferencesRepository,
             favoritesRepository,
-            recentFilesRepository
+            recentFilesRepository,
+            ocrModelManager
         )
     }
 
@@ -283,6 +295,62 @@ class ToolViewModelTest {
             runOcr = org.mockito.kotlin.eq(false),
             exportFormat = org.mockito.kotlin.eq("otp")
         )
+    }
+
+    @Test
+    fun testDownloadOcrLanguageDelegates() {
+        viewModel.downloadOcrLanguage("chinese")
+        verify(ocrModelManager).downloadLanguage("chinese")
+    }
+
+    @Test
+    fun testCheckOcrStatusesDelegates() {
+        viewModel.checkOcrStatuses()
+        verify(ocrModelManager).checkAllStatuses()
+    }
+
+    @Test
+    fun testUpdateOcrLanguageDelegates() = runTest {
+        viewModel.updateOcrLanguage("devanagari")
+        mainDispatcherRule.dispatcher.scheduler.advanceUntilIdle()
+        verify(preferencesRepository).updateOcrLanguage("devanagari")
+    }
+
+    @Test
+    fun preparePptPreviewUpdatesProgressAndUri() = runTest {
+        val input = Uri.parse("file:///tmp/input.pptx")
+        val output = Uri.parse("file:///tmp/output.pdf")
+        
+        whenever(pdfProcessor.convertPptToPdf(
+            context = org.mockito.kotlin.any(),
+            uri = org.mockito.kotlin.any(),
+            slideRange = org.mockito.kotlin.any(),
+            customRange = org.mockito.kotlin.any(),
+            selectedSlides = org.mockito.kotlin.any(),
+            slidesPerPage = org.mockito.kotlin.any(),
+            includeNotes = org.mockito.kotlin.any(),
+            quality = org.mockito.kotlin.any(),
+            onProgress = org.mockito.kotlin.anyOrNull()
+        )).thenAnswer { invocation ->
+            val callback = invocation.getArgument<((Float) -> Unit)?>(8)
+            callback?.invoke(0.5f)
+            output
+        }
+
+        val progressValues = mutableListOf<Float?>()
+        val job = launch(kotlinx.coroutines.Dispatchers.Unconfined) {
+            viewModel.pptPreviewProgress.collect {
+                progressValues.add(it)
+            }
+        }
+
+        viewModel.preparePptPreview(context, input)
+        mainDispatcherRule.dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(output, viewModel.pptPreviewPdfUri.value)
+        assertEquals(listOf(null, 0.0f, 0.5f, null), progressValues)
+
+        job.cancel()
     }
 }
 

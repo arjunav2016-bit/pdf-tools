@@ -122,13 +122,20 @@ class OptimizeProcessor @Inject constructor() {
     }
 
     /**
-     * Crops targeted pages (or all pages if range is empty) by a given margin percentage.
+     * Crops targeted pages (or all pages if range is empty) by a given margin percentage or absolute mm coordinates.
      */
     suspend fun cropPdf(
         context: Context,
         uri: Uri,
         marginPercentage: Float, // e.g. 0.05f, 0.10f, 0.20f
-        pageRange: String
+        pageRange: String,
+        useAbsoluteCrop: Boolean = false,
+        leftMm: Float = 0f,
+        topMm: Float = 0f,
+        widthMm: Float = 0f,
+        heightMm: Float = 0f,
+        applyToAllPages: Boolean = true,
+        currentPageIndex: Int = 0
     ): Uri = withContext(Dispatchers.IO) {
         val tempInputFile = File.createTempFile("crop_input_", ".pdf", context.cacheDir)
         val outputFile = File(context.cacheDir, "Cropped_${System.currentTimeMillis()}.pdf")
@@ -142,30 +149,55 @@ class OptimizeProcessor @Inject constructor() {
             
             PDDocument.load(tempInputFile).use { doc ->
                 val totalPages = doc.numberOfPages
-                val selectedPages = if (pageRange.trim().isEmpty()) {
-                    (0 until totalPages).toList()
+                val selectedPages = if (applyToAllPages) {
+                    if (pageRange.trim().isEmpty()) {
+                        (0 until totalPages).toList()
+                    } else {
+                        PageRangeUtils.parsePageRanges(pageRange, totalPages)
+                    }
                 } else {
-                    PageRangeUtils.parsePageRanges(pageRange, totalPages)
+                    listOf(currentPageIndex).filter { it in 0 until totalPages }
                 }
                 
-                if (selectedPages.isEmpty() && pageRange.trim().isNotEmpty()) {
+                if (selectedPages.isEmpty() && applyToAllPages && pageRange.trim().isNotEmpty()) {
                     throw IllegalArgumentException("Please enter a valid page range (e.g., 1-3, 5) within the document's bounds (1-$totalPages).")
                 }
                 
                 for (pageIdx in selectedPages) {
                     val page = doc.getPage(pageIdx)
-                    val cropBox = page.cropBox
+                    val cropBox = page.cropBox ?: page.mediaBox
                     
-                    val dx = cropBox.width * marginPercentage
-                    val dy = cropBox.height * marginPercentage
-                    
-                    val newCropBox = PDRectangle(
-                        cropBox.lowerLeftX + dx,
-                        cropBox.lowerLeftY + dy,
-                        cropBox.width - (2f * dx),
-                        cropBox.height - (2f * dy)
-                    )
-                    page.cropBox = newCropBox
+                    if (useAbsoluteCrop) {
+                        // 1 mm = 72 / 25.4 points
+                        val pointsPerMm = 72f / 25.4f
+                        val leftPoints = leftMm * pointsPerMm
+                        val topPointsFromTop = topMm * pointsPerMm
+                        val widthPoints = widthMm * pointsPerMm
+                        val heightPoints = heightMm * pointsPerMm
+                        
+                        val pageHeight = cropBox.height
+                        
+                        val newLowerLeftX = cropBox.lowerLeftX + leftPoints
+                        val newLowerLeftY = cropBox.lowerLeftY + (pageHeight - topPointsFromTop - heightPoints)
+                        
+                        val clampedX = newLowerLeftX.coerceIn(cropBox.lowerLeftX, cropBox.upperRightX)
+                        val clampedY = newLowerLeftY.coerceIn(cropBox.lowerLeftY, cropBox.upperRightY)
+                        val clampedWidth = widthPoints.coerceAtMost(cropBox.upperRightX - clampedX)
+                        val clampedHeight = heightPoints.coerceAtMost(cropBox.upperRightY - clampedY)
+                        
+                        page.cropBox = PDRectangle(clampedX, clampedY, clampedWidth, clampedHeight)
+                    } else {
+                        val dx = cropBox.width * marginPercentage
+                        val dy = cropBox.height * marginPercentage
+                        
+                        val newCropBox = PDRectangle(
+                            cropBox.lowerLeftX + dx,
+                            cropBox.lowerLeftY + dy,
+                            cropBox.width - (2f * dx),
+                            cropBox.height - (2f * dy)
+                        )
+                        page.cropBox = newCropBox
+                    }
                 }
                 doc.save(outputFile)
             }

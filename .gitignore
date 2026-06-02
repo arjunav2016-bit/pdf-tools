@@ -25,3 +25,4 @@ __pycache__/
 /*.ppt
 /*.pdf
 /PROJECT_OUTLINE.txt
+.kotlin/

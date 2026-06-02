@@ -115,6 +115,10 @@ dependencies {
 
   // ML Kit Text Recognition (On-device OCR)
   implementation("com.google.android.gms:play-services-mlkit-text-recognition:19.0.0")
+  implementation("com.google.android.gms:play-services-mlkit-text-recognition-chinese:16.0.0")
+  implementation("com.google.android.gms:play-services-mlkit-text-recognition-devanagari:16.0.0")
+  implementation("com.google.android.gms:play-services-mlkit-text-recognition-japanese:16.0.0")
+  implementation("com.google.android.gms:play-services-mlkit-text-recognition-korean:16.0.0")
 
   // ML Kit Document Scanner (Camera-based document scanning with edge detection)
   implementation("com.google.android.gms:play-services-mlkit-document-scanner:16.0.0-beta1")

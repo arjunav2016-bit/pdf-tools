@@ -51,6 +51,12 @@ import java.util.zip.ZipOutputStream
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
+import com.google.mlkit.vision.text.chinese.ChineseTextRecognizerOptions
+import com.google.mlkit.vision.text.devanagari.DevanagariTextRecognizerOptions
+import com.google.mlkit.vision.text.japanese.JapaneseTextRecognizerOptions
+import com.google.mlkit.vision.text.korean.KoreanTextRecognizerOptions
+import com.example.pdftools.data.UserPreferencesRepository
+import kotlinx.coroutines.flow.first
 import com.google.android.gms.tasks.Tasks
 import org.apache.poi.xslf.usermodel.XSLFTextBox
 
@@ -895,14 +901,17 @@ class ConvertProcessor @Inject constructor() {
         selectedSlides: Set<Int> = emptySet(),
         slidesPerPage: Int = 1,
         includeNotes: Boolean = false,
-        quality: String = "medium"
+        quality: String = "medium",
+        onProgress: ((Float) -> Unit)? = null
     ): Uri = withContext(Dispatchers.IO) {
         val outputFile = File(context.cacheDir, "PptToPdf_${System.currentTimeMillis()}.pdf")
 
         try {
             if (shouldUsePptBackend(slideRange, selectedSlides, slidesPerPage, includeNotes)) {
                 try {
+                    onProgress?.invoke(0f)
                     convertPptToPdfWithBackend(context, uri, outputFile)
+                    onProgress?.invoke(1f)
                     return@withContext Uri.fromFile(outputFile)
                 } catch (e: Throwable) {
                     Log.w("ConvertProcessor", "PPT backend conversion failed; using local fallback", e)
@@ -910,8 +919,11 @@ class ConvertProcessor @Inject constructor() {
                 }
             }
 
-            context.contentResolver.openInputStream(uri)?.use { inputStream ->
-                val slideShow = XMLSlideShow(inputStream)
+            val inputStream = context.contentResolver.openInputStream(uri)
+                ?: throw IllegalArgumentException("Could not open the PowerPoint file.")
+
+            inputStream.use { stream ->
+                val slideShow = XMLSlideShow(stream)
                 // Dynamically resolve slide dimensions
                 val dimensions = getPresentationSlideSize(slideShow)
                 val slideWidth = dimensions.first
@@ -956,9 +968,11 @@ class ConvertProcessor @Inject constructor() {
 
                     // Group slides by pages
                     val slideGroups = slidesToConvert.chunked(clampedPerPage)
+                    val totalGroups = slideGroups.size.coerceAtLeast(1)
 
-                    for (group in slideGroups) {
+                    for ((groupIndex, group) in slideGroups.withIndex()) {
                         currentCoroutineContext().ensureActive()
+                        onProgress?.invoke(groupIndex.toFloat() / totalGroups)
 
                         if (clampedPerPage == 1) {
                             // Single slide per page — use slide dimensions
@@ -1054,8 +1068,9 @@ class ConvertProcessor @Inject constructor() {
 
                     slideShow.close()
                     pdfDoc.save(outputFile)
+                    onProgress?.invoke(1f)
                 }
-            } ?: throw IllegalArgumentException("Could not open the PowerPoint file.")
+            }
             Uri.fromFile(outputFile)
         } catch (e: Throwable) {
             outputFile.delete()
@@ -2287,7 +2302,15 @@ $slideRels
                 val bitmap = renderer.renderImageWithDPI(pageNum - 1, 150f, ImageType.ARGB)
                 try {
                     val image = InputImage.fromBitmap(bitmap, 0)
-                    val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+                    val ocrLang = UserPreferencesRepository(context).preferences.first().ocrLanguage
+                    val options = when (ocrLang) {
+                        "chinese" -> ChineseTextRecognizerOptions.Builder().build()
+                        "devanagari" -> DevanagariTextRecognizerOptions.Builder().build()
+                        "japanese" -> JapaneseTextRecognizerOptions.Builder().build()
+                        "korean" -> KoreanTextRecognizerOptions.Builder().build()
+                        else -> TextRecognizerOptions.DEFAULT_OPTIONS
+                    }
+                    val recognizer = TextRecognition.getClient(options)
                     val result = Tasks.await(recognizer.process(image))
                     pageText = result.text
                 } catch (e: Exception) {

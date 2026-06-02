@@ -10,6 +10,8 @@ import com.tom_roush.pdfbox.pdmodel.common.PDRectangle
 import com.tom_roush.pdfbox.pdmodel.font.PDType1Font
 import com.tom_roush.pdfbox.pdmodel.graphics.image.LosslessFactory
 import com.tom_roush.pdfbox.pdmodel.graphics.state.PDExtendedGraphicsState
+import com.tom_roush.pdfbox.pdmodel.graphics.image.PDImageXObject
+import com.tom_roush.pdfbox.util.Matrix
 import com.tom_roush.pdfbox.rendering.PDFRenderer
 import com.tom_roush.pdfbox.rendering.ImageType
 import com.tom_roush.pdfbox.text.PDFTextStripper
@@ -21,6 +23,14 @@ import com.example.pdftools.data.DiffType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
+import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions
+import com.google.mlkit.vision.text.chinese.ChineseTextRecognizerOptions
+import com.google.mlkit.vision.text.devanagari.DevanagariTextRecognizerOptions
+import com.google.mlkit.vision.text.japanese.JapaneseTextRecognizerOptions
+import com.google.mlkit.vision.text.korean.KoreanTextRecognizerOptions
+import com.example.pdftools.data.UserPreferencesRepository
+import kotlinx.coroutines.flow.first
 
 import com.example.pdftools.utils.PageRangeUtils
 import javax.inject.Inject
@@ -43,11 +53,18 @@ class EditProcessor @Inject constructor() {
         fontSize: Float,
         rotation: Float,
         opacity: Float,
-        pageRange: String
+        pageRange: String,
+        isImage: Boolean = false,
+        imageUri: Uri? = null,
+        position: String = "center"
     ): Uri = withContext(Dispatchers.IO) {
-        if (text.trim().isEmpty()) {
+        if (!isImage && text.trim().isEmpty()) {
             throw IllegalArgumentException("Watermark text cannot be empty.")
         }
+        if (isImage && imageUri == null) {
+            throw IllegalArgumentException("Watermark image cannot be empty.")
+        }
+
         val tempInputFile = File.createTempFile("watermark_input_", ".pdf", context.cacheDir)
         val outputFile = File(context.cacheDir, "Watermarked_${System.currentTimeMillis()}.pdf")
         
@@ -70,6 +87,19 @@ class EditProcessor @Inject constructor() {
                     throw IllegalArgumentException("Please enter a valid page range (e.g., 1-3, 5) within the document's bounds (1-$totalPages).")
                 }
                 
+                // Pre-load image watermark once if applicable
+                val imageXObject = if (isImage && imageUri != null) {
+                    context.contentResolver.openInputStream(imageUri)?.use { input ->
+                        val tempImgFile = File.createTempFile("watermark_img_", ".png", context.cacheDir)
+                        tempImgFile.outputStream().use { out -> input.copyTo(out) }
+                        val xobj = PDImageXObject.createFromFile(tempImgFile.absolutePath, doc)
+                        tempImgFile.delete()
+                        xobj
+                    }
+                } else {
+                    null
+                }
+
                 val parsedColor = try {
                     android.graphics.Color.parseColor(colorHex)
                 } catch (e: Exception) {
@@ -79,43 +109,76 @@ class EditProcessor @Inject constructor() {
                 val g = android.graphics.Color.green(parsedColor) / 255f
                 val b = android.graphics.Color.blue(parsedColor) / 255f
                 
+                val font = PDType1Font.HELVETICA_BOLD
+                val margin = 36f
+
                 for (pageIdx in selectedPages) {
                     val page = doc.getPage(pageIdx)
                     val width = page.mediaBox.width
                     val height = page.mediaBox.height
                     
                     PDPageContentStream(doc, page, PDPageContentStream.AppendMode.APPEND, true, true).use { contentStream ->
-                        // Apply translucent styling using extended graphics state
                         val extGS = PDExtendedGraphicsState().apply {
                             nonStrokingAlphaConstant = opacity
                         }
                         contentStream.setGraphicsStateParameters(extGS)
-                        contentStream.setNonStrokingColor(r, g, b)
-                        
-                        val safeText = text.filter { it.code in 32..126 }
-                        val font = PDType1Font.HELVETICA_BOLD
-                        contentStream.beginText()
-                        contentStream.setFont(font, fontSize)
-                        
-                        // Calculate dimensions for text centering
-                        val textWidth = font.getStringWidth(safeText) / 1000f * fontSize
-                        val textHeight = fontSize
-                        
-                        // Set text rotation and translation around the center of the page
-                        val rad = Math.toRadians(rotation.toDouble())
-                        val cos = Math.cos(rad).toFloat()
-                        val sin = Math.sin(rad).toFloat()
-                        
-                        // Page center
-                        val cx = width / 2f
-                        val cy = height / 2f
-                        
-                        // Transform origin to page center, then apply rotation, and shift back to align text center
-                        contentStream.setTextMatrix(cos.toDouble(), sin.toDouble(), -sin.toDouble(), cos.toDouble(), cx.toDouble(), cy.toDouble())
-                        contentStream.newLineAtOffset(-textWidth / 2f, -textHeight / 4f)
-                        
-                        contentStream.showText(safeText)
-                        contentStream.endText()
+
+                        if (isImage && imageXObject != null) {
+                            val targetWidth = fontSize * 2.5f
+                            val targetHeight = targetWidth * (imageXObject.height.toFloat() / imageXObject.width.toFloat())
+
+                            val cx = when {
+                                position.endsWith("left") -> margin + targetWidth / 2f
+                                position.endsWith("right") -> width - margin - targetWidth / 2f
+                                else -> width / 2f
+                            }
+                            val cy = when {
+                                position.startsWith("bottom") -> margin + targetHeight / 2f
+                                position.startsWith("top") -> height - margin - targetHeight / 2f
+                                else -> height / 2f
+                            }
+
+                            contentStream.saveGraphicsState()
+                            val rad = Math.toRadians(rotation.toDouble())
+                            val matrix = Matrix()
+                            matrix.translate(cx, cy)
+                            matrix.rotate(rad)
+                            matrix.translate(-targetWidth / 2f, -targetHeight / 2f)
+                            matrix.scale(targetWidth, targetHeight)
+                            
+                            contentStream.drawImage(imageXObject, matrix)
+                            contentStream.restoreGraphicsState()
+                        } else if (!isImage) {
+                            contentStream.setNonStrokingColor(r, g, b)
+                            
+                            val safeText = text.filter { it.code in 32..126 }
+                            contentStream.beginText()
+                            contentStream.setFont(font, fontSize)
+                            
+                            val textWidth = font.getStringWidth(safeText) / 1000f * fontSize
+                            val textHeight = fontSize
+
+                            val cx = when {
+                                position.endsWith("left") -> margin + textWidth / 2f
+                                position.endsWith("right") -> width - margin - textWidth / 2f
+                                else -> width / 2f
+                            }
+                            val cy = when {
+                                position.startsWith("bottom") -> margin + textHeight / 2f
+                                position.startsWith("top") -> height - margin - textHeight / 2f
+                                else -> height / 2f
+                            }
+
+                            val rad = Math.toRadians(rotation.toDouble())
+                            val cos = Math.cos(rad).toFloat()
+                            val sin = Math.sin(rad).toFloat()
+                            
+                            contentStream.setTextMatrix(cos.toDouble(), sin.toDouble(), -sin.toDouble(), cos.toDouble(), cx.toDouble(), cy.toDouble())
+                            contentStream.newLineAtOffset(-textWidth / 2f, -textHeight / 4f)
+                            
+                            contentStream.showText(safeText)
+                            contentStream.endText()
+                        }
                     }
                 }
                 doc.save(outputFile)
@@ -135,10 +198,14 @@ class EditProcessor @Inject constructor() {
     suspend fun addPageNumbers(
         context: Context,
         uri: Uri,
-        format: String, // "simple" (e.g. "1"), "prefixed" (e.g. "Page 1"), "detailed" (e.g. "Page 1 of 5")
-        position: String, // "bottom_center", "bottom_right", "top_right"
+        format: String, // "simple", "prefixed", "detailed"
+        position: String, // "top_left", "top_center", "top_right", "bottom_left", "bottom_center", "bottom_right"
         fontSize: Float,
-        pageRange: String
+        pageRange: String = "",
+        colorHex: String = "#80488D",
+        rangeType: String = "all",
+        startFromPage: Int = 1,
+        startingNumber: Int = 1
     ): Uri = withContext(Dispatchers.IO) {
         val tempInputFile = File.createTempFile("page_numbers_input_", ".pdf", context.cacheDir)
         val outputFile = File(context.cacheDir, "PageNumbered_${System.currentTimeMillis()}.pdf")
@@ -152,35 +219,56 @@ class EditProcessor @Inject constructor() {
             
             PDDocument.load(tempInputFile).use { doc ->
                 val totalPages = doc.numberOfPages
-                val selectedPages = if (pageRange.trim().isEmpty()) {
-                    (0 until totalPages).toList()
-                } else {
-                    PageRangeUtils.parsePageRanges(pageRange, totalPages)
-                }
                 
-                if (selectedPages.isEmpty() && pageRange.trim().isNotEmpty()) {
-                    throw IllegalArgumentException("Please enter a valid page range (e.g., 1-3, 5) within the document's bounds (1-$totalPages).")
+                val parsedColor = try {
+                    android.graphics.Color.parseColor(colorHex)
+                } catch (e: Exception) {
+                    android.graphics.Color.GRAY
                 }
+                val r = android.graphics.Color.red(parsedColor) / 255f
+                val g = android.graphics.Color.green(parsedColor) / 255f
+                val b = android.graphics.Color.blue(parsedColor) / 255f
                 
-                for (pageIdx in selectedPages) {
+                for (pageIdx in 0 until totalPages) {
+                    val shouldNumber = when (rangeType) {
+                        "exclude_first" -> pageIdx > 0
+                        "start_from" -> pageIdx >= (startFromPage - 1)
+                        else -> {
+                            if (pageRange.trim().isEmpty()) {
+                                true
+                            } else {
+                                val parsedSelected = try { PageRangeUtils.parsePageRanges(pageRange, totalPages).toSet() } catch (_: Exception) { emptySet() }
+                                pageIdx in parsedSelected
+                            }
+                        }
+                    }
+                    
+                    if (!shouldNumber) continue
+                    
+                    val offset = when (rangeType) {
+                        "exclude_first" -> pageIdx - 1
+                        "start_from" -> pageIdx - (startFromPage - 1)
+                        else -> pageIdx
+                    }
+                    val pageNum = startingNumber + offset
+                    
+                    val text = when (format) {
+                        "simple" -> "$pageNum"
+                        "prefixed" -> "Page $pageNum"
+                        "detailed" -> "Page $pageNum of $totalPages"
+                        else -> "$pageNum"
+                    }
+                    
                     val page = doc.getPage(pageIdx)
                     val width = page.mediaBox.width
                     val height = page.mediaBox.height
                     
-                    val text = when (format) {
-                        "simple" -> "${pageIdx + 1}"
-                        "prefixed" -> "Page ${pageIdx + 1}"
-                        "detailed" -> "Page ${pageIdx + 1} of $totalPages"
-                        else -> "${pageIdx + 1}"
-                    }
-                    
                     PDPageContentStream(doc, page, PDPageContentStream.AppendMode.APPEND, true, true).use { contentStream ->
-                        // Render page number in a semi-translucent dark gray (#555555)
                         val extGS = PDExtendedGraphicsState().apply {
-                            nonStrokingAlphaConstant = 0.8f
+                            nonStrokingAlphaConstant = 1.0f
                         }
                         contentStream.setGraphicsStateParameters(extGS)
-                        contentStream.setNonStrokingColor(0.33f, 0.33f, 0.33f)
+                        contentStream.setNonStrokingColor(r, g, b)
                         
                         val font = PDType1Font.HELVETICA
                         contentStream.beginText()
@@ -188,17 +276,15 @@ class EditProcessor @Inject constructor() {
                         
                         val textWidth = font.getStringWidth(text) / 1000f * fontSize
                         
-                        val x = when (position) {
-                            "bottom_center" -> (width - textWidth) / 2f
-                            "bottom_right" -> width - textWidth - 40f
-                            "top_right" -> width - textWidth - 40f
+                        val x = when {
+                            position.endsWith("left") -> 36f
+                            position.endsWith("right") -> width - textWidth - 36f
                             else -> (width - textWidth) / 2f
                         }
                         
-                        val y = when (position) {
-                            "bottom_center", "bottom_right" -> 30f
-                            "top_right" -> height - 40f
-                            else -> 30f
+                        val y = when {
+                            position.startsWith("top") -> height - 36f - fontSize
+                            else -> 36f
                         }
                         
                         contentStream.newLineAtOffset(x, y)
@@ -495,9 +581,15 @@ class EditProcessor @Inject constructor() {
                     val bitmap = renderer.renderImageWithDPI(i, 150f, ImageType.ARGB)
                     try {
                         val image = com.google.mlkit.vision.common.InputImage.fromBitmap(bitmap, 0)
-                        val recognizer = com.google.mlkit.vision.text.TextRecognition.getClient(
-                            com.google.mlkit.vision.text.latin.TextRecognizerOptions.DEFAULT_OPTIONS
-                        )
+                        val ocrLang = UserPreferencesRepository(context).preferences.first().ocrLanguage
+                        val options = when (ocrLang) {
+                            "chinese" -> ChineseTextRecognizerOptions.Builder().build()
+                            "devanagari" -> DevanagariTextRecognizerOptions.Builder().build()
+                            "japanese" -> JapaneseTextRecognizerOptions.Builder().build()
+                            "korean" -> KoreanTextRecognizerOptions.Builder().build()
+                            else -> TextRecognizerOptions.DEFAULT_OPTIONS
+                        }
+                        val recognizer = TextRecognition.getClient(options)
                         val result = com.google.android.gms.tasks.Tasks.await(recognizer.process(image))
                         ocrText.append(result.text).append("\n")
                     } catch (e: Exception) {

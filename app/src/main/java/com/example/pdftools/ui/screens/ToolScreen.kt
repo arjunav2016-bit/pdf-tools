@@ -105,6 +105,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.geometry.CornerRadius
 import com.example.pdftools.data.PdfTool
+import com.example.pdftools.data.OcrModuleStatus
 import com.example.pdftools.theme.LocalDarkTheme
 import com.example.pdftools.ui.screens.tools.CompareResultDisplayConfig
 import com.example.pdftools.ui.screens.tools.CompressToolConfig
@@ -122,12 +123,22 @@ import com.example.pdftools.ui.screens.tools.RemovePagesToolConfig
 import com.example.pdftools.ui.screens.tools.PasswordToolConfig
 import androidx.compose.material.icons.automirrored.filled.CallSplit
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Lock
 import com.example.pdftools.ui.screens.tools.PdfaToolConfig
 import com.example.pdftools.ui.screens.tools.RedactToolConfig
 import com.example.pdftools.ui.screens.tools.RotateToolConfig
 import com.example.pdftools.ui.screens.tools.ScanToolConfig
 import com.example.pdftools.ui.screens.tools.SignToolConfig
+import com.example.pdftools.ui.screens.tools.SignPdfSurgicalScreen
+import com.example.pdftools.ui.screens.tools.ProtectPdfSurgicalScreen
+import com.example.pdftools.ui.screens.tools.UnlockPdfSurgicalScreen
+import com.example.pdftools.ui.screens.tools.PdfFormsSurgicalScreen
+import com.example.pdftools.ui.screens.tools.EditPdfSurgicalScreen
+import com.example.pdftools.ui.screens.tools.CropPdfSurgicalScreen
+import com.example.pdftools.ui.screens.tools.RotatePdfSurgicalScreen
 import com.example.pdftools.ui.screens.tools.WatermarkToolConfig
+import com.example.pdftools.ui.screens.tools.WatermarkSurgicalScreen
+import com.example.pdftools.ui.screens.tools.PageNumbersSurgicalScreen
 import com.example.pdftools.ui.screens.tools.PdfToImageToolConfig
 import com.example.pdftools.ui.screens.tools.PdfToPptToolConfig
 
@@ -575,6 +586,135 @@ fun ToolScreen(
                 accentColor = accentColor,
                 containerColor = containerColor
             )
+        } else if (tool.id == "protect_pdf" && selectedFiles.isNotEmpty()) {
+            ProtectPdfSurgicalScreen(
+                tool = tool,
+                viewModel = viewModel,
+                selectedFiles = selectedFiles,
+                pageCount = pageCount,
+                isProcessing = isProcessing,
+                isComplete = isComplete,
+                outputUris = outputUris,
+                progress = progress,
+                innerPadding = innerPadding,
+                accentColor = accentColor,
+                containerColor = containerColor
+            )
+        } else if (tool.id == "unlock_pdf" && selectedFiles.isNotEmpty()) {
+            UnlockPdfSurgicalScreen(
+                tool = tool,
+                viewModel = viewModel,
+                selectedFiles = selectedFiles,
+                isProcessing = isProcessing,
+                isComplete = isComplete,
+                outputUris = outputUris,
+                progress = progress,
+                innerPadding = innerPadding,
+                accentColor = accentColor,
+                containerColor = containerColor
+            )
+        } else if (tool.id == "crop_pdf" && selectedFiles.isNotEmpty()) {
+            CropPdfSurgicalScreen(
+                tool = tool,
+                viewModel = viewModel,
+                selectedFiles = selectedFiles,
+                pageCount = pageCount,
+                isProcessing = isProcessing,
+                isComplete = isComplete,
+                outputUris = outputUris,
+                progress = progress,
+                innerPadding = innerPadding,
+                accentColor = accentColor,
+                containerColor = containerColor
+            )
+        } else if (tool.id == "rotate_pdf" && selectedFiles.isNotEmpty()) {
+            RotatePdfSurgicalScreen(
+                tool = tool,
+                viewModel = viewModel,
+                selectedFiles = selectedFiles,
+                pageCount = pageCount,
+                isProcessing = isProcessing,
+                isComplete = isComplete,
+                outputUris = outputUris,
+                progress = progress,
+                innerPadding = innerPadding,
+                accentColor = accentColor,
+                containerColor = containerColor
+            )
+        } else if (tool.id == "add_watermark" && selectedFiles.isNotEmpty()) {
+            WatermarkSurgicalScreen(
+                tool = tool,
+                viewModel = viewModel,
+                selectedFiles = selectedFiles,
+                pageCount = pageCount,
+                isProcessing = isProcessing,
+                isComplete = isComplete,
+                outputUris = outputUris,
+                progress = progress,
+                innerPadding = innerPadding,
+                accentColor = accentColor,
+                containerColor = containerColor
+            )
+        } else if (tool.id == "add_page_numbers" && selectedFiles.isNotEmpty()) {
+            PageNumbersSurgicalScreen(
+                tool = tool,
+                viewModel = viewModel,
+                selectedFiles = selectedFiles,
+                pageCount = pageCount,
+                isProcessing = isProcessing,
+                isComplete = isComplete,
+                outputUris = outputUris,
+                progress = progress,
+                innerPadding = innerPadding,
+                accentColor = accentColor,
+                containerColor = containerColor
+            )
+        } else if (tool.id == "sign_pdf" && selectedFiles.isNotEmpty()) {
+            SignPdfSurgicalScreen(
+                tool = tool,
+                viewModel = viewModel,
+                selectedFiles = selectedFiles,
+                pageCount = pageCount,
+                isProcessing = isProcessing,
+                isComplete = isComplete,
+                outputUris = outputUris,
+                progress = progress,
+                innerPadding = innerPadding,
+                accentColor = accentColor,
+                containerColor = containerColor
+            )
+        } else if (tool.id == "pdf_forms") {
+            PdfFormsSurgicalScreen(
+                tool = tool,
+                viewModel = viewModel,
+                selectedFiles = selectedFiles,
+                isProcessing = isProcessing,
+                isComplete = isComplete,
+                outputUris = outputUris,
+                progress = progress,
+                innerPadding = innerPadding,
+                accentColor = accentColor,
+                containerColor = containerColor,
+                onPickFiles = {
+                    filePickerLauncher.launch(arrayOf("application/pdf"))
+                }
+            )
+        } else if (tool.id == "edit_pdf") {
+            EditPdfSurgicalScreen(
+                tool = tool,
+                viewModel = viewModel,
+                selectedFiles = selectedFiles,
+                isProcessing = isProcessing,
+                isComplete = isComplete,
+                outputUris = outputUris,
+                progress = progress,
+                innerPadding = innerPadding,
+                accentColor = accentColor,
+                containerColor = containerColor,
+                onPickFiles = {
+                    filePickerLauncher.launch(arrayOf("application/pdf"))
+                }
+            )
         } else if (isWideScreen) {
             Row(
                 modifier = Modifier
@@ -713,6 +853,12 @@ fun ToolScreen(
                                     } else if (tool.id == "pdf_to_jpg") {
                                         Icon(
                                             imageVector = Icons.Filled.Autorenew,
+                                            contentDescription = null,
+                                            modifier = Modifier.padding(end = 8.dp)
+                                        )
+                                    } else if (tool.id == "redact_pdf") {
+                                        Icon(
+                                            imageVector = Icons.Filled.Lock,
                                             contentDescription = null,
                                             modifier = Modifier.padding(end = 8.dp)
                                         )
@@ -1371,7 +1517,7 @@ fun ExtractPagesSurgicalScreen(
                             ) {
                                 if (progress != null) {
                                     androidx.compose.material3.LinearProgressIndicator(
-                                        progress = progress,
+                                        progress = { progress },
                                         color = accentColor,
                                         trackColor = containerColor,
                                         modifier = Modifier.fillMaxWidth()
@@ -4329,10 +4475,35 @@ fun OcrPdfSurgicalScreen(
         selectedFile?.let { getFileNameFromUri(context, it) } ?: ""
     }
 
+    LaunchedEffect(Unit) {
+        viewModel.checkOcrStatuses()
+    }
+
     // Config states
-    var selectedLanguage by remember { mutableStateOf("English") }
-    val languages = listOf("English", "Spanish", "French", "German")
+    val ocrConfig by viewModel.ocrConfig.collectAsState()
+    val ocrResultText = ocrConfig.ocrResultText
+    val selectedLangCode = ocrConfig.ocrLanguage
+    val moduleStatuses = ocrConfig.moduleStatuses
+
+    val languageMap = mapOf(
+        "English" to "latin",
+        "Chinese" to "chinese",
+        "Hindi" to "devanagari",
+        "Japanese" to "japanese",
+        "Korean" to "korean"
+    )
+    val languages = listOf("English", "Chinese", "Hindi", "Japanese", "Korean")
     var dropdownExpanded by remember { mutableStateOf(false) }
+
+    val selectedLanguageDisplayName = when (selectedLangCode) {
+        "chinese" -> "Chinese"
+        "devanagari" -> "Hindi"
+        "japanese" -> "Japanese"
+        "korean" -> "Korean"
+        else -> "English"
+    }
+
+    val selectedStatus = if (selectedLangCode == "latin") OcrModuleStatus.Ready else moduleStatuses[selectedLangCode] ?: OcrModuleStatus.NotDownloaded
 
     // Format selection: "searchable_pdf" or "raw_text"
     var selectedFormat by remember { mutableStateOf("searchable_pdf") }
@@ -4351,9 +4522,6 @@ fun OcrPdfSurgicalScreen(
         1 -> "Optimized balance of speed and character recognition accuracy."
         else -> "Deep neural network analysis for low-contrast or complex layouts (slower)."
     }
-
-    val ocrConfig by viewModel.ocrConfig.collectAsState()
-    val ocrResultText = ocrConfig.ocrResultText
 
     Box(
         modifier = Modifier
@@ -4690,7 +4858,7 @@ fun OcrPdfSurgicalScreen(
 
                         Box(modifier = Modifier.fillMaxWidth()) {
                             OutlinedTextField(
-                                value = selectedLanguage,
+                                value = selectedLanguageDisplayName,
                                 onValueChange = {},
                                 readOnly = true,
                                 modifier = Modifier.fillMaxWidth(),
@@ -4716,12 +4884,109 @@ fun OcrPdfSurgicalScreen(
                             ) {
                                 languages.forEach { lang ->
                                     DropdownMenuItem(
-                                        text = { Text(text = lang) },
+                                        text = {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text(text = lang, style = MaterialTheme.typography.bodyLarge)
+                                                val itemLangCode = languageMap[lang] ?: "latin"
+                                                val itemStatus = if (itemLangCode == "latin") OcrModuleStatus.Ready else moduleStatuses[itemLangCode] ?: OcrModuleStatus.NotDownloaded
+                                                val labelText = when (itemStatus) {
+                                                    is OcrModuleStatus.Ready -> "Available"
+                                                    is OcrModuleStatus.NotDownloaded -> "Not Installed"
+                                                    is OcrModuleStatus.Downloading -> "Downloading... ${(itemStatus.progress * 100).toInt()}%"
+                                                    is OcrModuleStatus.Error -> "Error"
+                                                }
+                                                val labelColor = when (itemStatus) {
+                                                    is OcrModuleStatus.Ready -> accentColor
+                                                    is OcrModuleStatus.Downloading -> accentColor.copy(alpha = 0.8f)
+                                                    is OcrModuleStatus.Error -> MaterialTheme.colorScheme.error
+                                                    else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                                }
+                                                Text(
+                                                    text = labelText,
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    color = labelColor,
+                                                    fontWeight = FontWeight.SemiBold
+                                                )
+                                            }
+                                        },
                                         onClick = {
-                                            selectedLanguage = lang
+                                            val targetLang = languageMap[lang] ?: "latin"
+                                            viewModel.updateOcrLanguage(targetLang)
+                                            val targetStatus = if (targetLang == "latin") OcrModuleStatus.Ready else moduleStatuses[targetLang] ?: OcrModuleStatus.NotDownloaded
+                                            if (targetStatus is OcrModuleStatus.NotDownloaded || targetStatus is OcrModuleStatus.Error) {
+                                                viewModel.downloadOcrLanguage(targetLang)
+                                            }
                                             dropdownExpanded = false
                                         }
                                     )
+                                }
+                            }
+                        }
+
+                        // Availability status card
+                        if (selectedLangCode != "latin" && selectedStatus !is OcrModuleStatus.Ready) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                                ),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(16.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = "Language Pack Required",
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        val desc = when (selectedStatus) {
+                                            is OcrModuleStatus.Downloading -> "Downloading model files... ${(selectedStatus.progress * 100).toInt()}%"
+                                            is OcrModuleStatus.Error -> "Failed to download model files: ${selectedStatus.message}"
+                                            else -> "This language pack needs to be downloaded for offline use."
+                                        }
+                                        Text(
+                                            text = desc,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.width(16.dp))
+
+                                    if (selectedStatus is OcrModuleStatus.Downloading) {
+                                        CircularProgressIndicator(
+                                            progress = { selectedStatus.progress },
+                                            modifier = Modifier.size(24.dp),
+                                            color = accentColor,
+                                            strokeWidth = 2.5.dp
+                                        )
+                                    } else {
+                                        Button(
+                                            onClick = { viewModel.downloadOcrLanguage(selectedLangCode) },
+                                            colors = ButtonDefaults.buttonColors(
+                                                containerColor = accentColor
+                                            ),
+                                            shape = RoundedCornerShape(20.dp)
+                                        ) {
+                                            Text(
+                                                text = if (selectedStatus is OcrModuleStatus.Error) "Retry" else "Download",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -4953,13 +5218,16 @@ fun OcrPdfSurgicalScreen(
                         } else {
                             Button(
                                 onClick = { viewModel.process(tool.id, context) },
+                                enabled = selectedLangCode == "latin" || selectedStatus is OcrModuleStatus.Ready,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(56.dp),
                                 shape = RoundedCornerShape(28.dp),
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = accentColor,
-                                    contentColor = Color.White
+                                    contentColor = Color.White,
+                                    disabledContainerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+                                    disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
                                 )
                             ) {
                                 Row(
@@ -6037,7 +6305,7 @@ fun PdfToWordSurgicalScreen(
                         Spacer(modifier = Modifier.height(22.dp))
                         if (progress != null) {
                             LinearProgressIndicator(
-                                progress = progress,
+                                progress = { progress },
                                 color = wordBlue,
                                 trackColor = wordBlue.copy(alpha = 0.15f),
                                 modifier = Modifier
@@ -7066,6 +7334,7 @@ fun PptToPdfSurgicalScreen(
     val selectedFile = selectedFiles.firstOrNull()
     val config by viewModel.pptToPdfConfig.collectAsState()
     val pptPreviewPdfUri by viewModel.pptPreviewPdfUri.collectAsState()
+    val pptPreviewProgress by viewModel.pptPreviewProgress.collectAsState()
 
     val fileSize = remember(selectedFile) {
         selectedFile?.let { getFileSize(context, it) } ?: 0L
@@ -7394,6 +7663,42 @@ fun PptToPdfSurgicalScreen(
 
                                     // Visual Slide Selection Grid
                                     slideCount?.let { totalSlides ->
+                                        val progressVal = pptPreviewProgress
+                                        if (pptPreviewPdfUri == null && progressVal != null) {
+                                            Column(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(bottom = 12.dp),
+                                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                                            ) {
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Text(
+                                                        text = "Generating preview...",
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                    Text(
+                                                        text = "${(progressVal * 100).toInt()}%",
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = accentColor
+                                                    )
+                                                }
+                                                LinearProgressIndicator(
+                                                    progress = { progressVal },
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .height(4.dp)
+                                                        .clip(RoundedCornerShape(2.dp)),
+                                                    color = accentColor,
+                                                    trackColor = accentColor.copy(alpha = 0.15f)
+                                                )
+                                            }
+                                        }
                                         if (totalSlides > 0) {
                                             Text(
                                                 text = "Tap slides to select",
@@ -8935,7 +9240,7 @@ fun PdfToExcelSurgicalScreen(
                         Spacer(modifier = Modifier.height(22.dp))
                         if (progress != null) {
                             androidx.compose.material3.LinearProgressIndicator(
-                                progress = progress,
+                                progress = { progress },
                                 color = excelGreen,
                                 trackColor = excelGreen.copy(alpha = 0.15f),
                                 modifier = Modifier
@@ -8959,4 +9264,3 @@ fun PdfToExcelSurgicalScreen(
         }
     }
 }
-

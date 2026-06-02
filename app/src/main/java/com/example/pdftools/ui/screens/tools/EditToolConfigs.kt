@@ -1134,7 +1134,7 @@ fun EditToolConfig(
                                             annot.fontSize.toInt()
                                         ),
                                         style = MaterialTheme.typography.labelSmall,
-                                        color = Color.Gray
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                                 IconButton(
@@ -1147,7 +1147,7 @@ fun EditToolConfig(
                                     Icon(
                                         Icons.Filled.Delete,
                                         contentDescription = stringResource(R.string.tool_delete),
-                                        tint = Color.Red,
+                                        tint = MaterialTheme.colorScheme.error,
                                         modifier = Modifier.size(16.dp)
                                     )
                                 }
@@ -1178,7 +1178,7 @@ fun EditToolConfig(
                                             (annot.height * 100).toInt()
                                         ),
                                         style = MaterialTheme.typography.labelSmall,
-                                        color = Color.Gray
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                                 IconButton(
@@ -1191,7 +1191,7 @@ fun EditToolConfig(
                                     Icon(
                                         Icons.Filled.Delete,
                                         contentDescription = stringResource(R.string.tool_delete),
-                                        tint = Color.Red,
+                                        tint = MaterialTheme.colorScheme.error,
                                         modifier = Modifier.size(16.dp)
                                     )
                                 }
