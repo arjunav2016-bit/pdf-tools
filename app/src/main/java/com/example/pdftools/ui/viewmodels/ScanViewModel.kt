@@ -9,6 +9,7 @@ import com.example.pdftools.data.RecentFilesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -77,6 +78,10 @@ class ScanViewModel @Inject constructor(
     // --- Page Management ---
 
     fun addPages(uris: List<Uri>) {
+        // Guard: don't allow adding pages while processing or after success
+        val state = _flowState.value
+        if (state is ScanFlowState.Processing || state is ScanFlowState.Success) return
+
         val newPages = uris.map { ScannedPage(uri = it) }
         _scannedPages.value = _scannedPages.value + newPages
         if (_scannedPages.value.isNotEmpty()) {
@@ -156,6 +161,8 @@ class ScanViewModel @Inject constructor(
     fun generatePdf(context: Context) {
         val pages = _scannedPages.value
         if (pages.isEmpty()) return
+        // Double-tap guard: ignore if already processing
+        if (processingJob?.isActive == true) return
 
         _flowState.value = ScanFlowState.Processing(message = "Preparing scan…")
         processingJob = viewModelScope.launch {
@@ -179,6 +186,9 @@ class ScanViewModel @Inject constructor(
                         )
                     }
                 )
+
+                // Check for cancellation after the long-running call
+                ensureActive()
 
                 // Record in recent files
                 val fileName = getFileName(context, result)

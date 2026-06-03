@@ -255,7 +255,7 @@ fun PdfFormsSurgicalScreen(
                     tool = tool,
                     outputUris = outputUris,
                     onClear = {
-                        viewModel.reset()
+                        viewModel.resetCurrentRun()
                         currentStep = FormsStep.DASHBOARD
                         activeIntent = ""
                     },
@@ -304,7 +304,7 @@ fun PdfFormsSurgicalScreen(
                         onFieldSelectType = { activeFieldType = it },
                         onFieldSelectForConfig = { selectedFieldIdForConfig = it },
                         onBack = {
-                            viewModel.reset()
+                            viewModel.resetCurrentRun()
                             currentStep = FormsStep.DASHBOARD
                         },
                         onStartFilling = {

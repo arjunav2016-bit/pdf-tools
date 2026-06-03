@@ -910,7 +910,7 @@ fun ToolScreen(
                             SuccessCard(
                                 tool = tool,
                                 outputUris = outputUris,
-                                onClear = { viewModel.reset() },
+                                onClear = { viewModel.resetCurrentRun() },
                                 accentColor = accentColor,
                                 containerColor = containerColor
                             )
@@ -956,7 +956,7 @@ fun ToolScreen(
                             SuccessCard(
                                 tool = tool,
                                 outputUris = outputUris,
-                                onClear = { viewModel.reset() },
+                                onClear = { viewModel.resetCurrentRun() },
                                 accentColor = accentColor,
                                 containerColor = containerColor
                             )
@@ -1257,7 +1257,7 @@ fun ExtractPagesSurgicalScreen(
                 SuccessCard(
                     tool = tool,
                     outputUris = outputUris,
-                    onClear = { viewModel.reset() },
+                    onClear = { viewModel.resetCurrentRun() },
                     accentColor = accentColor,
                     containerColor = containerColor
                 )
@@ -1634,7 +1634,7 @@ fun MergePdfSurgicalScreen(
                 SuccessCard(
                     tool = tool,
                     outputUris = outputUris,
-                    onClear = { viewModel.reset() },
+                    onClear = { viewModel.resetCurrentRun() },
                     accentColor = accentColor,
                     containerColor = containerColor
                 )
@@ -2041,7 +2041,7 @@ fun SplitPdfSurgicalScreen(
                 SuccessCard(
                     tool = tool,
                     outputUris = outputUris,
-                    onClear = { viewModel.reset() },
+                    onClear = { viewModel.resetCurrentRun() },
                     accentColor = accentColor,
                     containerColor = containerColor
                 )
@@ -2448,7 +2448,7 @@ fun RemovePagesSurgicalScreen(
                 SuccessCard(
                     tool = tool,
                     outputUris = outputUris,
-                    onClear = { viewModel.reset() },
+                    onClear = { viewModel.resetCurrentRun() },
                     accentColor = accentColor,
                     containerColor = containerColor
                 )
@@ -2890,7 +2890,7 @@ fun OrganizePdfSurgicalScreen(
                 SuccessCard(
                     tool = tool,
                     outputUris = outputUris,
-                    onClear = { viewModel.reset() },
+                    onClear = { viewModel.resetCurrentRun() },
                     accentColor = accentColor,
                     containerColor = containerColor
                 )
@@ -3511,7 +3511,7 @@ fun CompressPdfSurgicalScreen(
                 SuccessCard(
                     tool = tool,
                     outputUris = outputUris,
-                    onClear = { viewModel.reset() },
+                    onClear = { viewModel.resetCurrentRun() },
                     accentColor = accentColor,
                     containerColor = containerColor
                 )
@@ -4043,7 +4043,7 @@ fun RepairPdfSurgicalScreen(
                 SuccessCard(
                     tool = tool,
                     outputUris = outputUris,
-                    onClear = { viewModel.reset() },
+                    onClear = { viewModel.resetCurrentRun() },
                     accentColor = accentColor,
                     containerColor = containerColor
                 )
@@ -4695,7 +4695,7 @@ fun OcrPdfSurgicalScreen(
                             .padding(horizontal = 20.dp, vertical = 12.dp)
                     ) {
                         Button(
-                            onClick = { viewModel.reset() },
+                            onClick = { viewModel.resetCurrentRun() },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(56.dp),
@@ -5357,7 +5357,7 @@ fun JpgToPdfSurgicalScreen(
                 SuccessCard(
                     tool = tool,
                     outputUris = outputUris,
-                    onClear = { viewModel.reset() },
+                    onClear = { viewModel.resetCurrentRun() },
                     accentColor = accentColor,
                     containerColor = containerColor
                 )
@@ -5959,7 +5959,7 @@ fun PdfToWordSurgicalScreen(
                 SuccessCard(
                     tool = tool,
                     outputUris = outputUris,
-                    onClear = { viewModel.reset() },
+                    onClear = { viewModel.resetCurrentRun() },
                     accentColor = accentColor,
                     containerColor = containerColor
                 )
@@ -6369,7 +6369,7 @@ fun WordToPdfSurgicalScreen(
                 SuccessCard(
                     tool = tool,
                     outputUris = outputUris,
-                    onClear = { viewModel.reset() },
+                    onClear = { viewModel.resetCurrentRun() },
                     accentColor = accentColor,
                     containerColor = containerColor
                 )
@@ -6831,7 +6831,7 @@ fun ExcelToPdfSurgicalScreen(
                 SuccessCard(
                     tool = tool,
                     outputUris = outputUris,
-                    onClear = { viewModel.reset() },
+                    onClear = { viewModel.resetCurrentRun() },
                     accentColor = accentColor,
                     containerColor = containerColor
                 )
@@ -7369,7 +7369,7 @@ fun PptToPdfSurgicalScreen(
                 SuccessCard(
                     tool = tool,
                     outputUris = outputUris,
-                    onClear = { viewModel.reset() },
+                    onClear = { viewModel.resetCurrentRun() },
                     accentColor = accentColor,
                     containerColor = containerColor
                 )
@@ -8307,7 +8307,7 @@ fun PdfToImageSurgicalScreen(
                 SuccessCard(
                     tool = tool,
                     outputUris = outputUris,
-                    onClear = { viewModel.reset() },
+                    onClear = { viewModel.resetCurrentRun() },
                     accentColor = accentColor,
                     containerColor = containerColor
                 )
@@ -8527,7 +8527,7 @@ fun PdfToPptSurgicalScreen(
                 SuccessCard(
                     tool = tool,
                     outputUris = outputUris,
-                    onClear = { viewModel.reset() },
+                    onClear = { viewModel.resetCurrentRun() },
                     accentColor = accentColor,
                     containerColor = containerColor
                 )
@@ -8746,7 +8746,7 @@ fun PdfToPdfaSurgicalScreen(
                 SuccessCard(
                     tool = tool,
                     outputUris = outputUris,
-                    onClear = { viewModel.reset() },
+                    onClear = { viewModel.resetCurrentRun() },
                     accentColor = accentColor,
                     containerColor = containerColor
                 )
@@ -8964,7 +8964,7 @@ fun PdfToExcelSurgicalScreen(
                 SuccessCard(
                     tool = tool,
                     outputUris = outputUris,
-                    onClear = { viewModel.reset() },
+                    onClear = { viewModel.resetCurrentRun() },
                     accentColor = accentColor,
                     containerColor = containerColor
                 )

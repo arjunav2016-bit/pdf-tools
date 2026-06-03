@@ -4,8 +4,8 @@
 **Scope:** Full app audit (no suspected bug)
 **Methodology:** 12-layer stack adapted for Jetpack Compose. 5 phases: ViewModel side-effect map → 3 parallel area audits (app shell, surgical tools, scan flow) → synthesis.
 **Total findings (raw):** 64 subagent findings across 4 audit agents
-**Unique bugs (deduped):** 35
-**Critical:** 4 · **High:** 9 · **Medium:** 13 · **Low:** 9
+**Unique bugs (deduped):** 35 (7 fixed: 4 CRITICAL, 3 HIGH)
+**Critical:** 4 (0 remaining) · **High:** 9 (6 remaining) · **Medium:** 13 · **Low:** 9
 
 ---
 
@@ -29,8 +29,9 @@
 
 ### CRITICAL
 
-#### BUG-001 — `RotateToolConfig` chip rotation has no effect
+#### [FIXED] BUG-001 — `RotateToolConfig` chip rotation has no effect
 - **Severity:** CRITICAL
+- **Status:** FIXED (in Phase 3)
 - **Touchpoint:** "Choose 90°/180°/270°" angle chips in `OrganizeToolConfigs.kt:651`
 - **Pattern:** Dead Path (data class field not bound to processor)
 - **Trace:**
@@ -44,8 +45,9 @@
 - **Recommended fix:** Either change the chip to `config.copy(previewRotation = angle)`, or change `process("rotate_pdf")` to read `c.degrees`. Pick one source of truth.
 - **Subagent ID:** CLICK-PATH-024
 
-#### BUG-002 — Scan: cancel during success race shows Success state to user who tapped Cancel
+#### [FIXED] BUG-002 — Scan: cancel during success race shows Success state to user who tapped Cancel
 - **Severity:** CRITICAL
+- **Status:** FIXED (in Phase 4)
 - **Touchpoint:** Cancel button in `ScanReviewContent.kt:497` Processing state
 - **Pattern:** Async Race (success-after-cancel)
 - **Trace:**
@@ -61,8 +63,9 @@
 - **Recommended fix:** Add `if (!isActive) return@launch` or `ensureActive()` between `pdfProcessor.scanToPdf(...)` return and the state writes. Or use a `wasCancelled` flag.
 - **Subagent ID:** CLICK-PATH-041
 
-#### BUG-003 — Scan: addPages from picker/camera flips flowState back to Review during Processing
+#### [FIXED] BUG-003 — Scan: addPages from picker/camera flips flowState back to Review during Processing
 - **Severity:** CRITICAL
+- **Status:** FIXED (in Phase 4)
 - **Touchpoint:** Gallery picker / camera scanner launcher callbacks in `ScanFlowScreen.kt:79–91, 94–100`
 - **Pattern:** Async Race (state-machine violation)
 - **Trace:**
@@ -79,8 +82,9 @@
 - **Recommended fix:** Guard `addPages` on `_flowState.value is Review || _flowState.value is Launcher` before mutating `_flowState`. Or remove the unconditional `_flowState = Review` from `addPages` (the screen should already be there).
 - **Subagent ID:** CLICK-PATH-044
 
-#### BUG-004 — Scan: Generate button can be double-tapped, leaking job and orphaning PDF
+#### [FIXED] BUG-004 — Scan: Generate button can be double-tapped, leaking job and orphaning PDF
 - **Severity:** CRITICAL
+- **Status:** FIXED (in Phase 4)
 - **Touchpoint:** "Save PDF" / "Generate PDF" button at `ScanReviewContent.kt:496–517`
 - **Pattern:** Async Race (double-tap)
 - **Trace:**
@@ -101,8 +105,9 @@
 
 ### HIGH
 
-#### BUG-005 — `ToolViewModel.reset()` is "nuclear" — wipes ALL 24 per-tool configs
+#### [FIXED] BUG-005 — `ToolViewModel.reset()` is "nuclear" — wipes ALL 24 per-tool configs
 - **Severity:** HIGH
+- **Status:** FIXED (in Phase 1)
 - **Touchpoint:** All 10 surgical screen "Close" (X) icons, all SuccessCard "Continue" buttons, tool-change `DisposableEffect`, FormsBuilder back button
 - **Pattern:** Sequential Undo (over-broad state reset)
 - **Trace:** See [Architecture Diagnosis](#architecture-diagnosis) below. `reset()` (ToolViewModel.kt:143–179) clears every per-tool config, not just the current tool's.
@@ -115,8 +120,9 @@
   - `resetAll()` — the current full reset. Used only by `ToolScreen.kt:240` (tool-change).
 - **Subagent IDs:** CLICK-PATH-001, 010, 012, 021, 058, 062, 064
 
-#### BUG-006 — `process("ocr_pdf")` REPLACES `OcrConfig` instead of `.copy()`
+#### [FIXED] BUG-006 — `process("ocr_pdf")` REPLACES `OcrConfig` instead of `.copy()`
 - **Severity:** HIGH
+- **Status:** FIXED (in Phase 2)
 - **Touchpoint:** OCR success path at `ToolViewModel.kt:453–458`
 - **Pattern:** Sequential Undo (data class field overwrite)
 - **Trace:**
@@ -247,8 +253,9 @@
 - **Recommended fix:** Before deleting, scan `signConfig.fields` for any field with `signatureUri == File(path)`. If found, either warn the user or null out the field's `signatureUri`.
 - **Subagent ID:** CLICK-PATH-036
 
-#### BUG-014 — EditPdf: sticky note ignores tap position, always saves at center
+#### [FIXED] BUG-014 — EditPdf: sticky note ignores tap position, always saves at center
 - **Severity:** HIGH
+- **Status:** FIXED (in Phase 3)
 - **Touchpoint:** Sticky note Save button at `EditPdfSurgicalScreen.kt:1586`
 - **Pattern:** Missing Transition (intended behavior is broken)
 - **Trace:**

@@ -216,7 +216,7 @@ fun EditPdfSurgicalScreen(
                     tool = tool,
                     outputUris = outputUris,
                     onClear = {
-                        viewModel.reset()
+                        viewModel.resetCurrentRun()
                         textElements.clear()
                         objectElements.clear()
                         markupStrokes.clear()
@@ -1360,7 +1360,7 @@ fun MarkupToolView(
                 .pointerInput(activePageIndex, activeToolMode) {
                     detectTapGestures { offset ->
                         if (activeToolMode == "sticky_note") {
-                            nextStickyPosition = offset
+                            nextStickyPosition = Offset(offset.x / size.width, offset.y / size.height)
                             stickyNoteTextDialog = true
                         } else if (activeToolMode == "eraser") {
                             // Erase hit-test on sketches
@@ -1591,8 +1591,8 @@ fun MarkupToolView(
                                     stickyNotes.add(
                                         StickyNote(
                                             text = localNoteVal,
-                                            x = 0.5f,
-                                            y = 0.5f,
+                                            x = nextStickyPosition.x,
+                                            y = nextStickyPosition.y,
                                             pageIndex = activePageIndex
                                         )
                                     )

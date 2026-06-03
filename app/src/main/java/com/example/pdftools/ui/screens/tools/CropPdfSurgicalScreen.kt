@@ -122,7 +122,7 @@ fun CropPdfSurgicalScreen(
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = { viewModel.reset() }) {
+                    IconButton(onClick = { viewModel.resetCurrentRun() }) {
                         Icon(imageVector = Icons.Default.Close, contentDescription = "Cancel")
                     }
                 },
@@ -159,7 +159,7 @@ fun CropPdfSurgicalScreen(
                     SuccessCard(
                         tool = tool,
                         outputUris = outputUris,
-                        onClear = { viewModel.reset() },
+                        onClear = { viewModel.resetCurrentRun() },
                         accentColor = accentColor,
                         containerColor = containerColor
                     )

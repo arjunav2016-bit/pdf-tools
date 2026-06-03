@@ -644,12 +644,12 @@ fun RotateToolConfig(
         ) {
             val angles = listOf(90, 180, 270)
             angles.forEach { angle ->
-                val isSelected = config.degrees == angle
+                val isSelected = config.previewRotation == angle
                 val cardBg = if (isSelected) accentColor else MaterialTheme.colorScheme.surfaceContainerLow
                 val contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
                 
                 Card(
-                    onClick = { viewModel.rotateConfig.value = config.copy(degrees = angle) },
+                    onClick = { viewModel.rotateConfig.value = config.copy(previewRotation = angle) },
                     modifier = Modifier
                         .weight(1f)
                         .height(64.dp),

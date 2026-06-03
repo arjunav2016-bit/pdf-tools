@@ -78,7 +78,7 @@ fun PageNumbersSurgicalScreen(
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = { viewModel.reset() }) {
+                    IconButton(onClick = { viewModel.resetCurrentRun() }) {
                         Icon(imageVector = Icons.Default.Close, contentDescription = "Cancel")
                     }
                 },
@@ -108,7 +108,7 @@ fun PageNumbersSurgicalScreen(
                     SuccessCard(
                         tool = tool,
                         outputUris = outputUris,
-                        onClear = { viewModel.reset() },
+                        onClear = { viewModel.resetCurrentRun() },
                         accentColor = accentColor,
                         containerColor = containerColor
                     )
@@ -753,7 +753,7 @@ fun PageNumbersSurgicalScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     OutlinedButton(
-                        onClick = { viewModel.reset() },
+                        onClick = { viewModel.resetCurrentRun() },
                         modifier = Modifier
                             .weight(1f)
                             .height(52.dp),

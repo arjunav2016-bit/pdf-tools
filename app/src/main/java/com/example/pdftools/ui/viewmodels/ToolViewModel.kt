@@ -140,7 +140,12 @@ class ToolViewModel @Inject constructor(
         }
     }
 
-    fun reset() {
+    /**
+     * Soft reset: clears only the current run's inputs/outputs/progress.
+     * Preserves all per-tool config state so users don't lose settings
+     * when closing a surgical screen or dismissing a success card.
+     */
+    fun resetCurrentRun() {
         processingJob?.cancel()
         processingJob = null
         _uiState.value = ToolUiState.Idle
@@ -148,6 +153,16 @@ class ToolViewModel @Inject constructor(
         _outputUris.value = emptyList()
         _pageCount.value = null
         _progress.value = null
+        _pptPreviewPdfUri.value = null
+        _pptPreviewProgress.value = null
+    }
+
+    /**
+     * Hard reset: clears everything including all 24 per-tool configs.
+     * Used only when the user switches to a different tool.
+     */
+    fun reset() {
+        resetCurrentRun()
         
         // Reset configs to defaults
         pageRangeConfig.value = PageRangeConfig()
@@ -174,8 +189,6 @@ class ToolViewModel @Inject constructor(
         pdfToWordConfig.value = PdfToWordConfig()
         excelToPdfConfig.value = ExcelToPdfConfig()
         pptToPdfConfig.value = PptToPdfConfig()
-        _pptPreviewPdfUri.value = null
-        _pptPreviewProgress.value = null
     }
 
     fun isFavorite(toolId: String): Boolean {
@@ -452,7 +465,7 @@ class ToolViewModel @Inject constructor(
                     }
                     "ocr_pdf" -> {
                         val text = pdfProcessor.ocrPdf(context, files.first())
-                        ocrConfig.value = OcrConfig(ocrResultText = text)
+                        ocrConfig.value = ocrConfig.value.copy(ocrResultText = text)
                         _outputUris.value = emptyList()
                         _uiState.value = ToolUiState.Success(emptyList())
                     }

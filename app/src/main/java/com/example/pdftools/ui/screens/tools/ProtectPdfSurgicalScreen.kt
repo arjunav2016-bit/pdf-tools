@@ -71,7 +71,7 @@ fun ProtectPdfSurgicalScreen(
                 SuccessCard(
                     tool = tool,
                     outputUris = outputUris,
-                    onClear = { viewModel.reset() },
+                    onClear = { viewModel.resetCurrentRun() },
                     accentColor = accentColor,
                     containerColor = containerColor
                 )

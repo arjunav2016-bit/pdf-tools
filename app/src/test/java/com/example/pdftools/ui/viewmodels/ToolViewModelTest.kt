@@ -352,6 +352,69 @@ class ToolViewModelTest {
 
         job.cancel()
     }
+
+    @Test
+    fun resetCurrentRunClearsRunStatePreservesConfigs() {
+        val first = Uri.parse("file:///tmp/first.pdf")
+        viewModel.addFiles(listOf(first))
+
+        // Set custom tool configs
+        viewModel.watermarkConfig.value = WatermarkConfig(text = "Draft")
+        viewModel.rotateConfig.value = RotateConfig(previewRotation = 180)
+        viewModel.compressConfig.value = CompressConfig(tier = CompressTier.EXTREME)
+
+        // Soft reset
+        viewModel.resetCurrentRun()
+
+        // Run state should be cleared
+        assertEquals(emptyList<Uri>(), viewModel.selectedFiles.value)
+        assertEquals(ToolUiState.Idle, viewModel.uiState.value)
+        assertEquals(emptyList<Uri>(), viewModel.outputUris.value)
+
+        // Tool configs should be PRESERVED
+        assertEquals(WatermarkConfig(text = "Draft"), viewModel.watermarkConfig.value)
+        assertEquals(180, viewModel.rotateConfig.value.previewRotation)
+        assertEquals(CompressTier.EXTREME, viewModel.compressConfig.value.tier)
+    }
+
+    @Test
+    fun resetClearsEverythingIncludingConfigs() {
+        viewModel.addFiles(listOf(Uri.parse("file:///tmp/first.pdf")))
+        viewModel.watermarkConfig.value = WatermarkConfig(text = "Draft")
+        viewModel.rotateConfig.value = RotateConfig(previewRotation = 180)
+
+        // Hard reset
+        viewModel.reset()
+
+        // Everything should be cleared
+        assertEquals(emptyList<Uri>(), viewModel.selectedFiles.value)
+        assertEquals(WatermarkConfig(), viewModel.watermarkConfig.value)
+        assertEquals(RotateConfig(), viewModel.rotateConfig.value)
+    }
+
+    @Test
+    fun processOcrPdfPreservesLanguageAndModuleStatuses() = runTest {
+        val input = Uri.parse("file:///tmp/input.pdf")
+        viewModel.addFiles(listOf(input))
+
+        // Pre-set OCR config with language and module statuses
+        val customStatuses = mapOf("latin" to OcrModuleStatus.Ready, "chinese" to OcrModuleStatus.NotDownloaded)
+        viewModel.ocrConfig.value = OcrConfig(
+            ocrLanguage = "chinese",
+            moduleStatuses = customStatuses
+        )
+
+        whenever(pdfProcessor.ocrPdf(context, input)).thenReturn("Extracted OCR text here")
+
+        viewModel.process("ocr_pdf", context)
+        mainDispatcherRule.dispatcher.scheduler.advanceUntilIdle()
+
+        // Language and module statuses should be preserved
+        assertEquals("chinese", viewModel.ocrConfig.value.ocrLanguage)
+        assertEquals(customStatuses, viewModel.ocrConfig.value.moduleStatuses)
+        // Result text should be set
+        assertEquals("Extracted OCR text here", viewModel.ocrConfig.value.ocrResultText)
+    }
 }
 
 

@@ -120,7 +120,7 @@ fun SignPdfSurgicalScreen(
                     tool = tool,
                     outputUris = outputUris,
                     onClear = {
-                        viewModel.reset()
+                        viewModel.resetCurrentRun()
                         currentStep = 1
                     },
                     accentColor = accentColor,
