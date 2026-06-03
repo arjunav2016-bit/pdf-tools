@@ -19,6 +19,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -414,6 +415,13 @@ class ToolViewModelTest {
         assertEquals(customStatuses, viewModel.ocrConfig.value.moduleStatuses)
         // Result text should be set
         assertEquals("Extracted OCR text here", viewModel.ocrConfig.value.ocrResultText)
+    }
+
+    @Test
+    fun setActiveToolUpdatesCurrentToolId() {
+        assertNull(viewModel.currentToolId)
+        viewModel.setActiveTool("crop_pdf")
+        assertEquals("crop_pdf", viewModel.currentToolId)
     }
 }
 

@@ -63,6 +63,7 @@ fun CropPdfSurgicalScreen(
     val context = LocalContext.current
     val selectedFile = selectedFiles.firstOrNull()
     val config by viewModel.cropConfig.collectAsState()
+    val currentConfig by rememberUpdatedState(config)
 
     // Query actual page size from PDFBox to properly map MM coordinates to PDF points
     val pageSize by produceState<Pair<Float, Float>>(
@@ -86,7 +87,7 @@ fun CropPdfSurgicalScreen(
         if (pageSize.first > 0 && pageSize.second > 0) {
             val widthMm = pageSize.first / 2.83464567f
             val heightMm = pageSize.second / 2.83464567f
-            if (config.widthMm == 0f || config.heightMm == 0f) {
+            if (!config.useAbsoluteCrop && (config.widthMm == 0f || config.heightMm == 0f)) {
                 viewModel.cropConfig.value = config.copy(
                     leftMm = 0f,
                     topMm = 0f,
@@ -271,13 +272,13 @@ fun CropPdfSurgicalScreen(
                                                     change.consume()
                                                     val deltaX = (dragAmount.x / W) * pageWidthMm
                                                     val deltaY = (dragAmount.y / H) * pageHeightMm
-                                                    val newL = (config.leftMm + deltaX).coerceIn(0f, config.leftMm + config.widthMm - 10f)
-                                                    val newT = (config.topMm + deltaY).coerceIn(0f, config.topMm + config.heightMm - 10f)
-                                                    viewModel.cropConfig.value = config.copy(
+                                                    val newL = (currentConfig.leftMm + deltaX).coerceIn(0f, currentConfig.leftMm + currentConfig.widthMm - 10f)
+                                                    val newT = (currentConfig.topMm + deltaY).coerceIn(0f, currentConfig.topMm + currentConfig.heightMm - 10f)
+                                                    viewModel.cropConfig.value = currentConfig.copy(
                                                         leftMm = newL,
                                                         topMm = newT,
-                                                        widthMm = config.leftMm + config.widthMm - newL,
-                                                        heightMm = config.topMm + config.heightMm - newT,
+                                                        widthMm = currentConfig.leftMm + currentConfig.widthMm - newL,
+                                                        heightMm = currentConfig.topMm + currentConfig.heightMm - newT,
                                                         useAbsoluteCrop = true
                                                     )
                                                 }
@@ -305,12 +306,12 @@ fun CropPdfSurgicalScreen(
                                                     change.consume()
                                                     val deltaX = (dragAmount.x / W) * pageWidthMm
                                                     val deltaY = (dragAmount.y / H) * pageHeightMm
-                                                    val newW = (config.widthMm + deltaX).coerceIn(10f, pageWidthMm - config.leftMm)
-                                                    val newT = (config.topMm + deltaY).coerceIn(0f, config.topMm + config.heightMm - 10f)
-                                                    viewModel.cropConfig.value = config.copy(
+                                                    val newW = (currentConfig.widthMm + deltaX).coerceIn(10f, pageWidthMm - currentConfig.leftMm)
+                                                    val newT = (currentConfig.topMm + deltaY).coerceIn(0f, currentConfig.topMm + currentConfig.heightMm - 10f)
+                                                    viewModel.cropConfig.value = currentConfig.copy(
                                                         topMm = newT,
                                                         widthMm = newW,
-                                                        heightMm = config.topMm + config.heightMm - newT,
+                                                        heightMm = currentConfig.topMm + currentConfig.heightMm - newT,
                                                         useAbsoluteCrop = true
                                                     )
                                                 }
@@ -338,11 +339,11 @@ fun CropPdfSurgicalScreen(
                                                     change.consume()
                                                     val deltaX = (dragAmount.x / W) * pageWidthMm
                                                     val deltaY = (dragAmount.y / H) * pageHeightMm
-                                                    val newL = (config.leftMm + deltaX).coerceIn(0f, config.leftMm + config.widthMm - 10f)
-                                                    val newH = (config.heightMm + deltaY).coerceIn(10f, pageHeightMm - config.topMm)
-                                                    viewModel.cropConfig.value = config.copy(
+                                                    val newL = (currentConfig.leftMm + deltaX).coerceIn(0f, currentConfig.leftMm + currentConfig.widthMm - 10f)
+                                                    val newH = (currentConfig.heightMm + deltaY).coerceIn(10f, pageHeightMm - currentConfig.topMm)
+                                                    viewModel.cropConfig.value = currentConfig.copy(
                                                         leftMm = newL,
-                                                        widthMm = config.leftMm + config.widthMm - newL,
+                                                        widthMm = currentConfig.leftMm + currentConfig.widthMm - newL,
                                                         heightMm = newH,
                                                         useAbsoluteCrop = true
                                                     )
@@ -371,9 +372,9 @@ fun CropPdfSurgicalScreen(
                                                     change.consume()
                                                     val deltaX = (dragAmount.x / W) * pageWidthMm
                                                     val deltaY = (dragAmount.y / H) * pageHeightMm
-                                                    val newW = (config.widthMm + deltaX).coerceIn(10f, pageWidthMm - config.leftMm)
-                                                    val newH = (config.heightMm + deltaY).coerceIn(10f, pageHeightMm - config.topMm)
-                                                    viewModel.cropConfig.value = config.copy(
+                                                    val newW = (currentConfig.widthMm + deltaX).coerceIn(10f, pageWidthMm - currentConfig.leftMm)
+                                                    val newH = (currentConfig.heightMm + deltaY).coerceIn(10f, pageHeightMm - currentConfig.topMm)
+                                                    viewModel.cropConfig.value = currentConfig.copy(
                                                         widthMm = newW,
                                                         heightMm = newH,
                                                         useAbsoluteCrop = true

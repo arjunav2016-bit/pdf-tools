@@ -85,6 +85,12 @@ class ToolViewModel @Inject constructor(
     val pdfToWordConfig = MutableStateFlow(PdfToWordConfig())
     val excelToPdfConfig = MutableStateFlow(ExcelToPdfConfig())
     val pptToPdfConfig = MutableStateFlow(PptToPdfConfig())
+    var currentToolId: String? = null
+        private set
+
+    fun setActiveTool(toolId: String) {
+        currentToolId = toolId
+    }
 
     init {
         viewModelScope.launch {

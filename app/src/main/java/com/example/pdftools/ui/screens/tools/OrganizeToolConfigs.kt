@@ -1079,7 +1079,7 @@ fun MergeToolConfig(
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenMultipleDocuments()
     ) { uris ->
-        if (uris.isNotEmpty()) {
+        if (uris.isNotEmpty() && viewModel.currentToolId == "merge_pdf") {
             viewModel.addFiles(uris)
         }
     }

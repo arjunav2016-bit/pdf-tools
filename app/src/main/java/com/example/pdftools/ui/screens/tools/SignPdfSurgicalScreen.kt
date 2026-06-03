@@ -276,6 +276,17 @@ fun SignPdfSurgicalScreen(
                                                     scope.launch {
                                                         userPrefsRepo.removeSavedSignature(path)
                                                         runCatching { File(path).delete() }
+                                                        // Null out references to this signature in config.fields
+                                                        val targetUri = Uri.fromFile(File(path))
+                                                        viewModel.signConfig.value = config.copy(
+                                                            fields = config.fields.map { field ->
+                                                                if (field.signatureUri == targetUri) {
+                                                                    field.copy(signatureUri = null)
+                                                                } else {
+                                                                    field
+                                                                }
+                                                            }
+                                                        )
                                                     }
                                                 },
                                                 modifier = Modifier

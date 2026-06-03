@@ -232,14 +232,18 @@ fun ToolScreen(
     val pdfToImageConfig by viewModel.pdfToImageConfig.collectAsState()
     val pdfToPptConfig by viewModel.pdfToPptConfig.collectAsState()
     var showDestructiveConfirmation by rememberSaveable(tool.id) { mutableStateOf(false) }
+    var showCancelConfirmation by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
 
     // Reset ViewModel state every time this screen enters composition
     // so re-entering from main menu doesn't show stale results
     androidx.compose.runtime.DisposableEffect(tool.id) {
+        viewModel.setActiveTool(tool.id)
         viewModel.reset()
-        onDispose { }
+        onDispose {
+            viewModel.cancelProcessing()
+        }
     }
 
     LaunchedEffect(uiState) {
@@ -257,9 +261,10 @@ fun ToolScreen(
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenMultipleDocuments()
     ) { uris ->
-        if (uris.isNotEmpty()) {
-            viewModel.addFiles(uris)
-            if (tool.id == "html_to_pdf") {
+        if (uris.isNotEmpty() && viewModel.currentToolId == tool.id) {
+            if (tool.id != "html_to_pdf") {
+                viewModel.addFiles(uris)
+            } else {
                 try {
                     context.contentResolver.openInputStream(uris.first())?.use { input ->
                         val content = input.bufferedReader().readText()
@@ -276,6 +281,10 @@ fun ToolScreen(
     val isProcessing = uiState is ToolUiState.Processing
     val processingState = uiState as? ToolUiState.Processing
     val requiresConfirmation = tool.id in setOf("remove_pages", "redact_pdf", "crop_pdf")
+
+    androidx.activity.compose.BackHandler(enabled = isProcessing) {
+        showCancelConfirmation = true
+    }
 
     if (showDestructiveConfirmation) {
         AlertDialog(
@@ -300,6 +309,30 @@ fun ToolScreen(
         )
     }
 
+    if (showCancelConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showCancelConfirmation = false },
+            title = { Text("Cancel Processing?") },
+            text = { Text("Are you sure you want to stop the current PDF task? Any progress will be lost.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showCancelConfirmation = false
+                        viewModel.cancelProcessing()
+                        onBack()
+                    }
+                ) {
+                    Text("Yes, Stop")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCancelConfirmation = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
     Scaffold(
         modifier = modifier.fillMaxSize(),
         topBar = {
@@ -312,7 +345,15 @@ fun ToolScreen(
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(
+                        onClick = {
+                            if (isProcessing) {
+                                showCancelConfirmation = true
+                            } else {
+                                onBack()
+                            }
+                        }
+                    ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Go back"
@@ -1604,7 +1645,7 @@ fun MergePdfSurgicalScreen(
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenMultipleDocuments()
     ) { uris ->
-        if (uris.isNotEmpty()) {
+        if (uris.isNotEmpty() && viewModel.currentToolId == tool.id) {
             viewModel.addFiles(uris)
         }
     }
@@ -8507,7 +8548,7 @@ fun PdfToPptSurgicalScreen(
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenMultipleDocuments()
     ) { uris ->
-        if (uris.isNotEmpty()) {
+        if (uris.isNotEmpty() && viewModel.currentToolId == tool.id) {
             viewModel.updateSelectedFiles(uris)
         }
     }
@@ -8726,7 +8767,7 @@ fun PdfToPdfaSurgicalScreen(
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenMultipleDocuments()
     ) { uris ->
-        if (uris.isNotEmpty()) {
+        if (uris.isNotEmpty() && viewModel.currentToolId == tool.id) {
             viewModel.updateSelectedFiles(uris)
         }
     }

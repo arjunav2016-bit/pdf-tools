@@ -104,6 +104,8 @@ fun PdfFormsSurgicalScreen(
     val context = LocalContext.current
     var currentStep by remember { mutableStateOf(FormsStep.DASHBOARD) }
     var activeIntent by remember { mutableStateOf("") } // "build" or "fill"
+    var pendingTemplate by remember { mutableStateOf<TemplateForm?>(null) }
+    var pendingRecent by remember { mutableStateOf<RecentFormDoc?>(null) }
 
     // Builder State
     val builderFields = remember { mutableStateListOf<BuilderField>() }
@@ -198,7 +200,21 @@ fun PdfFormsSurgicalScreen(
     // Auto-transition when file is picked
     LaunchedEffect(selectedFiles) {
         if (selectedFiles.isNotEmpty() && currentStep == FormsStep.DASHBOARD) {
-            if (activeIntent == "build") {
+            val template = pendingTemplate
+            val recent = pendingRecent
+            if (template != null) {
+                fillerFields.clear()
+                fillerFields.addAll(template.fields)
+                activeFieldIndex = 0
+                currentStep = FormsStep.FILLER
+                pendingTemplate = null
+            } else if (recent != null) {
+                fillerFields.clear()
+                fillerFields.addAll(recent.fields)
+                activeFieldIndex = 0
+                currentStep = FormsStep.FILLER
+                pendingRecent = null
+            } else if (activeIntent == "build") {
                 builderFields.clear()
                 currentStep = FormsStep.BUILDER
             } else if (activeIntent == "fill") {
@@ -272,24 +288,28 @@ fun PdfFormsSurgicalScreen(
                         accentColor = accentColor,
                         containerColor = containerColor,
                         onNewBuild = {
+                            pendingTemplate = null
+                            pendingRecent = null
                             activeIntent = "build"
                             onPickFiles()
                         },
                         onNewFill = {
+                            pendingTemplate = null
+                            pendingRecent = null
                             activeIntent = "fill"
                             onPickFiles()
                         },
                         onLoadTemplate = { template ->
-                            fillerFields.clear()
-                            fillerFields.addAll(template.fields)
-                            activeFieldIndex = 0
-                            currentStep = FormsStep.FILLER
+                            pendingTemplate = template
+                            pendingRecent = null
+                            activeIntent = "fill"
+                            onPickFiles()
                         },
                         onLoadRecent = { recent ->
-                            fillerFields.clear()
-                            fillerFields.addAll(recent.fields)
-                            activeFieldIndex = 0
-                            currentStep = FormsStep.FILLER
+                            pendingRecent = recent
+                            pendingTemplate = null
+                            activeIntent = "fill"
+                            onPickFiles()
                         }
                     )
                 }
