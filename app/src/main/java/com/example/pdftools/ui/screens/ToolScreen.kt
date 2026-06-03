@@ -869,9 +869,7 @@ fun ToolScreen(
                                         .height(56.dp),
                                     shape = RoundedCornerShape(16.dp),
                                     colors = ButtonDefaults.buttonColors(
-                                        containerColor = if (tool.id == "remove_pages") Color(0xFFC0392B)
-                                                         else if (tool.id == "pdf_to_jpg" || tool.id == "pdf_to_ppt") Color(0xFF004B95)
-                                                         else accentColor
+                                        containerColor = accentColor
                                     )
                                 ) {
                                     if (tool.id == "split_pdf") {
@@ -1103,9 +1101,7 @@ fun ToolScreen(
                                     .height(56.dp),
                                 shape = RoundedCornerShape(16.dp),
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (tool.id == "remove_pages") Color(0xFFC0392B)
-                                                     else if (tool.id == "pdf_to_jpg" || tool.id == "pdf_to_ppt") Color(0xFF004B95)
-                                                     else accentColor
+                                    containerColor = accentColor
                                 )
                             ) {
                                 if (tool.id == "split_pdf") {
@@ -3247,12 +3243,12 @@ fun OrganizePdfSurgicalScreen(
                                                     },
                                                     modifier = Modifier
                                                         .size(32.dp)
-                                                        .background(Color(0xFF2E7D32).copy(alpha = 0.08f), CircleShape)
+                                                        .background(accentColor.copy(alpha = 0.08f), CircleShape)
                                                 ) {
                                                     Icon(
                                                         imageVector = Icons.Filled.Add,
                                                         contentDescription = "Duplicate Page",
-                                                        tint = Color(0xFF2E7D32),
+                                                        tint = accentColor,
                                                         modifier = Modifier.size(16.dp)
                                                     )
                                                 }
