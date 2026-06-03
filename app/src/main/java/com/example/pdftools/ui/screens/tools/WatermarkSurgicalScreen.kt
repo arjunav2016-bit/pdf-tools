@@ -114,13 +114,14 @@ fun WatermarkSurgicalScreen(
                     }
                 },
                 actions = {
+                    val isBtnEnabled = if (config.isImage) (config.imageUri != null && imageBitmap != null) else config.text.isNotEmpty()
                     TextButton(
                         onClick = { viewModel.process(tool.id, context) },
-                        enabled = if (config.isImage) config.imageUri != null else config.text.isNotEmpty()
+                        enabled = isBtnEnabled
                     ) {
                         Text(
                             text = "Apply",
-                            color = if (if (config.isImage) config.imageUri != null else config.text.isNotEmpty()) accentColor else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                            color = if (isBtnEnabled) accentColor else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -666,7 +667,7 @@ fun WatermarkSurgicalScreen(
                         .fillMaxWidth()
                         .padding(horizontal = 20.dp, vertical = 12.dp)
                 ) {
-                    val isBtnEnabled = if (config.isImage) config.imageUri != null else config.text.isNotEmpty()
+                    val isBtnEnabled = if (config.isImage) (config.imageUri != null && imageBitmap != null) else config.text.isNotEmpty()
                     Button(
                         onClick = { viewModel.process(tool.id, context) },
                         enabled = isBtnEnabled,

@@ -145,6 +145,21 @@ fun EditPdfSurgicalScreen(
     // Undo/Redo Stacks
     val undoStack = remember { mutableStateListOf<HistoryState>() }
     val redoStack = remember { mutableStateListOf<HistoryState>() }
+    val textUndoStack = remember { mutableStateListOf<HistoryState>() }
+    val textRedoStack = remember { mutableStateListOf<HistoryState>() }
+    val objectsUndoStack = remember { mutableStateListOf<HistoryState>() }
+    val objectsRedoStack = remember { mutableStateListOf<HistoryState>() }
+    val markupUndoStack = remember { mutableStateListOf<HistoryState>() }
+    val markupRedoStack = remember { mutableStateListOf<HistoryState>() }
+
+    fun getActiveStacks(): Pair<MutableList<HistoryState>, MutableList<HistoryState>> {
+        return when (currentStep) {
+            EditToolStep.TEXT_TOOL -> textUndoStack to textRedoStack
+            EditToolStep.OBJECTS_TOOL -> objectsUndoStack to objectsRedoStack
+            EditToolStep.MARKUP_TOOL -> markupUndoStack to markupRedoStack
+            else -> undoStack to redoStack
+        }
+    }
 
     fun captureState(): HistoryState {
         return HistoryState(
@@ -156,8 +171,9 @@ fun EditPdfSurgicalScreen(
     }
 
     fun pushHistory() {
-        undoStack.add(captureState())
-        redoStack.clear()
+        val (activeUndo, activeRedo) = getActiveStacks()
+        activeUndo.add(captureState())
+        activeRedo.clear()
     }
 
     fun restoreState(state: HistoryState) {
@@ -172,19 +188,21 @@ fun EditPdfSurgicalScreen(
     }
 
     fun handleUndo() {
-        if (undoStack.isNotEmpty()) {
+        val (activeUndo, activeRedo) = getActiveStacks()
+        if (activeUndo.isNotEmpty()) {
             val currentState = captureState()
-            redoStack.add(currentState)
-            val previousState = undoStack.removeAt(undoStack.lastIndex)
+            activeRedo.add(currentState)
+            val previousState = activeUndo.removeAt(activeUndo.lastIndex)
             restoreState(previousState)
         }
     }
 
     fun handleRedo() {
-        if (redoStack.isNotEmpty()) {
+        val (activeUndo, activeRedo) = getActiveStacks()
+        if (activeRedo.isNotEmpty()) {
             val currentState = captureState()
-            undoStack.add(currentState)
-            val nextState = redoStack.removeAt(redoStack.lastIndex)
+            activeUndo.add(currentState)
+            val nextState = activeRedo.removeAt(activeRedo.lastIndex)
             restoreState(nextState)
         }
     }
@@ -223,6 +241,12 @@ fun EditPdfSurgicalScreen(
                         stickyNotes.clear()
                         undoStack.clear()
                         redoStack.clear()
+                        textUndoStack.clear()
+                        textRedoStack.clear()
+                        objectsUndoStack.clear()
+                        objectsRedoStack.clear()
+                        markupUndoStack.clear()
+                        markupRedoStack.clear()
                         activePageIndex = 0
                         currentStep = EditToolStep.DASHBOARD
                     },
@@ -295,8 +319,8 @@ fun EditPdfSurgicalScreen(
                         accentColor = accentColor,
                         onBack = { currentStep = EditToolStep.DASHBOARD },
                         onPushHistory = { pushHistory() },
-                        undoAvailable = undoStack.isNotEmpty(),
-                        redoAvailable = redoStack.isNotEmpty(),
+                        undoAvailable = getActiveStacks().first.isNotEmpty(),
+                        redoAvailable = getActiveStacks().second.isNotEmpty(),
                         onUndo = { handleUndo() },
                         onRedo = { handleRedo() }
                     )
@@ -308,8 +332,8 @@ fun EditPdfSurgicalScreen(
                         accentColor = accentColor,
                         onBack = { currentStep = EditToolStep.DASHBOARD },
                         onPushHistory = { pushHistory() },
-                        undoAvailable = undoStack.isNotEmpty(),
-                        redoAvailable = redoStack.isNotEmpty(),
+                        undoAvailable = getActiveStacks().first.isNotEmpty(),
+                        redoAvailable = getActiveStacks().second.isNotEmpty(),
                         onUndo = { handleUndo() },
                         onRedo = { handleRedo() }
                     )
@@ -322,8 +346,8 @@ fun EditPdfSurgicalScreen(
                         accentColor = accentColor,
                         onBack = { currentStep = EditToolStep.DASHBOARD },
                         onPushHistory = { pushHistory() },
-                        undoAvailable = undoStack.isNotEmpty(),
-                        redoAvailable = redoStack.isNotEmpty(),
+                        undoAvailable = getActiveStacks().first.isNotEmpty(),
+                        redoAvailable = getActiveStacks().second.isNotEmpty(),
                         onUndo = { handleUndo() },
                         onRedo = { handleRedo() }
                     )
@@ -432,8 +456,7 @@ fun EditDashboard(
                 ).forEach { (name, date) ->
                     Card(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onLoadSample() },
+                            .fillMaxWidth(),
                         shape = RoundedCornerShape(16.dp),
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
                     ) {

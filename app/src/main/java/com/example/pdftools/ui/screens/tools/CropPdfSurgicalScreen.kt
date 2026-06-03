@@ -804,6 +804,7 @@ fun CropPdfSurgicalScreen(
                 ) {
                     Button(
                         onClick = { viewModel.process(tool.id, context) },
+                        enabled = pageSize.first > 0 && config.widthMm > 0 && config.heightMm > 0,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(56.dp),

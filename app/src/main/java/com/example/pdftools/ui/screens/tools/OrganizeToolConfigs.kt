@@ -1086,6 +1086,10 @@ fun MergeToolConfig(
 
     // Resolve size and page count asynchronously
     LaunchedEffect(selectedFiles) {
+        val currentUris = selectedFiles.toSet()
+        val keysToRemove = fileMetadata.keys.filter { it !in currentUris }
+        keysToRemove.forEach { fileMetadata.remove(it) }
+
         selectedFiles.forEach { uri ->
             if (!fileMetadata.containsKey(uri)) {
                 val size = getFileSize(context, uri)
