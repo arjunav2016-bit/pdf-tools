@@ -35,6 +35,8 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
@@ -76,6 +78,23 @@ fun SettingsScreen(
         }.getOrNull() ?: unknownVersion
     }
 
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(viewModel.clearCacheResult) {
+        viewModel.clearCacheResult.collect { result ->
+            if (result.isSuccess) {
+                snackbarHostState.showSnackbar(
+                    message = context.getString(R.string.settings_cache_clear_success)
+                )
+            } else {
+                val errorMsg = result.exceptionOrNull()?.message ?: "Unknown error"
+                snackbarHostState.showSnackbar(
+                    message = context.getString(R.string.settings_cache_clear_error, errorMsg)
+                )
+            }
+        }
+    }
+
     if (showClearCacheConfirmation) {
         AlertDialog(
             onDismissRequest = { showClearCacheConfirmation = false },
@@ -101,6 +120,7 @@ fun SettingsScreen(
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.settings_title)) },

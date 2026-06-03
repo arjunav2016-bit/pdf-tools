@@ -63,4 +63,10 @@ class PdfPreviewRepository @Inject constructor() {
             }
         } ?: (0f to 0f)
     }
+
+    fun evictAll() {
+        synchronized(bitmapCache) {
+            bitmapCache.evictAll()
+        }
+    }
 }

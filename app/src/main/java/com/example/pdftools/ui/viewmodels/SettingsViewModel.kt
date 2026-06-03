@@ -12,17 +12,22 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.example.pdftools.data.PdfPreviewRepository
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val userPreferencesRepository: UserPreferencesRepository,
+    private val pdfPreviewRepository: PdfPreviewRepository,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
     val preferences: StateFlow<UserPreferences> = userPreferencesRepository.preferences.stateIn(
@@ -62,10 +67,21 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    private val _clearCacheResult = MutableSharedFlow<Result<Unit>>()
+    val clearCacheResult: SharedFlow<Result<Unit>> = _clearCacheResult.asSharedFlow()
+
     fun clearCache() {
         viewModelScope.launch(Dispatchers.IO) {
-            context.cacheDir.listFiles()?.forEach(File::deleteRecursively)
+            val result = runCatching {
+                context.cacheDir.listFiles()?.forEach { file ->
+                    if (!file.deleteRecursively()) {
+                        throw Exception("Failed to delete some cache files.")
+                    }
+                }
+                pdfPreviewRepository.evictAll()
+            }
             _cacheSizeBytes.value = calculateCacheSize()
+            _clearCacheResult.emit(result)
         }
     }
 

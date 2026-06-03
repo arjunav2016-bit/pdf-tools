@@ -44,9 +44,10 @@ fun MainNavigation() {
             entry<Onboarding> {
                 OnboardingScreen(
                     onFinished = {
-                        navigationViewModel.setOnboardingCompleted()
-                        backStack.clear()
-                        backStack.add(Main)
+                        navigationViewModel.setOnboardingCompleted {
+                            backStack.clear()
+                            backStack.add(Main)
+                        }
                     },
                     modifier = Modifier.safeDrawingPadding()
                 )

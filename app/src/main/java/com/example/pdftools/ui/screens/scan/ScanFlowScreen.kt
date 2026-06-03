@@ -4,6 +4,7 @@ import android.Manifest
 import android.app.Activity
 import android.content.pm.PackageManager
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -101,12 +102,14 @@ fun ScanFlowScreen(
 
     // Track if camera permission was denied (to show rationale dialog)
     var showPermissionDeniedDialog by remember { mutableStateOf(false) }
+    var permissionDenialCount by remember { mutableStateOf(0) }
 
     // Camera permission launcher – launches the scanner automatically on grant
     val cameraPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted ->
         if (isGranted) {
+            permissionDenialCount = 0
             // Permission granted – launch the scanner
             val activity = context as? Activity ?: return@rememberLauncherForActivityResult
             scanner.getStartScanIntent(activity)
@@ -123,6 +126,7 @@ fun ScanFlowScreen(
                     ).show()
                 }
         } else {
+            permissionDenialCount++
             showPermissionDeniedDialog = true
         }
     }
@@ -159,6 +163,7 @@ fun ScanFlowScreen(
 
     // Permission denied dialog
     if (showPermissionDeniedDialog) {
+        val isPermanentlyDenied = permissionDenialCount >= 2
         AlertDialog(
             onDismissRequest = { showPermissionDeniedDialog = false },
             icon = {
@@ -175,21 +180,85 @@ fun ScanFlowScreen(
                 )
             },
             text = {
-                Text(stringResource(R.string.scan_camera_permission_rationale))
+                if (isPermanentlyDenied) {
+                    Text("Camera permission has been denied. Please enable it in the app settings to use the scanner.")
+                } else {
+                    Text(stringResource(R.string.scan_camera_permission_rationale))
+                }
             },
             confirmButton = {
                 Button(
                     onClick = {
                         showPermissionDeniedDialog = false
-                        cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                        if (isPermanentlyDenied) {
+                            val intent = android.content.Intent(
+                                android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                android.net.Uri.fromParts("package", context.packageName, null)
+                            ).apply {
+                                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            context.startActivity(intent)
+                        } else {
+                            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                        }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = accentColor)
                 ) {
-                    Text(stringResource(R.string.scan_camera_permission_grant))
+                    Text(
+                        if (isPermanentlyDenied) "Go to Settings"
+                        else stringResource(R.string.scan_camera_permission_grant)
+                    )
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showPermissionDeniedDialog = false }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            }
+        )
+    }
+
+    var showExitConfirmationDialog by remember { mutableStateOf(false) }
+
+    fun handleBack() {
+        when (flowState) {
+            is ScanFlowState.Processing -> {
+                showExitConfirmationDialog = true
+            }
+            is ScanFlowState.Review -> {
+                viewModel.goToLauncher()
+            }
+            is ScanFlowState.Success -> {
+                onBack()
+            }
+            is ScanFlowState.Error -> {
+                viewModel.dismissError()
+            }
+            else -> onBack()
+        }
+    }
+
+    BackHandler(onBack = ::handleBack)
+
+    if (showExitConfirmationDialog) {
+        AlertDialog(
+            onDismissRequest = { showExitConfirmationDialog = false },
+            title = { Text("Cancel PDF Generation?") },
+            text = { Text("Going back will cancel the current PDF generation. Are you sure you want to exit?") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showExitConfirmationDialog = false
+                        viewModel.cancelProcessing()
+                        onBack()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = accentColor)
+                ) {
+                    Text("Exit")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showExitConfirmationDialog = false }) {
                     Text(stringResource(R.string.cancel))
                 }
             }
@@ -212,16 +281,7 @@ fun ScanFlowScreen(
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = {
-                        when (flowState) {
-                            is ScanFlowState.Review -> viewModel.goToLauncher()
-                            is ScanFlowState.Success -> {
-                                viewModel.reset()
-                                onBack()
-                            }
-                            else -> onBack()
-                        }
-                    }) {
+                    IconButton(onClick = ::handleBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = stringResource(R.string.go_back)
@@ -286,7 +346,7 @@ fun ScanFlowScreen(
                     ErrorContent(
                         message = state.message,
                         accentColor = accentColor,
-                        onRetry = { viewModel.dismissError() }
+                        onRetry = { viewModel.generatePdf(context) }
                     )
                 }
             }
@@ -568,11 +628,15 @@ private fun SuccessContent(
                     onClick = {
                         try {
                             val intent = android.content.Intent(android.content.Intent.ACTION_VIEW)
-                            val contentUri = androidx.core.content.FileProvider.getUriForFile(
-                                context,
-                                "com.example.pdftools.fileprovider",
-                                java.io.File(outputUri.path!!)
-                            )
+                            val contentUri = if (outputUri.scheme == "content") {
+                                outputUri
+                            } else {
+                                androidx.core.content.FileProvider.getUriForFile(
+                                    context,
+                                    "com.example.pdftools.fileprovider",
+                                    java.io.File(outputUri.path ?: throw IllegalArgumentException("URI path is null"))
+                                )
+                            }
                             intent.setDataAndType(contentUri, "application/pdf")
                             intent.addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
                             context.startActivity(intent)
@@ -594,11 +658,15 @@ private fun SuccessContent(
                 OutlinedButton(
                     onClick = {
                         try {
-                            val contentUri = androidx.core.content.FileProvider.getUriForFile(
-                                context,
-                                "com.example.pdftools.fileprovider",
-                                java.io.File(outputUri.path!!)
-                            )
+                            val contentUri = if (outputUri.scheme == "content") {
+                                outputUri
+                            } else {
+                                androidx.core.content.FileProvider.getUriForFile(
+                                    context,
+                                    "com.example.pdftools.fileprovider",
+                                    java.io.File(outputUri.path ?: throw IllegalArgumentException("URI path is null"))
+                                )
+                            }
                             val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
                                 type = "application/pdf"
                                 putExtra(android.content.Intent.EXTRA_STREAM, contentUri)

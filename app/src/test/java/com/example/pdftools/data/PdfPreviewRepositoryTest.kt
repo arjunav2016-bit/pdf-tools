@@ -71,6 +71,25 @@ class PdfPreviewRepositoryTest {
         }
     }
 
+    @Test
+    fun evictAllClearsCache() = runTest {
+        val pdf = createPdf(pageCount = 1)
+        try {
+            val uri = Uri.fromFile(pdf)
+            val first = repository.renderPage(context, uri, pageIndex = 0, width = 120)
+
+            repository.evictAll()
+
+            val second = repository.renderPage(context, uri, pageIndex = 0, width = 120)
+
+            assertEquals(120, first.width)
+            assertEquals(120, second.width)
+            org.junit.Assert.assertNotSame(first, second)
+        } finally {
+            pdf.delete()
+        }
+    }
+
     private fun createPdf(pageCount: Int): File {
         val file = File(context.cacheDir, "preview_${System.nanoTime()}.pdf")
         PDDocument().use { doc ->

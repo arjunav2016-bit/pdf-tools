@@ -20,9 +20,10 @@ class NavigationViewModel @Inject constructor(
 
     fun getToolById(id: String): PdfTool? = toolRepository.getToolById(id)
 
-    fun setOnboardingCompleted() {
+    fun setOnboardingCompleted(onComplete: () -> Unit = {}) {
         viewModelScope.launch {
             userPreferencesRepository.setOnboardingCompleted(true)
+            onComplete()
         }
     }
 }
