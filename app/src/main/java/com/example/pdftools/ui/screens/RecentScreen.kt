@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.outlined.HistoryToggleOff
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -45,6 +46,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -73,6 +77,30 @@ fun RecentScreen(
 ) {
     val recents by viewModel.recents.collectAsState()
     val context = LocalContext.current
+    var showClearConfirmation by remember { mutableStateOf(false) }
+
+    if (showClearConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showClearConfirmation = false },
+            title = { Text("Clear History?") },
+            text = { Text("Are you sure you want to clear your recent documents history? This action cannot be undone.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showClearConfirmation = false
+                        viewModel.clear()
+                    }
+                ) {
+                    Text("Clear", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearConfirmation = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -102,7 +130,7 @@ fun RecentScreen(
                 },
                 actions = {
                     if (recents.isNotEmpty()) {
-                        IconButton(onClick = { viewModel.clear() }) {
+                        IconButton(onClick = { showClearConfirmation = true }) {
                             Icon(
                                 imageVector = Icons.Filled.DeleteSweep,
                                 contentDescription = stringResource(R.string.clear_all_history),

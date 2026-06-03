@@ -61,6 +61,7 @@ fun MainScreen(
 ) {
     val currentTab by viewModel.currentTab.collectAsState()
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val homeLazyListState = androidx.compose.foundation.lazy.rememberLazyListState()
     val isWideScreen = configuration.screenWidthDp >= 600
 
     Scaffold(
@@ -166,6 +167,7 @@ fun MainScreen(
                     AppTab.HOME -> HomeScreen(
                         onToolClick = onToolClick,
                         onSettingsClick = onSettingsClick,
+                        scrollState = homeLazyListState,
                         modifier = Modifier.fillMaxSize()
                     )
                     AppTab.FAVORITES -> FavoritesScreen(onToolClick = onToolClick, modifier = Modifier.fillMaxSize())

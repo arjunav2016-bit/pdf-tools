@@ -231,6 +231,7 @@ fun ToolScreen(
     val pageRangeConfig by viewModel.pageRangeConfig.collectAsState()
     val pdfToImageConfig by viewModel.pdfToImageConfig.collectAsState()
     val pdfToPptConfig by viewModel.pdfToPptConfig.collectAsState()
+    val favorites by viewModel.favorites.collectAsState()
     var showDestructiveConfirmation by rememberSaveable(tool.id) { mutableStateOf(false) }
     var showCancelConfirmation by remember { mutableStateOf(false) }
 
@@ -378,7 +379,7 @@ fun ToolScreen(
                             )
                         }
                     } else {
-                        val isFav = viewModel.isFavorite(tool.id)
+                        val isFav = favorites.contains(tool.id)
                         IconButton(onClick = { viewModel.toggleFavorite(tool.id) }) {
                             Icon(
                                 imageVector = if (isFav) Icons.Filled.Star else Icons.Outlined.StarBorder,

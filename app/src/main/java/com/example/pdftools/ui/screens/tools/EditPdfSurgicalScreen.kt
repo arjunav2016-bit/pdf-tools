@@ -223,6 +223,7 @@ fun EditPdfSurgicalScreen(
                         stickyNotes.clear()
                         undoStack.clear()
                         redoStack.clear()
+                        activePageIndex = 0
                         currentStep = EditToolStep.DASHBOARD
                     },
                     accentColor = accentColor,

@@ -67,6 +67,7 @@ fun HomeScreen(
     onToolClick: (PdfTool) -> Unit,
     onSettingsClick: () -> Unit = {},
     modifier: Modifier = Modifier,
+    scrollState: androidx.compose.foundation.lazy.LazyListState = rememberLazyListState(),
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val searchQuery by viewModel.searchQuery.collectAsState()
@@ -76,8 +77,6 @@ fun HomeScreen(
     val filteredTools = remember(searchQuery) {
         viewModel.getFilteredTools(searchQuery)
     }
-
-    val scrollState = rememberLazyListState()
 
     // Parallax translation for title based on list scroll offset
     val titleTranslationY = remember {

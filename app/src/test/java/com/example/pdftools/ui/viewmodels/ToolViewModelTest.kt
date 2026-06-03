@@ -139,6 +139,24 @@ class ToolViewModelTest {
     }
 
     @Test
+    fun favoritesStateFlowExposesRepositoryFavorites() {
+        val mockFavoritesList = listOf("merge_pdf", "split_pdf")
+        val favoritesFlow = MutableStateFlow(mockFavoritesList)
+        whenever(favoritesRepository.favorites).thenReturn(favoritesFlow)
+
+        val testViewModel = ToolViewModel(
+            pdfProcessor,
+            previewRepository,
+            preferencesRepository,
+            favoritesRepository,
+            recentFilesRepository,
+            ocrModelManager
+        )
+
+        assertEquals(mockFavoritesList, testViewModel.favorites.value)
+    }
+
+    @Test
     fun compressConfigResetsToDefault() {
         viewModel.compressConfig.value = CompressConfig(tier = CompressTier.EXTREME)
         viewModel.reset()

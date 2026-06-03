@@ -328,6 +328,7 @@ fun PdfFormsSurgicalScreen(
                             currentStep = FormsStep.DASHBOARD
                         },
                         onStartFilling = {
+                            activeIntent = "build"
                             fillerFields.clear()
                             fillerFields.addAll(builderFields)
                             activeFieldIndex = 0
@@ -347,7 +348,7 @@ fun PdfFormsSurgicalScreen(
                             fillerFields[idx] = fillerFields[idx].copy(value = value)
                         },
                         onBack = {
-                            if (selectedFiles.isEmpty()) {
+                            if (activeIntent == "fill") {
                                 currentStep = FormsStep.DASHBOARD
                             } else {
                                 currentStep = FormsStep.BUILDER

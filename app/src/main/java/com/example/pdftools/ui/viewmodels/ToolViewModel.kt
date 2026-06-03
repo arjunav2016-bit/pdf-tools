@@ -88,6 +88,8 @@ class ToolViewModel @Inject constructor(
     var currentToolId: String? = null
         private set
 
+    val favorites: StateFlow<List<String>> = favoritesRepository.favorites
+
     fun setActiveTool(toolId: String) {
         currentToolId = toolId
     }
