@@ -453,5 +453,7 @@
     <string name="tool_pdfa_guidance_text">PDF/A is an ISO-standardized version of PDF designed for long-term digital preservation of electronic documents.</string>
     <string name="settings_cache_clear_success">Cache cleared successfully</string>
     <string name="settings_cache_clear_error">Failed to clear cache: %1$s</string>
+    <string name="undo">Undo</string>
+    <string name="removed_from_recents">Removed from recents</string>
 </resources>
 

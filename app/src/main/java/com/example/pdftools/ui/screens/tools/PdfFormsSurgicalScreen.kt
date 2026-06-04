@@ -1298,6 +1298,7 @@ fun FormFillingView(
                                 onFieldIndexChange(activeFieldIndex + 1)
                             }
                         },
+                        enabled = !isLastField || selectedFile != null,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(52.dp),

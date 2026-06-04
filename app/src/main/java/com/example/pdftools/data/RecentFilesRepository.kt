@@ -98,6 +98,26 @@ class RecentFilesRepository(
         }
     }
 
+    fun deleteRecent(id: String) {
+        coroutineScope.launch {
+            recentFileDao.deleteById(id)
+        }
+    }
+
+    fun insertRecent(recent: RecentFile) {
+        coroutineScope.launch {
+            recentFileDao.insert(
+                RecentFileEntity(
+                    id = recent.id,
+                    fileName = recent.fileName,
+                    toolId = recent.toolId,
+                    filePath = recent.filePath,
+                    timestamp = recent.timestamp
+                )
+            )
+        }
+    }
+
     fun clear() {
         coroutineScope.launch {
             recentFileDao.clearAll()

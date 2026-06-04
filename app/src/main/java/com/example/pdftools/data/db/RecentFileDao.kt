@@ -14,6 +14,9 @@ interface RecentFileDao {
     @Query("DELETE FROM recent_files WHERE filePath = :path")
     suspend fun deleteByPath(path: String)
 
+    @Query("DELETE FROM recent_files WHERE id = :id")
+    suspend fun deleteById(id: String)
+
     @Query("DELETE FROM recent_files")
     suspend fun clearAll()
 

@@ -19,6 +19,14 @@ class RecentViewModel @Inject constructor(
 
     fun getToolById(id: String): PdfTool? = toolRepository.getToolById(id)
 
+    fun deleteRecent(id: String) {
+        recentFilesRepository.deleteRecent(id)
+    }
+
+    fun insertRecent(recent: RecentFile) {
+        recentFilesRepository.insertRecent(recent)
+    }
+
     fun clear() {
         recentFilesRepository.clear()
     }
