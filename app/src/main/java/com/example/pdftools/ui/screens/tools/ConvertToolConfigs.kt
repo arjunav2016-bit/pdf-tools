@@ -597,8 +597,7 @@ fun LegacyHtmlToolConfig(
 ) {
     val config by viewModel.htmlConfig.collectAsState()
 
-    // HTML accent color - web-themed teal/cyan
-    val htmlAccent = Color(0xFF0097A7)
+    val htmlAccent = accentColor
 
     // We can infer template selection from the content of htmlContent or keep it local to UI
     var templateSelection by remember {
@@ -623,9 +622,9 @@ fun LegacyHtmlToolConfig(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),
             colors = CardDefaults.cardColors(
-                containerColor = htmlAccent.copy(alpha = 0.08f)
+                containerColor = accentColor.copy(alpha = 0.08f)
             ),
-            border = androidx.compose.foundation.BorderStroke(1.dp, htmlAccent.copy(alpha = 0.3f))
+            border = androidx.compose.foundation.BorderStroke(1.dp, accentColor.copy(alpha = 0.3f))
         ) {
             Row(
                 modifier = Modifier
@@ -637,7 +636,7 @@ fun LegacyHtmlToolConfig(
                 Icon(
                     imageVector = Icons.Filled.Info,
                     contentDescription = "Info",
-                    tint = htmlAccent,
+                    tint = accentColor,
                     modifier = Modifier.size(22.dp)
                 )
                 Text(
@@ -666,9 +665,9 @@ fun LegacyHtmlToolConfig(
             )
             sources.forEach { (mode, title) ->
                 val isSelected = config.inputType == mode
-                val cardBg = if (isSelected) htmlAccent.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)
-                val borderCol = if (isSelected) htmlAccent else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
-                val textCol = if (isSelected) htmlAccent else MaterialTheme.colorScheme.onSurface
+                val cardBg = if (isSelected) accentColor.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)
+                val borderCol = if (isSelected) accentColor else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                val textCol = if (isSelected) accentColor else MaterialTheme.colorScheme.onSurface
 
                 Card(
                     modifier = Modifier
@@ -718,16 +717,16 @@ fun LegacyHtmlToolConfig(
                     Icon(
                         imageVector = Icons.Filled.Language,
                         contentDescription = "URL",
-                        tint = htmlAccent
+                        tint = accentColor
                     )
                 },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 shape = RoundedCornerShape(16.dp),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = htmlAccent,
+                    focusedBorderColor = accentColor,
                     unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
-                    focusedLabelColor = htmlAccent
+                    focusedLabelColor = accentColor
                 )
             )
             Text(
