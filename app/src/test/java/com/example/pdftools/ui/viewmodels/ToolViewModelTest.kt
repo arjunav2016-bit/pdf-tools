@@ -441,6 +441,65 @@ class ToolViewModelTest {
         viewModel.setActiveTool("crop_pdf")
         assertEquals("crop_pdf", viewModel.currentToolId)
     }
+
+    @Test
+    fun pptPreviewCancellationResetsStateFlows() = runTest {
+        val input = Uri.parse("file:///tmp/input.pptx")
+        val output = Uri.parse("file:///tmp/output.pdf")
+        whenever(pdfProcessor.convertPptToPdf(
+            context = org.mockito.kotlin.any(),
+            uri = org.mockito.kotlin.any(),
+            slideRange = org.mockito.kotlin.any(),
+            customRange = org.mockito.kotlin.any(),
+            selectedSlides = org.mockito.kotlin.any(),
+            slidesPerPage = org.mockito.kotlin.any(),
+            includeNotes = org.mockito.kotlin.any(),
+            quality = org.mockito.kotlin.any(),
+            onProgress = org.mockito.kotlin.anyOrNull()
+        )).thenAnswer {
+            val progressCallback = it.getArgument<((Float) -> Unit)?>(8)
+            progressCallback?.invoke(0.5f)
+            output
+        }
+
+        viewModel.preparePptPreview(context, input)
+
+        // Cancel it immediately
+        viewModel.cancelPptPreview()
+        mainDispatcherRule.dispatcher.scheduler.advanceUntilIdle()
+
+        // State flows should be cleared
+        assertNull(viewModel.pptPreviewProgress.value)
+        assertNull(viewModel.pptPreviewPdfUri.value)
+    }
+
+    @Test
+    fun pptPreviewGenerationUpdatesProgressAndUri() = runTest {
+        val input = Uri.parse("file:///tmp/input.pptx")
+        val output = Uri.parse("file:///tmp/output.pdf")
+        whenever(pdfProcessor.convertPptToPdf(
+            context = org.mockito.kotlin.any(),
+            uri = org.mockito.kotlin.any(),
+            slideRange = org.mockito.kotlin.any(),
+            customRange = org.mockito.kotlin.any(),
+            selectedSlides = org.mockito.kotlin.any(),
+            slidesPerPage = org.mockito.kotlin.any(),
+            includeNotes = org.mockito.kotlin.any(),
+            quality = org.mockito.kotlin.any(),
+            onProgress = org.mockito.kotlin.anyOrNull()
+        )).thenAnswer {
+            val progressCallback = it.getArgument<((Float) -> Unit)?>(8)
+            progressCallback?.invoke(0.5f)
+            output
+        }
+
+        viewModel.preparePptPreview(context, input)
+        mainDispatcherRule.dispatcher.scheduler.advanceUntilIdle()
+
+        // State flows should be updated to successful values
+        assertNull(viewModel.pptPreviewProgress.value) // reset to null in finally
+        assertEquals(output, viewModel.pptPreviewPdfUri.value)
+    }
 }
 
 

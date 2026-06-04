@@ -71,7 +71,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -7377,6 +7379,9 @@ fun PptToPdfSurgicalScreen(
     val config by viewModel.pptToPdfConfig.collectAsState()
     val pptPreviewPdfUri by viewModel.pptPreviewPdfUri.collectAsState()
     val pptPreviewProgress by viewModel.pptPreviewProgress.collectAsState()
+    val uiState by viewModel.uiState.collectAsState()
+    val processingState = uiState as? ToolUiState.Processing
+    val statusMessage = processingState?.statusMessage ?: "Rendering slides and building PDF layout"
 
     val fileSize = remember(selectedFile) {
         selectedFile?.let { getFileSize(context, it) } ?: 0L
@@ -7390,9 +7395,21 @@ fun PptToPdfSurgicalScreen(
     var slidePreviewTexts by remember { mutableStateOf<List<String>>(emptyList()) }
     LaunchedEffect(selectedFile) {
         selectedFile?.let { uri ->
-            slideCount = viewModel.getSlideCount(context, uri)
-            slidePreviewTexts = viewModel.getSlidePreviewTexts(context, uri)
-            viewModel.preparePptPreview(context, uri)
+            launch {
+                slideCount = viewModel.getSlideCount(context, uri)
+            }
+            launch {
+                slidePreviewTexts = viewModel.getSlidePreviewTexts(context, uri)
+            }
+            launch {
+                viewModel.preparePptPreview(context, uri)
+            }
+        }
+    }
+
+    DisposableEffect(selectedFile) {
+        onDispose {
+            viewModel.cancelPptPreview()
         }
     }
 
@@ -8205,7 +8222,7 @@ fun PptToPdfSurgicalScreen(
                         Spacer(modifier = Modifier.height(8.dp))
 
                         Text(
-                            text = "Rendering slides and building PDF layout",
+                            text = statusMessage,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center
@@ -8213,14 +8230,26 @@ fun PptToPdfSurgicalScreen(
 
                         Spacer(modifier = Modifier.height(24.dp))
 
-                        androidx.compose.material3.LinearProgressIndicator(
-                            color = accentColor,
-                            trackColor = accentColor.copy(alpha = 0.15f),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(5.dp)
-                                .clip(RoundedCornerShape(3.dp))
-                        )
+                        if (progress != null) {
+                            androidx.compose.material3.LinearProgressIndicator(
+                                progress = { progress },
+                                color = accentColor,
+                                trackColor = accentColor.copy(alpha = 0.15f),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(5.dp)
+                                    .clip(RoundedCornerShape(3.dp))
+                            )
+                        } else {
+                            androidx.compose.material3.LinearProgressIndicator(
+                                color = accentColor,
+                                trackColor = accentColor.copy(alpha = 0.15f),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(5.dp)
+                                    .clip(RoundedCornerShape(3.dp))
+                            )
+                        }
                     }
                 }
             }

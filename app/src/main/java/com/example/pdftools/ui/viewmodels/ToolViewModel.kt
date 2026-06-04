@@ -132,6 +132,8 @@ class ToolViewModel @Inject constructor(
     private val _pptPreviewProgress = MutableStateFlow<Float?>(null)
     val pptPreviewProgress: StateFlow<Float?> = _pptPreviewProgress.asStateFlow()
 
+    private var pptPreviewJob: Job? = null
+
     // Actions
     fun addFiles(uris: List<Uri>) {
         _selectedFiles.value = _selectedFiles.value + uris
@@ -156,13 +158,12 @@ class ToolViewModel @Inject constructor(
     fun resetCurrentRun() {
         processingJob?.cancel()
         processingJob = null
+        cancelPptPreview()
         _uiState.value = ToolUiState.Idle
         _selectedFiles.value = emptyList()
         _outputUris.value = emptyList()
         _pageCount.value = null
         _progress.value = null
-        _pptPreviewPdfUri.value = null
-        _pptPreviewProgress.value = null
     }
 
     /**
@@ -245,9 +246,11 @@ class ToolViewModel @Inject constructor(
     }
 
     fun preparePptPreview(context: Context, uri: Uri) {
-        viewModelScope.launch {
+        pptPreviewJob?.cancel()
+        _pptPreviewProgress.value = 0f
+        _pptPreviewPdfUri.value = null
+        pptPreviewJob = viewModelScope.launch {
             try {
-                _pptPreviewProgress.value = 0f
                 val previewUri = pdfProcessor.convertPptToPdf(
                     context = context,
                     uri = uri,
@@ -256,7 +259,10 @@ class ToolViewModel @Inject constructor(
                     }
                 )
                 _pptPreviewPdfUri.value = previewUri
-            } catch (_: Exception) {
+            } catch (e: CancellationException) {
+                _pptPreviewPdfUri.value = null
+                throw e
+            } catch (e: Exception) {
                 _pptPreviewPdfUri.value = null
             } finally {
                 _pptPreviewProgress.value = null
@@ -264,9 +270,17 @@ class ToolViewModel @Inject constructor(
         }
     }
 
+    fun cancelPptPreview() {
+        pptPreviewJob?.cancel()
+        pptPreviewJob = null
+        _pptPreviewProgress.value = null
+        _pptPreviewPdfUri.value = null
+    }
+
     fun cancelProcessing() {
         processingJob?.cancel()
         processingJob = null
+        cancelPptPreview()
         _progress.value = null
         _uiState.value = ToolUiState.Idle
     }
