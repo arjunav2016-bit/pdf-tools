@@ -162,8 +162,8 @@ fun RecentScreen(
                         RecentFileItem(
                             recent = recent,
                             tool = viewModel.getToolById(recent.toolId),
-                            onOpen = { openFile(context, recent) },
-                            onShare = { shareFile(context, recent) }
+                            onOpen = { ctx -> openFile(ctx, recent) },
+                            onShare = { ctx -> shareFile(ctx, recent) }
                         )
                     }
                 }
@@ -176,8 +176,8 @@ fun RecentScreen(
 private fun RecentFileItem(
     recent: RecentFile,
     tool: com.example.pdftools.data.PdfTool?,
-    onOpen: () -> Unit,
-    onShare: () -> Unit,
+    onOpen: (Context) -> Unit,
+    onShare: (Context) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val isDarkTheme = LocalDarkTheme.current
@@ -245,12 +245,13 @@ private fun RecentFileItem(
             Spacer(modifier = Modifier.width(8.dp))
             
             // Actions
+            val context = LocalContext.current
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 IconButton(
-                    onClick = onOpen,
+                    onClick = { onOpen(context) },
                     modifier = Modifier.size(36.dp)
                 ) {
                     Icon(
@@ -261,7 +262,7 @@ private fun RecentFileItem(
                     )
                 }
                 IconButton(
-                    onClick = onShare,
+                    onClick = { onShare(context) },
                     modifier = Modifier.size(36.dp)
                 ) {
                     Icon(
