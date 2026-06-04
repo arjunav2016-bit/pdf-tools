@@ -1,13 +1,8 @@
 package com.example.pdftools.ui.components
 
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
@@ -38,12 +33,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -69,9 +62,21 @@ fun ToolCard(
         ),
         label = "cardScale"
     )
+    val pressRotation by animateFloatAsState(
+        targetValue = if (isPressed) {
+            if (tool.id.hashCode() % 2 == 0) 1f else -1f
+        } else {
+            0f
+        },
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "cardRotation"
+    )
 
     val elevation by animateDpAsState(
-        targetValue = if (isPressed) 4.dp else 0.dp,
+        targetValue = if (isPressed) 4.dp else 1.dp,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
             stiffness = Spring.StiffnessLow
@@ -79,16 +84,43 @@ fun ToolCard(
         label = "cardElevation"
     )
 
+    var entered by remember(tool.id, animationDelay) { mutableStateOf(false) }
+    LaunchedEffect(tool.id, animationDelay) {
+        delay(animationDelay.toLong())
+        entered = true
+    }
+    val entranceAlpha by animateFloatAsState(
+        targetValue = if (entered) 1f else 0f,
+        animationSpec = tween(durationMillis = 320),
+        label = "cardEntranceAlpha"
+    )
+    val entranceOffset by animateDpAsState(
+        targetValue = if (entered) 0.dp else 14.dp,
+        animationSpec = tween(durationMillis = 320),
+        label = "cardEntranceOffset"
+    )
+    val density = LocalDensity.current
+
     val isDarkTheme = LocalDarkTheme.current
-    val accentColor = if (isDarkTheme) tool.category.darkAccentColor else tool.category.accentColor
-    val containerColor = if (isDarkTheme) tool.category.darkContainerColor else tool.category.containerColor
+    val accentColor = remember(isDarkTheme, tool.category) {
+        if (isDarkTheme) tool.category.darkAccentColor else tool.category.accentColor
+    }
+    val containerColor = remember(isDarkTheme, tool.category) {
+        if (isDarkTheme) tool.category.darkContainerColor else tool.category.containerColor
+    }
 
     val haptic = LocalHapticFeedback.current
 
     Card(
         modifier = modifier
-            .scale(pressScale)
-            .defaultMinSize(minHeight = 140.dp)
+            .graphicsLayer {
+                alpha = entranceAlpha
+                translationY = with(density) { entranceOffset.toPx() }
+                scaleX = pressScale
+                scaleY = pressScale
+                rotationZ = pressRotation
+            }
+            .defaultMinSize(minHeight = 132.dp)
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
@@ -113,14 +145,14 @@ fun ToolCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 18.dp, horizontal = 12.dp),
+                .padding(vertical = 20.dp, horizontal = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             // Icon circle
             Box(
                 modifier = Modifier
-                    .size(56.dp)
+                    .size(60.dp)
                     .clip(CircleShape)
                     .background(containerColor),
                 contentAlignment = Alignment.Center
@@ -136,7 +168,7 @@ fun ToolCard(
             // Tool name
             Text(
                 text = tool.name,
-                style = MaterialTheme.typography.labelMedium,
+                style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center,

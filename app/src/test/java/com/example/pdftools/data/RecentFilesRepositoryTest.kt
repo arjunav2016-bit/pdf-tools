@@ -54,6 +54,12 @@ class RecentFilesRepositoryTest {
     fun testAddAndClearRecents() = runTest {
         repository = RecentFilesRepository(context, recentFileDao, this)
 
+        // Clear prepopulated mock files first so the test starts in a clean state
+        repository.clear()
+        withTimeout(2000) {
+            repository.recents.filter { it.isEmpty() }.first()
+        }
+
         // Initial state should be empty
         assertTrue(repository.recents.value.isEmpty())
 

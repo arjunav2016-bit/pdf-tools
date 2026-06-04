@@ -3,6 +3,7 @@ package com.example.pdftools.ui.viewmodels
 import android.content.Context
 import android.graphics.Bitmap
 import android.net.Uri
+import androidx.compose.runtime.Stable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.pdftools.data.PdfProcessor
@@ -22,6 +23,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+@Stable
 sealed interface ToolUiState {
     data object Idle : ToolUiState
     data class Processing(
@@ -596,14 +598,24 @@ class ToolViewModel @Inject constructor(
     }
 
     private fun progressReporter(statusPrefix: String): (Float) -> Unit {
-        return { value ->
-            val normalized = value.coerceIn(0f, 1f)
-            _progress.value = normalized
-            _uiState.value = ToolUiState.Processing(
-                progress = normalized,
-                statusMessage = "$statusPrefix ${(normalized * 100).toInt()}%"
-            )
+        return ProcessorProgressReporter(statusPrefix)
+    }
+
+    private inner class ProcessorProgressReporter(
+        private val statusPrefix: String
+    ) : (Float) -> Unit {
+        override fun invoke(value: Float) {
+            reportProgress(statusPrefix, value)
         }
+    }
+
+    private fun reportProgress(statusPrefix: String, value: Float) {
+        val normalized = value.coerceIn(0f, 1f)
+        _progress.value = normalized
+        _uiState.value = ToolUiState.Processing(
+            progress = normalized,
+            statusMessage = "$statusPrefix ${(normalized * 100).toInt()}%"
+        )
     }
 
     private fun getFileName(context: Context, uri: Uri): String {

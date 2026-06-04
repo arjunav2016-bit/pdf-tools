@@ -80,6 +80,11 @@ class RecentFilesRepository(
                 // Clear old preferences
                 prefs.edit().clear().apply()
             }
+
+            // Clean up any existing mock files that might have been seeded previously
+            recentFileDao.deleteById("mock_doc_1")
+            recentFileDao.deleteById("mock_doc_2")
+            recentFileDao.deleteById("mock_doc_3")
         }
     }
 

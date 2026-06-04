@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -52,24 +51,28 @@ fun CategorySection(
     onToolClick: (PdfTool) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var visible by remember { mutableStateOf(false) }
+    var visible by remember(category) { mutableStateOf(false) }
 
     LaunchedEffect(key1 = category) {
         delay(100)
         visible = true
     }
 
-    val categoryIcon = when (category) {
-        ToolCategory.ORGANIZE_PDF -> Icons.Filled.SwapVert
-        ToolCategory.OPTIMIZE_PDF -> Icons.Filled.Speed
-        ToolCategory.CONVERT_TO_PDF -> Icons.Filled.SwapHoriz
-        ToolCategory.CONVERT_FROM_PDF -> Icons.Filled.Apps
-        ToolCategory.EDIT_PDF -> Icons.Filled.Edit
-        ToolCategory.PDF_SECURITY -> Icons.Filled.Security
+    val categoryIcon = remember(category) {
+        when (category) {
+            ToolCategory.ORGANIZE_PDF -> Icons.Filled.SwapVert
+            ToolCategory.OPTIMIZE_PDF -> Icons.Filled.Speed
+            ToolCategory.CONVERT_TO_PDF -> Icons.Filled.SwapHoriz
+            ToolCategory.CONVERT_FROM_PDF -> Icons.Filled.Apps
+            ToolCategory.EDIT_PDF -> Icons.Filled.Edit
+            ToolCategory.PDF_SECURITY -> Icons.Filled.Security
+        }
     }
 
-    val accentColor = if (LocalDarkTheme.current) category.darkAccentColor else category.accentColor
-    val containerColor = if (LocalDarkTheme.current) category.darkContainerColor else category.containerColor
+    val isDarkTheme = LocalDarkTheme.current
+    val accentColor = remember(isDarkTheme, category) {
+        if (isDarkTheme) category.darkAccentColor else category.accentColor
+    }
 
     AnimatedVisibility(
         visible = visible,
@@ -92,7 +95,7 @@ fun CategorySection(
                 Box(
                     modifier = Modifier
                         .width(6.dp)
-                        .height(24.dp)
+                        .height(28.dp)
                         .clip(RoundedCornerShape(3.dp))
                         .background(accentColor)
                 )
@@ -111,6 +114,17 @@ fun CategorySection(
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
+
+                AnimatedVisibility(
+                    visible = visible,
+                    enter = fadeIn(animationSpec = tween(durationMillis = 250))
+                ) {
+                    Text(
+                        text = if (tools.size == 1) "(1 tool)" else "(${tools.size} tools)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
 
             BoxWithConstraints(
@@ -123,7 +137,7 @@ fun CategorySection(
 
                 Column(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     for (rowIdx in 0 until rowsCount) {
                         Row(

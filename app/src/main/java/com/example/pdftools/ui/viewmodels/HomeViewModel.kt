@@ -17,8 +17,8 @@ class HomeViewModel @Inject constructor(
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
-    val allTools: List<PdfTool>
-        get() = toolRepository.allTools
+    val allTools: List<PdfTool> = toolRepository.allTools
+    private val toolsByCategory: Map<ToolCategory, List<PdfTool>> = toolRepository.toolsByCategory
 
     fun updateSearchQuery(query: String) {
         _searchQuery.value = query
@@ -26,9 +26,9 @@ class HomeViewModel @Inject constructor(
 
     fun getFilteredTools(query: String): Map<ToolCategory, List<PdfTool>> {
         return if (query.isBlank()) {
-            toolRepository.toolsByCategory
+            toolsByCategory
         } else {
-            toolRepository.allTools
+            allTools
                 .filter { it.name.contains(query, ignoreCase = true) }
                 .groupBy { it.category }
         }

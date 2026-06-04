@@ -34,6 +34,12 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -47,6 +53,7 @@ import androidx.compose.runtime.setValue
 import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
@@ -152,6 +159,8 @@ fun SettingsScreen(
             item {
                 SettingsGroupCard(
                     title = stringResource(R.string.settings_appearance),
+                    description = "Choose your theme preference",
+                    icon = Icons.Filled.Palette,
                     animationDelay = 50
                 ) {
                     Text(
@@ -177,6 +186,8 @@ fun SettingsScreen(
             item {
                 SettingsGroupCard(
                     title = stringResource(R.string.settings_processing_defaults),
+                    description = "Tune conversion and compression defaults",
+                    icon = Icons.Filled.Speed,
                     animationDelay = 100
                 ) {
                     SliderPreference(
@@ -190,6 +201,7 @@ fun SettingsScreen(
                         onValueChange = { localQuality = it },
                         onValueChangeFinished = { viewModel.updateCompressionQuality(localQuality.roundToInt()) }
                     )
+                    SettingsDivider()
                     SliderPreference(
                         title = stringResource(R.string.settings_pdf_image_dpi),
                         valueLabel = stringResource(R.string.settings_dpi_value, localDpi.roundToInt()),
@@ -198,6 +210,7 @@ fun SettingsScreen(
                         onValueChange = { localDpi = it },
                         onValueChangeFinished = { viewModel.updateExportDpi(localDpi.roundToInt()) }
                     )
+                    SettingsDivider()
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
@@ -234,6 +247,8 @@ fun SettingsScreen(
             item {
                 SettingsGroupCard(
                     title = stringResource(R.string.settings_storage),
+                    description = "Manage temporary files and storage use",
+                    icon = Icons.Filled.Storage,
                     animationDelay = 150
                 ) {
                     Row(
@@ -263,12 +278,15 @@ fun SettingsScreen(
             item {
                 SettingsGroupCard(
                     title = stringResource(R.string.settings_about),
+                    description = "Version and project information",
+                    icon = Icons.Filled.Info,
                     animationDelay = 200
                 ) {
                     Text(
                         text = stringResource(R.string.settings_app_version, versionName),
                         style = MaterialTheme.typography.bodyMedium
                     )
+                    SettingsDivider()
                     TextButton(
                         onClick = { uriHandler.openUri("https://www.apache.org/licenses/") }
                     ) {
@@ -285,6 +303,8 @@ fun SettingsScreen(
 @Composable
 private fun SettingsGroupCard(
     title: String,
+    description: String,
+    icon: ImageVector,
     modifier: Modifier = Modifier,
     animationDelay: Int = 0,
     content: @Composable ColumnScope.() -> Unit
@@ -299,7 +319,7 @@ private fun SettingsGroupCard(
         visible = visible,
         enter = fadeIn(animationSpec = tween(durationMillis = 400)) +
                 slideInVertically(
-                    initialOffsetY = { it / 4 },
+                    initialOffsetY = { it / 6 },
                     animationSpec = tween(durationMillis = 400)
                 ),
         modifier = modifier
@@ -312,7 +332,7 @@ private fun SettingsGroupCard(
                 color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
             ),
             colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
             )
         ) {
             Column(
@@ -321,12 +341,33 @@ private fun SettingsGroupCard(
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = title,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        Text(
+                            text = title,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = description,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
                 content()
             }
         }
@@ -362,9 +403,21 @@ private fun SliderPreference(
             value = value,
             onValueChange = onValueChange,
             onValueChangeFinished = onValueChangeFinished,
-            valueRange = valueRange
+            valueRange = valueRange,
+            colors = SliderDefaults.colors(
+                thumbColor = MaterialTheme.colorScheme.primary,
+                activeTrackColor = MaterialTheme.colorScheme.primary,
+                inactiveTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest
+            )
         )
     }
+}
+
+@Composable
+private fun SettingsDivider() {
+    HorizontalDivider(
+        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+    )
 }
 
 @Composable

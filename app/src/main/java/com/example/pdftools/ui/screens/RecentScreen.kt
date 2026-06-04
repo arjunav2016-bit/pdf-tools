@@ -39,6 +39,8 @@ import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.outlined.HistoryToggleOff
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -59,6 +61,8 @@ import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -81,6 +85,7 @@ import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.pdftools.R
 import com.example.pdftools.theme.LocalDarkTheme
+import com.example.pdftools.ui.components.staggeredFadeIn
 import com.example.pdftools.ui.viewmodels.RecentViewModel
 import com.example.pdftools.data.RecentFile
 import java.io.File
@@ -207,19 +212,19 @@ fun RecentScreen(
                             }
                         )
 
-                        StaggeredListItem(index = index) {
-                            SwipeToDismissBox(
-                                state = swipeState,
-                                backgroundContent = { SwipeBackground(dismissState = swipeState) },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                RecentFileItem(
-                                    recent = recent,
-                                    tool = viewModel.getToolById(recent.toolId),
-                                    onOpen = { ctx -> openFile(ctx, recent) },
-                                    onShare = { ctx -> shareFile(ctx, recent) }
-                                )
-                            }
+                        SwipeToDismissBox(
+                            state = swipeState,
+                            backgroundContent = { SwipeBackground(dismissState = swipeState) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .staggeredFadeIn(index)
+                        ) {
+                            RecentFileItem(
+                                recent = recent,
+                                tool = viewModel.getToolById(recent.toolId),
+                                onOpen = { ctx -> openFile(ctx, recent) },
+                                onShare = { ctx -> shareFile(ctx, recent) }
+                            )
                         }
                     }
                 }
@@ -237,18 +242,17 @@ private fun RecentFileItem(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val isDarkTheme = LocalDarkTheme.current
-    val accentColor = tool?.category?.let { if (isDarkTheme) it.darkAccentColor else it.accentColor }
-        ?: MaterialTheme.colorScheme.primary
-    val containerColor = tool?.category?.let { if (isDarkTheme) it.darkContainerColor else it.containerColor }
-        ?: MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f)
+    var showMenu by remember { mutableStateOf(false) }
 
     val formattedDate = rememberFormattedDate(recent.timestamp)
+    val sizeStr = rememberFileSize(recent.filePath, context)
 
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .bounceClick { onOpen(context) },
+            .clickable {
+                onOpen(context)
+            },
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerLow
@@ -257,29 +261,30 @@ private fun RecentFileItem(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Category Icon Circle
+            // PDF Icon Square (rounded)
+            val isDark = LocalDarkTheme.current
+            val pdfIconBg = if (isDark) com.example.pdftools.data.ToolCategory.ORGANIZE_PDF.darkContainerColor else com.example.pdftools.data.ToolCategory.ORGANIZE_PDF.containerColor
+            val pdfIconTint = if (isDark) com.example.pdftools.data.ToolCategory.ORGANIZE_PDF.darkAccentColor else com.example.pdftools.data.ToolCategory.ORGANIZE_PDF.accentColor
+
             Box(
                 modifier = Modifier
                     .size(44.dp)
-                    .clip(CircleShape)
-                    .background(containerColor),
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(pdfIconBg),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = tool?.icon ?: Icons.Filled.History,
-                    contentDescription = stringResource(
-                        R.string.recent_tool_icon,
-                        tool?.name ?: stringResource(R.string.process_action)
-                    ),
-                    tint = accentColor,
-                    modifier = Modifier.size(20.dp)
+                    imageVector = Icons.Filled.PictureAsPdf,
+                    contentDescription = "PDF File",
+                    tint = pdfIconTint,
+                    modifier = Modifier.size(22.dp)
                 )
             }
-            Spacer(modifier = Modifier.width(14.dp))
-            
+            Spacer(modifier = Modifier.width(12.dp))
+
             // Details
             Column(
                 modifier = Modifier.weight(1f),
@@ -295,39 +300,40 @@ private fun RecentFileItem(
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    text = "${tool?.name ?: "Process"} - $formattedDate",
+                    text = "$formattedDate - $sizeStr",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                 )
             }
-            
+
             Spacer(modifier = Modifier.width(8.dp))
-            
-            // Actions
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                IconButton(
-                    onClick = { onOpen(context) },
-                    modifier = Modifier.size(36.dp)
-                ) {
+
+            // Actions Menu
+            Box {
+                IconButton(onClick = { showMenu = true }) {
                     Icon(
-                        imageVector = Icons.Filled.OpenInNew,
-                        contentDescription = stringResource(R.string.open_file),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(18.dp)
+                        imageVector = Icons.Filled.MoreVert,
+                        contentDescription = "Options",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                IconButton(
-                    onClick = { onShare(context) },
-                    modifier = Modifier.size(36.dp)
+                DropdownMenu(
+                    expanded = showMenu,
+                    onDismissRequest = { showMenu = false }
                 ) {
-                    Icon(
-                        imageVector = Icons.Filled.Share,
-                        contentDescription = stringResource(R.string.share_file),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(18.dp)
+                    DropdownMenuItem(
+                        text = { Text("Open") },
+                        onClick = {
+                            showMenu = false
+                            onOpen(context)
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Share") },
+                        onClick = {
+                            showMenu = false
+                            onShare(context)
+                        }
                     )
                 }
             }
@@ -337,9 +343,33 @@ private fun RecentFileItem(
 
 @Composable
 private fun rememberFormattedDate(timestamp: Long): String {
-    val formatter = SimpleDateFormat("MMM d, h:mm a", Locale.getDefault())
-    return formatter.format(Date(timestamp))
+    return remember(timestamp) {
+        val now = System.currentTimeMillis()
+        val diff = now - timestamp
+        val oneDay = 24 * 60 * 60 * 1000L
+        if (diff < oneDay && SimpleDateFormat("d", Locale.getDefault()).format(Date(now)) == SimpleDateFormat("d", Locale.getDefault()).format(Date(timestamp))) {
+            "Today"
+        } else if (diff < 2 * oneDay) {
+            "Yesterday"
+        } else {
+            val formatter = SimpleDateFormat("MMM d, yyyy", Locale.getDefault())
+            formatter.format(Date(timestamp))
+        }
+    }
 }
+
+@Composable
+private fun rememberFileSize(filePath: String, context: Context): String {
+    return remember(filePath) {
+        try {
+            val uri = android.net.Uri.parse(filePath)
+            getFileSizeFromUri(context, uri)
+        } catch (e: Exception) {
+            "Unknown size"
+        }
+    }
+}
+
 
 @Composable
 private fun EmptyRecentsState() {

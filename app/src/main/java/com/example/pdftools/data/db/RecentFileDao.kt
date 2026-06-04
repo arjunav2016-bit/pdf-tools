@@ -20,6 +20,9 @@ interface RecentFileDao {
     @Query("DELETE FROM recent_files")
     suspend fun clearAll()
 
+    @Query("SELECT COUNT(*) FROM recent_files")
+    suspend fun getCount(): Int
+
     @Query("DELETE FROM recent_files WHERE id NOT IN (SELECT id FROM recent_files ORDER BY timestamp DESC LIMIT :limit)")
     suspend fun trim(limit: Int)
 }
