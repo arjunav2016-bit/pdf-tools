@@ -22,6 +22,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -101,8 +102,8 @@ fun ScanFlowScreen(
     }
 
     // Track if camera permission was denied (to show rationale dialog)
-    var showPermissionDeniedDialog by remember { mutableStateOf(false) }
-    var permissionDenialCount by remember { mutableStateOf(0) }
+    var showPermissionDeniedDialog by rememberSaveable { mutableStateOf(false) }
+    var permissionDenialCount by rememberSaveable { mutableStateOf(0) }
 
     // Camera permission launcher – launches the scanner automatically on grant
     val cameraPermissionLauncher = rememberLauncherForActivityResult(
@@ -152,8 +153,12 @@ fun ScanFlowScreen(
                     ).show()
                 }
         } else {
-            // Request camera permission – result handled in cameraPermissionLauncher
-            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+            if (permissionDenialCount >= 2) {
+                showPermissionDeniedDialog = true
+            } else {
+                // Request camera permission – result handled in cameraPermissionLauncher
+                cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+            }
         }
     }
 
@@ -346,7 +351,8 @@ fun ScanFlowScreen(
                     ErrorContent(
                         message = state.message,
                         accentColor = accentColor,
-                        onRetry = { viewModel.generatePdf(context) }
+                        onRetry = { viewModel.generatePdf(context) },
+                        onDismiss = { viewModel.dismissError() }
                     )
                 }
             }
@@ -707,7 +713,8 @@ private fun SuccessContent(
 private fun ErrorContent(
     message: String,
     accentColor: Color,
-    onRetry: () -> Unit
+    onRetry: () -> Unit,
+    onDismiss: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -730,12 +737,28 @@ private fun ErrorContent(
             color = MaterialTheme.colorScheme.onSurface
         )
         Spacer(modifier = Modifier.height(24.dp))
-        Button(
-            onClick = onRetry,
-            colors = ButtonDefaults.buttonColors(containerColor = accentColor),
-            shape = RoundedCornerShape(14.dp)
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("Try Again", fontWeight = FontWeight.Bold)
+            OutlinedButton(
+                onClick = onDismiss,
+                shape = RoundedCornerShape(14.dp),
+                border = BorderStroke(1.dp, accentColor)
+            ) {
+                Text(
+                    text = "Dismiss",
+                    color = accentColor,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            Button(
+                onClick = onRetry,
+                colors = ButtonDefaults.buttonColors(containerColor = accentColor),
+                shape = RoundedCornerShape(14.dp)
+            ) {
+                Text("Try Again", fontWeight = FontWeight.Bold)
+            }
         }
     }
 }

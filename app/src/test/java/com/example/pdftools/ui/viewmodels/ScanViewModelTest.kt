@@ -92,4 +92,29 @@ class ScanViewModelTest {
 
         assertEquals(ScanFlowState.Review, viewModel.flowState.value)
     }
+
+    @Test
+    fun dismissErrorWithPagesReturnsToReview() = runTest {
+        viewModel.addPages(listOf(Uri.parse("file://page1.jpg")))
+        
+        doAnswer { throw RuntimeException("Simulated error") }.`when`(pdfProcessor).scanToPdf(
+            any(), any(), any(), any(), any(), any(), any()
+        )
+
+        viewModel.generatePdf(context)
+        advanceUntilIdle()
+
+        assertTrue(viewModel.flowState.value is ScanFlowState.Error)
+        assertEquals("Simulated error", (viewModel.flowState.value as ScanFlowState.Error).message)
+
+        viewModel.dismissError()
+        assertEquals(ScanFlowState.Review, viewModel.flowState.value)
+    }
+
+    @Test
+    fun dismissErrorWithoutPagesReturnsToLauncher() = runTest {
+        viewModel.dismissError()
+        assertEquals(ScanFlowState.Launcher, viewModel.flowState.value)
+    }
 }
+
