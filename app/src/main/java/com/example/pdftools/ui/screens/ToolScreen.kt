@@ -364,31 +364,13 @@ fun ToolScreen(
                     }
                 },
                 actions = {
-                    if (tool.id == "pdf_to_ppt") {
-                        IconButton(onClick = { /* Search action */ }) {
-                            Icon(
-                                imageVector = Icons.Filled.Search,
-                                contentDescription = "Search",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    } else if (tool.id == "pdf_to_jpg") {
-                        IconButton(onClick = { /* Settings action */ }) {
-                            Icon(
-                                imageVector = Icons.Filled.Settings,
-                                contentDescription = "Settings",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    } else {
-                        val isFav = favorites.contains(tool.id)
-                        IconButton(onClick = { viewModel.toggleFavorite(tool.id) }) {
-                            Icon(
-                                imageVector = if (isFav) Icons.Filled.Star else Icons.Outlined.StarBorder,
-                                contentDescription = "Toggle favorite",
-                                tint = if (isFav) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
+                    val isFav = favorites.contains(tool.id)
+                    IconButton(onClick = { viewModel.toggleFavorite(tool.id) }) {
+                        Icon(
+                            imageVector = if (isFav) Icons.Filled.Star else Icons.Outlined.StarBorder,
+                            contentDescription = "Toggle favorite",
+                            tint = if (isFav) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
