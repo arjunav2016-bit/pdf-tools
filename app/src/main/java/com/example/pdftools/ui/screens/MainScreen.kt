@@ -62,6 +62,8 @@ fun MainScreen(
     val currentTab by viewModel.currentTab.collectAsState()
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
     val homeLazyListState = androidx.compose.foundation.lazy.rememberLazyListState()
+    val recentLazyListState = androidx.compose.foundation.lazy.rememberLazyListState()
+    val favoritesLazyGridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
     val isWideScreen = configuration.screenWidthDp >= 600
 
     Scaffold(
@@ -170,8 +172,15 @@ fun MainScreen(
                         scrollState = homeLazyListState,
                         modifier = Modifier.fillMaxSize()
                     )
-                    AppTab.FAVORITES -> FavoritesScreen(onToolClick = onToolClick, modifier = Modifier.fillMaxSize())
-                    AppTab.RECENT -> RecentScreen(modifier = Modifier.fillMaxSize())
+                    AppTab.FAVORITES -> FavoritesScreen(
+                        onToolClick = onToolClick,
+                        gridState = favoritesLazyGridState,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                    AppTab.RECENT -> RecentScreen(
+                        scrollState = recentLazyListState,
+                        modifier = Modifier.fillMaxSize()
+                    )
                 }
             }
         }

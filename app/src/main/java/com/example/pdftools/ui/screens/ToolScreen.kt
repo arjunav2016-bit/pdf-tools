@@ -246,6 +246,7 @@ fun ToolScreen(
         viewModel.reset()
         onDispose {
             viewModel.cancelProcessing()
+            viewModel.resetCurrentRun()
         }
     }
 
@@ -271,7 +272,7 @@ fun ToolScreen(
                 try {
                     context.contentResolver.openInputStream(uris.first())?.use { input ->
                         val content = input.bufferedReader().readText()
-                        viewModel.htmlConfig.value = htmlConfig.copy(htmlContent = content)
+                        viewModel.htmlConfig.value = viewModel.htmlConfig.value.copy(htmlContent = content)
                     }
                 } catch (e: Exception) {
                     e.printStackTrace()
@@ -781,7 +782,7 @@ fun ToolScreen(
                     }
 
                     // Selected files
-                    if (selectedFiles.isNotEmpty() && !isComplete && tool.id != "merge_pdf" && tool.id != "pdf_to_jpg" && tool.id != "pdf_to_ppt" && tool.id != "pdf_to_pdfa") {
+                    if (selectedFiles.isNotEmpty() && !isComplete && tool.id != "merge_pdf" && tool.id != "pdf_to_jpg" && tool.id != "pdf_to_ppt" && tool.id != "pdf_to_pdfa" && tool.id != "html_to_pdf") {
                         item {
                             Text(
                                 text = "Selected Files (${selectedFiles.size})",
@@ -1004,7 +1005,7 @@ fun ToolScreen(
                 }
 
                 // Selected files (only show when not complete)
-                if (selectedFiles.isNotEmpty() && !isComplete && tool.id != "merge_pdf" && tool.id != "pdf_to_jpg" && tool.id != "pdf_to_ppt" && tool.id != "pdf_to_pdfa") {
+                if (selectedFiles.isNotEmpty() && !isComplete && tool.id != "merge_pdf" && tool.id != "pdf_to_jpg" && tool.id != "pdf_to_ppt" && tool.id != "pdf_to_pdfa" && tool.id != "html_to_pdf") {
                     item {
                         Text(
                             text = "Selected Files (${selectedFiles.size})",

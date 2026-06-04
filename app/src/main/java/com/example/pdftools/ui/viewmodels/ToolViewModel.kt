@@ -506,7 +506,17 @@ class ToolViewModel @Inject constructor(
                     }
                     "html_to_pdf" -> {
                         val c = htmlConfig.value
-                        val result = pdfProcessor.convertHtmlToPdf(context, c.htmlContent)
+                        val result = pdfProcessor.convertHtmlToPdf(
+                            context = context,
+                            htmlContent = c.htmlContent,
+                            inputType = c.inputType,
+                            url = c.url,
+                            loadJs = c.loadJs,
+                            loadBackgroundGraphics = c.loadBackgroundGraphics,
+                            pageScale = c.pageScale,
+                            captureArea = c.captureArea,
+                            selectedAreaSelector = c.selectedAreaSelector
+                        )
                         onProcessingSuccess(toolId, context, result)
                     }
                     "word_to_pdf" -> {

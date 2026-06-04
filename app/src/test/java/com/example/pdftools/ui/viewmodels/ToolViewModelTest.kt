@@ -500,6 +500,49 @@ class ToolViewModelTest {
         assertNull(viewModel.pptPreviewProgress.value) // reset to null in finally
         assertEquals(output, viewModel.pptPreviewPdfUri.value)
     }
+
+    @Test
+    fun processHtmlToPdfMapsParametersCorrectly() = runTest {
+        val output = Uri.parse("file:///tmp/output.pdf")
+        whenever(pdfProcessor.convertHtmlToPdf(
+            context = org.mockito.kotlin.eq(context),
+            htmlContent = org.mockito.kotlin.eq("<html>test</html>"),
+            inputType = org.mockito.kotlin.eq("url"),
+            url = org.mockito.kotlin.eq("https://example.com/custom"),
+            loadJs = org.mockito.kotlin.eq(false),
+            loadBackgroundGraphics = org.mockito.kotlin.eq(false),
+            pageScale = org.mockito.kotlin.eq(1.5f),
+            captureArea = org.mockito.kotlin.eq("selected_area"),
+            selectedAreaSelector = org.mockito.kotlin.eq("#main")
+        )).thenReturn(output)
+
+        viewModel.htmlConfig.value = HtmlConfig(
+            htmlContent = "<html>test</html>",
+            inputType = "url",
+            url = "https://example.com/custom",
+            loadJs = false,
+            loadBackgroundGraphics = false,
+            pageScale = 1.5f,
+            captureArea = "selected_area",
+            selectedAreaSelector = "#main"
+        )
+        viewModel.process("html_to_pdf", context)
+
+        mainDispatcherRule.dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(ToolUiState.Success(listOf(output)), viewModel.uiState.value)
+        verify(pdfProcessor).convertHtmlToPdf(
+            context = org.mockito.kotlin.eq(context),
+            htmlContent = org.mockito.kotlin.eq("<html>test</html>"),
+            inputType = org.mockito.kotlin.eq("url"),
+            url = org.mockito.kotlin.eq("https://example.com/custom"),
+            loadJs = org.mockito.kotlin.eq(false),
+            loadBackgroundGraphics = org.mockito.kotlin.eq(false),
+            pageScale = org.mockito.kotlin.eq(1.5f),
+            captureArea = org.mockito.kotlin.eq("selected_area"),
+            selectedAreaSelector = org.mockito.kotlin.eq("#main")
+        )
+    }
 }
 
 

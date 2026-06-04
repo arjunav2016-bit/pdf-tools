@@ -52,6 +52,7 @@ import com.example.pdftools.ui.components.ToolCard
 fun FavoritesScreen(
     onToolClick: (PdfTool) -> Unit,
     modifier: Modifier = Modifier,
+    gridState: androidx.compose.foundation.lazy.grid.LazyGridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState(),
     viewModel: FavoritesViewModel = hiltViewModel()
 ) {
     val favoriteTools by viewModel.favoriteTools.collectAsState()
@@ -97,6 +98,7 @@ fun FavoritesScreen(
                 EmptyFavoritesState()
             } else {
                 LazyVerticalGrid(
+                    state = gridState,
                     columns = GridCells.Adaptive(minSize = 112.dp),
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),

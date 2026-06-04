@@ -1293,7 +1293,10 @@ fun MergeToolConfig(
 
                         // Close / Remove button
                         IconButton(
-                            onClick = { viewModel.removeFile(index) },
+                            onClick = {
+                                fileMetadata.remove(uri)
+                                viewModel.removeFile(index)
+                            },
                             modifier = Modifier.size(36.dp)
                         ) {
                             Icon(

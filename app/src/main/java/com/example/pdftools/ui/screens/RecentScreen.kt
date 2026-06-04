@@ -94,6 +94,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun RecentScreen(
     modifier: Modifier = Modifier,
+    scrollState: androidx.compose.foundation.lazy.LazyListState = androidx.compose.foundation.lazy.rememberLazyListState(),
     viewModel: RecentViewModel = hiltViewModel()
 ) {
     val recents by viewModel.recents.collectAsState()
@@ -179,6 +180,7 @@ fun RecentScreen(
                 EmptyRecentsState()
             } else {
                 LazyColumn(
+                    state = scrollState,
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
