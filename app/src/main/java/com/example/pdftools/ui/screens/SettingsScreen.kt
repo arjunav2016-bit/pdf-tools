@@ -71,6 +71,8 @@ fun SettingsScreen(
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
     var showClearCacheConfirmation by remember { mutableStateOf(false) }
+    var localQuality by remember(preferences.compressionQuality) { mutableStateOf(preferences.compressionQuality.toFloat()) }
+    var localDpi by remember(preferences.exportDpi) { mutableStateOf(preferences.exportDpi.toFloat()) }
     val unknownVersion = stringResource(R.string.settings_unknown_version)
     val versionName = remember(context, unknownVersion) {
         runCatching {
@@ -181,18 +183,20 @@ fun SettingsScreen(
                         title = stringResource(R.string.settings_compression_quality),
                         valueLabel = stringResource(
                             R.string.settings_percent_value,
-                            preferences.compressionQuality
+                            localQuality.roundToInt()
                         ),
-                        value = preferences.compressionQuality.toFloat(),
+                        value = localQuality,
                         valueRange = 30f..100f,
-                        onValueChange = { viewModel.updateCompressionQuality(it.roundToInt()) }
+                        onValueChange = { localQuality = it },
+                        onValueChangeFinished = { viewModel.updateCompressionQuality(localQuality.roundToInt()) }
                     )
                     SliderPreference(
                         title = stringResource(R.string.settings_pdf_image_dpi),
-                        valueLabel = stringResource(R.string.settings_dpi_value, preferences.exportDpi),
-                        value = preferences.exportDpi.toFloat(),
+                        valueLabel = stringResource(R.string.settings_dpi_value, localDpi.roundToInt()),
+                        value = localDpi,
                         valueRange = 72f..300f,
-                        onValueChange = { viewModel.updateExportDpi(it.roundToInt()) }
+                        onValueChange = { localDpi = it },
+                        onValueChangeFinished = { viewModel.updateExportDpi(localDpi.roundToInt()) }
                     )
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -335,7 +339,8 @@ private fun SliderPreference(
     valueLabel: String,
     value: Float,
     valueRange: ClosedFloatingPointRange<Float>,
-    onValueChange: (Float) -> Unit
+    onValueChange: (Float) -> Unit,
+    onValueChangeFinished: (() -> Unit)? = null
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(
@@ -356,6 +361,7 @@ private fun SliderPreference(
         Slider(
             value = value,
             onValueChange = onValueChange,
+            onValueChangeFinished = onValueChangeFinished,
             valueRange = valueRange
         )
     }
