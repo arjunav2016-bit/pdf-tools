@@ -21,8 +21,12 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
+import com.tom_roush.pdfbox.pdmodel.PDDocument
+import com.tom_roush.pdfbox.text.PDFTextStripper
 import java.io.File
 import java.io.IOException
+import java.awt.geom.Rectangle2D
+import org.apache.poi.sl.usermodel.ShapeType
 import org.apache.poi.xwpf.usermodel.XWPFDocument
 import org.apache.poi.xslf.usermodel.XMLSlideShow
 import org.apache.poi.xssf.usermodel.XSSFWorkbook
@@ -1280,6 +1284,75 @@ class PdfProcessorTest {
             )
             val file = File(outputUri.path ?: "")
             assertTrue(file.exists())
+            file.delete()
+        } finally {
+            pptFile.delete()
+        }
+    }
+
+    @Test
+    fun testConvertPptToPdf_groupedShapesDoesNotCrash() = kotlinx.coroutines.test.runTest {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val tempDir = context.cacheDir
+        val pptFile = File(tempDir, "ppt_group_${System.currentTimeMillis()}.pptx")
+        try {
+            XMLSlideShow().use { ppt ->
+                val slide = ppt.createSlide()
+                val group = slide.createGroup()
+                group.anchor = Rectangle2D.Double(60.0, 60.0, 260.0, 160.0)
+                group.interiorAnchor = Rectangle2D.Double(0.0, 0.0, 260.0, 160.0)
+
+                val rect = group.createAutoShape()
+                rect.shapeType = ShapeType.ROUND_RECT
+                rect.anchor = Rectangle2D.Double(10.0, 20.0, 150.0, 80.0)
+                rect.text = "Grouped Text"
+
+                val connector = group.createConnector()
+                connector.anchor = Rectangle2D.Double(30.0, 110.0, 180.0, 30.0)
+
+                pptFile.outputStream().use { out -> ppt.write(out) }
+            }
+
+            val outputUri = pdfProcessor.convertPptToPdf(context = context, uri = Uri.fromFile(pptFile))
+            val file = File(outputUri.path ?: "")
+            assertTrue(file.exists())
+            assertTrue(file.length() > 0)
+            file.delete()
+        } finally {
+            pptFile.delete()
+        }
+    }
+
+    @Test
+    fun testConvertPptToPdf_tableRendersExtractableText() = kotlinx.coroutines.test.runTest {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val tempDir = context.cacheDir
+        val pptFile = File(tempDir, "ppt_table_${System.currentTimeMillis()}.pptx")
+        try {
+            XMLSlideShow().use { ppt ->
+                val slide = ppt.createSlide()
+                val table = slide.createTable(2, 2)
+                table.anchor = Rectangle2D.Double(60.0, 60.0, 360.0, 120.0)
+                table.setColumnWidth(0, 180.0)
+                table.setColumnWidth(1, 180.0)
+                table.setRowHeight(0, 60.0)
+                table.setRowHeight(1, 60.0)
+                table.getCell(0, 0).text = "Header A"
+                table.getCell(0, 1).text = "Header B"
+                table.getCell(1, 0).text = "Value A"
+                table.getCell(1, 1).text = "Value B"
+
+                pptFile.outputStream().use { out -> ppt.write(out) }
+            }
+
+            val outputUri = pdfProcessor.convertPptToPdf(context = context, uri = Uri.fromFile(pptFile))
+            val file = File(outputUri.path ?: "")
+            assertTrue(file.exists())
+            PDDocument.load(file).use { pdf ->
+                val text = PDFTextStripper().getText(pdf)
+                assertTrue(text.contains("Header A"))
+                assertTrue(text.contains("Value B"))
+            }
             file.delete()
         } finally {
             pptFile.delete()

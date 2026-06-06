@@ -7,6 +7,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -83,7 +84,7 @@ fun MainNavigation() {
                             }
                         },
                         onSettingsClick = { backStack.add(Settings) },
-                        modifier = Modifier.safeDrawingPadding()
+                        modifier = Modifier.fillMaxSize()
                     )
                 }
 

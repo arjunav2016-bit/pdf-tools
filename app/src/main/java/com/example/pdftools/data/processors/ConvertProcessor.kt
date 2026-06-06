@@ -1,4 +1,4 @@
-package com.example.pdftools.data.processors
+﻿package com.example.pdftools.data.processors
 
 import android.content.Context
 import android.graphics.Bitmap
@@ -28,24 +28,30 @@ import com.tom_roush.pdfbox.pdmodel.PDPageContentStream
 import com.tom_roush.pdfbox.pdmodel.common.PDRectangle
 import com.tom_roush.pdfbox.pdmodel.graphics.image.JPEGFactory
 import com.tom_roush.pdfbox.pdmodel.graphics.image.LosslessFactory
+import com.tom_roush.pdfbox.pdmodel.font.PDFont
+import com.tom_roush.pdfbox.pdmodel.font.PDType0Font
 import com.tom_roush.pdfbox.pdmodel.font.PDType1Font
 import com.tom_roush.pdfbox.rendering.PDFRenderer
 import com.tom_roush.pdfbox.rendering.ImageType
 import com.tom_roush.pdfbox.text.PDFTextStripper
+import com.tom_roush.pdfbox.util.Matrix as PdfMatrix
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.apache.poi.sl.usermodel.ShapeType
 import org.apache.poi.xwpf.usermodel.XWPFDocument
 import org.apache.poi.xwpf.usermodel.XWPFParagraph
 import org.apache.poi.xslf.usermodel.XMLSlideShow
+import org.apache.poi.xslf.usermodel.XSLFConnectorShape
+import org.apache.poi.xslf.usermodel.XSLFGroupShape
+import org.apache.poi.xslf.usermodel.XSLFPictureShape
+import org.apache.poi.xslf.usermodel.XSLFSimpleShape
+import org.apache.poi.xslf.usermodel.XSLFTable
 import org.apache.poi.xslf.usermodel.XSLFTextShape
 import org.apache.poi.xssf.usermodel.XSSFWorkbook
 import org.apache.poi.ss.usermodel.CellType
 import org.apache.poi.ss.usermodel.DateUtil
 import android.util.Log
 import java.io.File
-import java.io.OutputStream
-import java.net.HttpURLConnection
-import java.net.URL
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 import com.google.mlkit.vision.common.InputImage
@@ -67,12 +73,13 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 
 /**
- * Handles all conversion operations: images↔PDF, Word/PPT/Excel↔PDF, HTML→PDF, scan.
+ * Handles all conversion operations: imagesâ†”PDF, Word/PPT/Excelâ†”PDF, HTMLâ†’PDF, scan.
  */
 @Singleton
 class ConvertProcessor @Inject constructor() {
-    private val pptConversionBackendUrl = "http://10.0.2.2:8080/convert/presentation-to-pdf"
-
+    private var embeddedFontDocId: Int? = null
+    private var embeddedRegularFont: PDType0Font? = null
+    private var embeddedBoldFont: PDType0Font? = null
 
     /**
      * Converts a list of image URIs (JPEG/PNG) into a single PDF.
@@ -414,7 +421,7 @@ class ConvertProcessor @Inject constructor() {
                                     drawX = (pgWidth - drawWidth) / 2f
                                     drawY = (pgHeight - drawHeight) / 2f
                                 }
-                                else -> { // "auto" — match image dimensions
+                                else -> { // "auto" â€” match image dimensions
                                     pgWidth = imgWidth
                                     pgHeight = imgHeight
                                     drawX = 0f
@@ -769,78 +776,6 @@ class ConvertProcessor @Inject constructor() {
         }
     }
 
-    private fun shouldUsePptBackend(
-        slideRange: String,
-        selectedSlides: Set<Int>,
-        slidesPerPage: Int,
-        includeNotes: Boolean
-    ): Boolean {
-        return slideRange != "custom" &&
-            selectedSlides.isEmpty() &&
-            slidesPerPage == 1 &&
-            !includeNotes
-    }
-
-    private fun convertPptToPdfWithBackend(context: Context, uri: Uri, outputFile: File) {
-        val boundary = "PdfToolsBoundary${System.currentTimeMillis()}"
-        val fileName = getSafeUploadFileName(context, uri)
-        val connection = (URL(pptConversionBackendUrl).openConnection() as HttpURLConnection).apply {
-            requestMethod = "POST"
-            connectTimeout = 5000
-            readTimeout = 120000
-            doOutput = true
-            setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
-            setRequestProperty("Accept", "application/pdf")
-        }
-
-        try {
-            connection.outputStream.use { output ->
-                output.writeUtf8("--$boundary\r\n")
-                output.writeUtf8("Content-Disposition: form-data; name=\"file\"; filename=\"$fileName\"\r\n")
-                output.writeUtf8("Content-Type: application/vnd.openxmlformats-officedocument.presentationml.presentation\r\n\r\n")
-                context.contentResolver.openInputStream(uri)?.use { input ->
-                    input.copyTo(output)
-                } ?: throw IllegalArgumentException("Could not open the PowerPoint file.")
-                output.writeUtf8("\r\n--$boundary--\r\n")
-            }
-
-            val status = connection.responseCode
-            if (status !in 200..299) {
-                val message = connection.errorStream?.bufferedReader()?.use { it.readText() }
-                    ?: "HTTP $status"
-                throw IllegalStateException("Backend conversion failed: $message")
-            }
-
-            connection.inputStream.use { input ->
-                outputFile.outputStream().use { output ->
-                    input.copyTo(output)
-                }
-            }
-
-            if (!outputFile.exists() || outputFile.length() == 0L) {
-                throw IllegalStateException("Backend returned an empty PDF.")
-            }
-        } finally {
-            connection.disconnect()
-        }
-    }
-
-    private fun OutputStream.writeUtf8(value: String) {
-        write(value.toByteArray(Charsets.UTF_8))
-    }
-
-    private fun getSafeUploadFileName(context: Context, uri: Uri): String {
-        val fallback = "presentation.pptx"
-        return try {
-            val name = uri.lastPathSegment
-                ?.substringAfterLast('/')
-                ?.takeIf { it.endsWith(".pptx", true) || it.endsWith(".ppt", true) || it.endsWith(".odp", true) }
-            name ?: fallback
-        } catch (_: Throwable) {
-            fallback
-        }
-    }
-
     /**
      * Returns the total number of slides in a PowerPoint (.pptx) file.
      */
@@ -907,18 +842,6 @@ class ConvertProcessor @Inject constructor() {
         val outputFile = File(context.cacheDir, "PptToPdf_${System.currentTimeMillis()}.pdf")
 
         try {
-            if (shouldUsePptBackend(slideRange, selectedSlides, slidesPerPage, includeNotes)) {
-                try {
-                    onProgress?.invoke(0f)
-                    convertPptToPdfWithBackend(context, uri, outputFile)
-                    onProgress?.invoke(1f)
-                    return@withContext Uri.fromFile(outputFile)
-                } catch (e: Throwable) {
-                    Log.w("ConvertProcessor", "PPT backend conversion failed; using local fallback", e)
-                    outputFile.delete()
-                }
-            }
-
             val inputStream = context.contentResolver.openInputStream(uri)
                 ?: throw IllegalArgumentException("Could not open the PowerPoint file.")
 
@@ -975,7 +898,7 @@ class ConvertProcessor @Inject constructor() {
                         onProgress?.invoke(groupIndex.toFloat() / totalGroups)
 
                         if (clampedPerPage == 1) {
-                            // Single slide per page — use slide dimensions
+                            // Single slide per page â€” use slide dimensions
                             val noteText = if (includeNotes) extractNotes(group[0]) else null
                             val extraHeight = if (!noteText.isNullOrBlank()) 120f else 0f
                             val page = PDPage(PDRectangle(slideWidth, slideHeight + extraHeight))
@@ -1003,13 +926,12 @@ class ConvertProcessor @Inject constructor() {
                                     cs.endText()
 
                                     cs.beginText()
-                                    cs.setFont(font, 8f)
+                                    val truncatedNotes = if (noteText.length > 200) noteText.take(200) + "..." else noteText
+                                    val notesFont = selectPptFont(context, pdfDoc, truncatedNotes, font, false)
+                                    cs.setFont(notesFont, 8f)
                                     cs.setNonStrokingColor(0.4f, 0.4f, 0.4f)
                                     cs.newLineAtOffset(margin, notesY - 14f)
-                                    val truncatedNotes = if (noteText.length > 200) noteText.take(200) + "..." else noteText
-                                    try {
-                                        cs.showText(truncatedNotes.filter { it.code in 32..126 })
-                                    } catch (_: Exception) { }
+                                    showPptText(cs, truncatedNotes)
                                     cs.endText()
                                 }
                             }
@@ -1051,13 +973,12 @@ class ConvertProcessor @Inject constructor() {
                                         val noteText = extractNotes(slide)
                                         if (!noteText.isNullOrBlank()) {
                                             cs.beginText()
-                                            cs.setFont(font, 6f)
+                                            val truncated = if (noteText.length > 60) noteText.take(60) + "..." else noteText
+                                            val noteFont = selectPptFont(context, pdfDoc, truncated, font, false)
+                                            cs.setFont(noteFont, 6f)
                                             cs.setNonStrokingColor(0.5f, 0.5f, 0.5f)
                                             cs.newLineAtOffset(cellX + innerMargin, cellY + 4f)
-                                            val truncated = if (noteText.length > 60) noteText.take(60) + "..." else noteText
-                                            try {
-                                                cs.showText(truncated.filter { it.code in 32..126 })
-                                            } catch (_: Exception) { }
+                                            showPptText(cs, truncated)
                                             cs.endText()
                                         }
                                     }
@@ -1187,6 +1108,593 @@ class ConvertProcessor @Inject constructor() {
         return null
     }
 
+    private fun loadEmbeddedFont(context: Context, pdfDoc: PDDocument, bold: Boolean): PDType0Font? {
+        val docId = System.identityHashCode(pdfDoc)
+        if (embeddedFontDocId != docId) {
+            embeddedFontDocId = docId
+            embeddedRegularFont = null
+            embeddedBoldFont = null
+        }
+
+        val cached = if (bold) embeddedBoldFont else embeddedRegularFont
+        if (cached != null) return cached
+
+        return try {
+            val assetName = if (bold) "fonts/NotoSans-Bold.ttf" else "fonts/NotoSans-Regular.ttf"
+            context.assets.open(assetName).use { input ->
+                PDType0Font.load(pdfDoc, input, true).also { loaded ->
+                    if (bold) embeddedBoldFont = loaded else embeddedRegularFont = loaded
+                }
+            }
+        } catch (e: Throwable) {
+            Log.w("ConvertProcessor", "Unable to load embedded Noto Sans font", e)
+            null
+        }
+    }
+
+    private fun containsNonAscii(text: String): Boolean = text.any { it.code > 126 }
+
+    private fun selectPptFont(
+        context: Context,
+        pdfDoc: PDDocument,
+        text: String,
+        baseFont: PDFont,
+        isBold: Boolean
+    ): PDFont {
+        return if (containsNonAscii(text)) {
+            loadEmbeddedFont(context, pdfDoc, isBold) ?: baseFont
+        } else {
+            baseFont
+        }
+    }
+
+    private fun getTextWidth(font: PDFont, text: String, fontSize: Float): Float {
+        return try {
+            font.getStringWidth(text) / 1000f * fontSize
+        } catch (_: Throwable) {
+            val ascii = text.filter { it.code in 32..126 }
+            if (ascii.isNotEmpty()) {
+                try {
+                    font.getStringWidth(ascii) / 1000f * fontSize
+                } catch (_: Throwable) {
+                    text.length * fontSize * 0.5f
+                }
+            } else {
+                text.length * fontSize * 0.5f
+            }
+        }
+    }
+
+    private fun showPptText(
+        cs: PDPageContentStream,
+        text: String
+    ) {
+        try {
+            cs.showText(text)
+        } catch (_: Throwable) {
+            val ascii = text.filter { it.code in 32..126 }
+            if (ascii.isNotEmpty()) {
+                try { cs.showText(ascii) } catch (_: Throwable) {}
+            }
+        }
+    }
+
+    private fun applyShapeRotation(
+        cs: PDPageContentStream,
+        shape: XSLFSimpleShape,
+        x: Float,
+        y: Float,
+        w: Float,
+        h: Float,
+        draw: () -> Unit
+    ) {
+        val rotation = try { shape.rotation.toFloat() } catch (_: Throwable) { 0f }
+        if (kotlin.math.abs(rotation) < 0.01f) {
+            draw()
+            return
+        }
+
+        cs.saveGraphicsState()
+        try {
+            val matrix = PdfMatrix.getRotateInstance(
+                Math.toRadians(rotation.toDouble()),
+                x + w / 2f,
+                y + h / 2f
+            )
+            cs.transform(matrix)
+            draw()
+        } finally {
+            cs.restoreGraphicsState()
+        }
+    }
+
+    private fun drawShapeGeometry(
+        cs: PDPageContentStream,
+        shape: XSLFSimpleShape,
+        x: Float,
+        y: Float,
+        w: Float,
+        h: Float
+    ) {
+        val type = try { shape.shapeType } catch (_: Throwable) { ShapeType.RECT }
+        when (type) {
+            ShapeType.ELLIPSE, ShapeType.WEDGE_ELLIPSE_CALLOUT -> addEllipsePath(cs, x, y, w, h)
+            ShapeType.ROUND_RECT, ShapeType.ROUND_1_RECT, ShapeType.ROUND_2_SAME_RECT,
+            ShapeType.ROUND_2_DIAG_RECT, ShapeType.SNIP_ROUND_RECT,
+            ShapeType.WEDGE_ROUND_RECT_CALLOUT -> addRoundRectPath(cs, x, y, w, h)
+            ShapeType.TRIANGLE -> {
+                cs.moveTo(x + w / 2f, y + h)
+                cs.lineTo(x + w, y)
+                cs.lineTo(x, y)
+                cs.closePath()
+            }
+            ShapeType.RT_TRIANGLE -> {
+                cs.moveTo(x, y + h)
+                cs.lineTo(x + w, y)
+                cs.lineTo(x, y)
+                cs.closePath()
+            }
+            ShapeType.DIAMOND -> {
+                cs.moveTo(x + w / 2f, y + h)
+                cs.lineTo(x + w, y + h / 2f)
+                cs.lineTo(x + w / 2f, y)
+                cs.lineTo(x, y + h / 2f)
+                cs.closePath()
+            }
+            ShapeType.RIGHT_ARROW, ShapeType.LEFT_ARROW, ShapeType.UP_ARROW, ShapeType.DOWN_ARROW,
+            ShapeType.LEFT_RIGHT_ARROW, ShapeType.UP_DOWN_ARROW, ShapeType.QUAD_ARROW,
+            ShapeType.STRIPED_RIGHT_ARROW, ShapeType.NOTCHED_RIGHT_ARROW, ShapeType.THICK_ARROW -> {
+                addArrowPath(cs, type, x, y, w, h)
+            }
+            ShapeType.LINE, ShapeType.LINE_INV, ShapeType.STRAIGHT_CONNECTOR_1 -> {
+                cs.moveTo(x, y + h)
+                cs.lineTo(x + w, y)
+            }
+            else -> cs.addRect(x, y, w, h)
+        }
+    }
+
+    private fun addEllipsePath(cs: PDPageContentStream, x: Float, y: Float, w: Float, h: Float) {
+        val k = 0.55228475f
+        val ox = w / 2f * k
+        val oy = h / 2f * k
+        val xe = x + w
+        val ye = y + h
+        val xm = x + w / 2f
+        val ym = y + h / 2f
+        cs.moveTo(x, ym)
+        cs.curveTo(x, ym + oy, xm - ox, ye, xm, ye)
+        cs.curveTo(xm + ox, ye, xe, ym + oy, xe, ym)
+        cs.curveTo(xe, ym - oy, xm + ox, y, xm, y)
+        cs.curveTo(xm - ox, y, x, ym - oy, x, ym)
+        cs.closePath()
+    }
+
+    private fun addRoundRectPath(cs: PDPageContentStream, x: Float, y: Float, w: Float, h: Float) {
+        val r = minOf(w, h) * 0.18f
+        val k = 0.55228475f
+        cs.moveTo(x + r, y)
+        cs.lineTo(x + w - r, y)
+        cs.curveTo(x + w - r + r * k, y, x + w, y + r - r * k, x + w, y + r)
+        cs.lineTo(x + w, y + h - r)
+        cs.curveTo(x + w, y + h - r + r * k, x + w - r + r * k, y + h, x + w - r, y + h)
+        cs.lineTo(x + r, y + h)
+        cs.curveTo(x + r - r * k, y + h, x, y + h - r + r * k, x, y + h - r)
+        cs.lineTo(x, y + r)
+        cs.curveTo(x, y + r - r * k, x + r - r * k, y, x + r, y)
+        cs.closePath()
+    }
+
+    private fun addArrowPath(cs: PDPageContentStream, type: ShapeType, x: Float, y: Float, w: Float, h: Float) {
+        val shaft = h * 0.28f
+        when (type) {
+            ShapeType.LEFT_ARROW -> {
+                cs.moveTo(x, y + h / 2f)
+                cs.lineTo(x + w * 0.35f, y + h)
+                cs.lineTo(x + w * 0.35f, y + h / 2f + shaft)
+                cs.lineTo(x + w, y + h / 2f + shaft)
+                cs.lineTo(x + w, y + h / 2f - shaft)
+                cs.lineTo(x + w * 0.35f, y + h / 2f - shaft)
+                cs.lineTo(x + w * 0.35f, y)
+            }
+            ShapeType.UP_ARROW -> {
+                cs.moveTo(x + w / 2f, y + h)
+                cs.lineTo(x + w, y + h * 0.65f)
+                cs.lineTo(x + w / 2f + shaft, y + h * 0.65f)
+                cs.lineTo(x + w / 2f + shaft, y)
+                cs.lineTo(x + w / 2f - shaft, y)
+                cs.lineTo(x + w / 2f - shaft, y + h * 0.65f)
+                cs.lineTo(x, y + h * 0.65f)
+            }
+            ShapeType.DOWN_ARROW -> {
+                cs.moveTo(x + w / 2f, y)
+                cs.lineTo(x + w, y + h * 0.35f)
+                cs.lineTo(x + w / 2f + shaft, y + h * 0.35f)
+                cs.lineTo(x + w / 2f + shaft, y + h)
+                cs.lineTo(x + w / 2f - shaft, y + h)
+                cs.lineTo(x + w / 2f - shaft, y + h * 0.35f)
+                cs.lineTo(x, y + h * 0.35f)
+            }
+            else -> {
+                cs.moveTo(x + w, y + h / 2f)
+                cs.lineTo(x + w * 0.65f, y + h)
+                cs.lineTo(x + w * 0.65f, y + h / 2f + shaft)
+                cs.lineTo(x, y + h / 2f + shaft)
+                cs.lineTo(x, y + h / 2f - shaft)
+                cs.lineTo(x + w * 0.65f, y + h / 2f - shaft)
+                cs.lineTo(x + w * 0.65f, y)
+            }
+        }
+        cs.closePath()
+    }
+
+    private fun renderSimpleShapeGeometry(
+        cs: PDPageContentStream,
+        shape: XSLFSimpleShape,
+        x: Float,
+        y: Float,
+        w: Float,
+        h: Float,
+        scale: Float
+    ) {
+        applyShapeRotation(cs, shape, x, y, w, h) {
+            val fillCol = getFillColorSafe(shape)
+            if (fillCol != null) {
+                val r = ((fillCol shr 16) and 0xFF) / 255f
+                val g = ((fillCol shr 8) and 0xFF) / 255f
+                val b = (fillCol and 0xFF) / 255f
+                cs.setNonStrokingColor(r, g, b)
+                drawShapeGeometry(cs, shape, x, y, w, h)
+                cs.fill()
+            }
+
+            val lineCol = getLineColorSafe(shape)
+            if (lineCol != null) {
+                val r = ((lineCol shr 16) and 0xFF) / 255f
+                val g = ((lineCol shr 8) and 0xFF) / 255f
+                val b = (lineCol and 0xFF) / 255f
+                cs.setStrokingColor(r, g, b)
+                val lineWidth = try {
+                    shape.lineWidth.toFloat().coerceAtLeast(0.5f) * scale
+                } catch (_: Throwable) {
+                    1.0f * scale
+                }
+                cs.setLineWidth(lineWidth.coerceAtLeast(0.25f))
+                drawShapeGeometry(cs, shape, x, y, w, h)
+                cs.stroke()
+            }
+        }
+    }
+
+    private fun drawConnectorLine(
+        cs: PDPageContentStream,
+        shape: XSLFConnectorShape,
+        x: Float,
+        y: Float,
+        w: Float,
+        h: Float,
+        scale: Float
+    ) {
+        val lineCol = getLineColorSafe(shape)
+        if (lineCol != null) {
+            val r = ((lineCol shr 16) and 0xFF) / 255f
+            val g = ((lineCol shr 8) and 0xFF) / 255f
+            val b = (lineCol and 0xFF) / 255f
+            cs.setStrokingColor(r, g, b)
+        } else {
+            cs.setStrokingColor(0.1f, 0.1f, 0.1f)
+        }
+        val lineWidth = try { shape.lineWidth.toFloat().coerceAtLeast(0.5f) * scale } catch (_: Throwable) { scale }
+        cs.setLineWidth(lineWidth.coerceAtLeast(0.25f))
+
+        val startX = x
+        val startY = y + h
+        val endX = x + w
+        val endY = y
+        cs.moveTo(startX, startY)
+        cs.lineTo(endX, endY)
+        cs.stroke()
+
+        val hasTailArrow = try { shape.lineTailDecoration != null } catch (_: Throwable) { false }
+        val hasHeadArrow = try { shape.lineHeadDecoration != null } catch (_: Throwable) { false }
+        if (hasTailArrow) drawArrowHead(cs, startX, startY, endX, endY, 6f * scale)
+        if (hasHeadArrow) drawArrowHead(cs, endX, endY, startX, startY, 6f * scale)
+    }
+
+    private fun drawArrowHead(cs: PDPageContentStream, tipX: Float, tipY: Float, fromX: Float, fromY: Float, size: Float) {
+        val angle = kotlin.math.atan2((tipY - fromY).toDouble(), (tipX - fromX).toDouble())
+        val left = angle + Math.toRadians(150.0)
+        val right = angle - Math.toRadians(150.0)
+        cs.moveTo(tipX, tipY)
+        cs.lineTo(tipX + kotlin.math.cos(left).toFloat() * size, tipY + kotlin.math.sin(left).toFloat() * size)
+        cs.moveTo(tipX, tipY)
+        cs.lineTo(tipX + kotlin.math.cos(right).toFloat() * size, tipY + kotlin.math.sin(right).toFloat() * size)
+        cs.stroke()
+    }
+
+    private fun renderPictureShape(
+        pdfDoc: PDDocument,
+        cs: PDPageContentStream,
+        shape: XSLFPictureShape,
+        x: Float,
+        y: Float,
+        w: Float,
+        h: Float
+    ) {
+        val picData = shape.pictureData
+        val bytes = picData.data
+        val contentType = picData.contentType?.lowercase() ?: ""
+        val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+        if (bitmap != null) {
+            try {
+                val pdImage = LosslessFactory.createFromImage(pdfDoc, bitmap)
+                cs.drawImage(pdImage, x, y, w, h)
+            } finally {
+                bitmap.recycle()
+            }
+        } else {
+            Log.w("ConvertProcessor", "Unsupported image format in slide: $contentType (${bytes.size} bytes)")
+            cs.setNonStrokingColor(0.93f, 0.93f, 0.95f)
+            cs.addRect(x, y, w, h)
+            cs.fill()
+            cs.setStrokingColor(0.8f, 0.8f, 0.82f)
+            cs.setLineWidth(0.5f)
+            cs.addRect(x, y, w, h)
+            cs.stroke()
+            cs.setStrokingColor(0.75f, 0.75f, 0.78f)
+            cs.moveTo(x, y)
+            cs.lineTo(x + w, y + h)
+            cs.stroke()
+            cs.moveTo(x + w, y)
+            cs.lineTo(x, y + h)
+            cs.stroke()
+        }
+    }
+
+    private fun renderTable(
+        context: Context,
+        pdfDoc: PDDocument,
+        cs: PDPageContentStream,
+        table: XSLFTable,
+        x: Float,
+        y: Float,
+        w: Float,
+        h: Float,
+        font: PDFont,
+        boldFont: PDFont,
+        defaultFontSize: Float,
+        scale: Float
+    ) {
+        val rows = table.numberOfRows.coerceAtLeast(1)
+        val cols = table.numberOfColumns.coerceAtLeast(1)
+        var currentY = y + h
+        for (rowIndex in 0 until rows) {
+            val rowHeight = try { table.getRowHeight(rowIndex).toFloat() * scale } catch (_: Throwable) { h / rows }
+            val cellY = currentY - rowHeight
+            var currentX = x
+            for (colIndex in 0 until cols) {
+                val cellWidth = try { table.getColumnWidth(colIndex).toFloat() * scale } catch (_: Throwable) { w / cols }
+                val cell = try { table.getCell(rowIndex, colIndex) } catch (_: Throwable) { null }
+                val fillColor = try { cell?.fillColor } catch (_: Throwable) { null }
+                if (fillColor != null) {
+                    cs.setNonStrokingColor(fillColor.red / 255f, fillColor.green / 255f, fillColor.blue / 255f)
+                    cs.addRect(currentX, cellY, cellWidth, rowHeight)
+                    cs.fill()
+                }
+
+                cs.setStrokingColor(0.6f, 0.6f, 0.6f)
+                cs.setLineWidth((0.7f * scale).coerceAtLeast(0.25f))
+                cs.addRect(currentX, cellY, cellWidth, rowHeight)
+                cs.stroke()
+
+                val text = try { cell?.text?.trim().orEmpty() } catch (_: Throwable) { "" }
+                if (text.isNotBlank()) {
+                    renderWrappedPptText(
+                        context = context,
+                        pdfDoc = pdfDoc,
+                        cs = cs,
+                        text = text,
+                        x = currentX + 4f * scale,
+                        topY = cellY + rowHeight - 4f * scale,
+                        maxWidth = cellWidth - 8f * scale,
+                        minY = cellY + 3f * scale,
+                        baseFont = font,
+                        boldBaseFont = boldFont,
+                        fontSize = (defaultFontSize * scale).coerceAtLeast(4f),
+                        isBold = rowIndex == 0,
+                        textR = 0.1f,
+                        textG = 0.1f,
+                        textB = 0.1f,
+                        alignment = "l"
+                    )
+                }
+                currentX += cellWidth
+            }
+            currentY = cellY
+        }
+    }
+
+    private fun renderGroupShape(
+        context: Context,
+        pdfDoc: PDDocument,
+        cs: PDPageContentStream,
+        group: XSLFGroupShape,
+        x: Float,
+        y: Float,
+        w: Float,
+        h: Float,
+        font: PDFont,
+        boldFont: PDFont,
+        defaultFontSize: Float,
+        scale: Float
+    ) {
+        val interior = try { group.interiorAnchor } catch (_: Throwable) { null }
+        val interiorX = interior?.x?.toFloat() ?: 0f
+        val interiorY = interior?.y?.toFloat() ?: 0f
+        val interiorW = (interior?.width?.toFloat() ?: w / scale).takeIf { it != 0f } ?: 1f
+        val interiorH = (interior?.height?.toFloat() ?: h / scale).takeIf { it != 0f } ?: 1f
+        val sx = w / interiorW
+        val sy = h / interiorH
+
+        for (child in group.shapes) {
+            val childAnchor = getShapeAnchorSafe(child) ?: continue
+            val childX = x + (childAnchor.left - interiorX) * sx
+            val childW = childAnchor.width() * sx
+            val childH = childAnchor.height() * sy
+            val childY = y + h - (childAnchor.top - interiorY) * sy - childH
+            renderPptShape(context, pdfDoc, cs, child, childX, childY, childW, childH, font, boldFont, defaultFontSize, scale * sx)
+        }
+    }
+
+    private fun renderPptShape(
+        context: Context,
+        pdfDoc: PDDocument,
+        cs: PDPageContentStream,
+        shape: org.apache.poi.xslf.usermodel.XSLFShape,
+        x: Float,
+        y: Float,
+        w: Float,
+        h: Float,
+        font: PDFont,
+        boldFont: PDFont,
+        defaultFontSize: Float,
+        scale: Float
+    ) {
+        when (shape) {
+            is XSLFGroupShape -> renderGroupShape(context, pdfDoc, cs, shape, x, y, w, h, font, boldFont, defaultFontSize, scale)
+            is XSLFTable -> renderTable(context, pdfDoc, cs, shape, x, y, w, h, font, boldFont, defaultFontSize, scale)
+            is XSLFConnectorShape -> drawConnectorLine(cs, shape, x, y, w, h, scale)
+            is XSLFPictureShape -> renderPictureShape(pdfDoc, cs, shape, x, y, w, h)
+            is XSLFSimpleShape -> {
+                renderSimpleShapeGeometry(cs, shape, x, y, w, h, scale)
+                if (shape is XSLFTextShape) {
+                    renderTextShape(context, pdfDoc, cs, shape, x, y, w, h, font, boldFont, defaultFontSize * scale, scale)
+                }
+            }
+            else -> Unit
+        }
+    }
+
+    private fun renderTextShape(
+        context: Context,
+        pdfDoc: PDDocument,
+        cs: PDPageContentStream,
+        shape: XSLFTextShape,
+        sx: Float,
+        pdfY: Float,
+        sw: Float,
+        sh: Float,
+        font: PDFont,
+        boldFont: PDFont,
+        defaultFontSize: Float,
+        fontScale: Float
+    ) {
+        val textPadding = 6f
+        var currentYOffset = textPadding
+        for (paragraph in shape.textParagraphs) {
+            val text = paragraph.text.trim()
+            if (text.isEmpty()) {
+                currentYOffset += defaultFontSize * 0.5f
+                continue
+            }
+
+            val bulletPrefix = getBulletPrefix(paragraph)
+            val isBold = paragraph.textRuns.any { it.isBold }
+            val isItalic = paragraph.textRuns.any { it.isItalic }
+            var fontSize = defaultFontSize
+            paragraph.textRuns.firstOrNull()?.fontSize?.let { fs ->
+                if (fs > 0) fontSize = fs.toFloat().coerceIn(6f, 72f) * fontScale
+            }
+            val baseFont = when {
+                isBold && isItalic -> PDType1Font.HELVETICA_BOLD_OBLIQUE
+                isBold -> boldFont
+                isItalic -> PDType1Font.HELVETICA_OBLIQUE
+                else -> font
+            }
+            val textColor = getTextRunColor(paragraph.textRuns.firstOrNull())
+            val textR = textColor?.let { ((it shr 16) and 0xFF) / 255f } ?: 0.1f
+            val textG = textColor?.let { ((it shr 8) and 0xFF) / 255f } ?: 0.1f
+            val textB = textColor?.let { (it and 0xFF) / 255f } ?: 0.1f
+            val displayText = if (bulletPrefix.isNotEmpty()) "$bulletPrefix $text" else text
+
+            currentYOffset += renderWrappedPptText(
+                context = context,
+                pdfDoc = pdfDoc,
+                cs = cs,
+                text = displayText,
+                x = sx + textPadding,
+                topY = pdfY + sh - currentYOffset,
+                maxWidth = sw - 2 * textPadding,
+                minY = pdfY,
+                baseFont = baseFont,
+                boldBaseFont = boldFont,
+                fontSize = fontSize,
+                isBold = isBold,
+                textR = textR,
+                textG = textG,
+                textB = textB,
+                alignment = getParagraphAlignment(paragraph)
+            )
+        }
+    }
+
+    private fun renderWrappedPptText(
+        context: Context,
+        pdfDoc: PDDocument,
+        cs: PDPageContentStream,
+        text: String,
+        x: Float,
+        topY: Float,
+        maxWidth: Float,
+        minY: Float,
+        baseFont: PDFont,
+        boldBaseFont: PDFont,
+        fontSize: Float,
+        isBold: Boolean,
+        textR: Float,
+        textG: Float,
+        textB: Float,
+        alignment: String
+    ): Float {
+        val selectedFont = selectPptFont(context, pdfDoc, text, if (isBold) boldBaseFont else baseFont, isBold)
+        val lineHeight = fontSize * 1.2f
+        var consumed = 0f
+        val words = text.split(Regex("\\s+")).filter { it.isNotEmpty() }
+        val lines = mutableListOf<String>()
+        val line = StringBuilder()
+        for (word in words) {
+            val testLine = if (line.isEmpty()) word else "$line $word"
+            if (getTextWidth(selectedFont, testLine, fontSize) > maxWidth && line.isNotEmpty()) {
+                lines.add(line.toString())
+                line.clear()
+                line.append(word)
+            } else {
+                line.clear()
+                line.append(testLine)
+            }
+        }
+        if (line.isNotEmpty()) lines.add(line.toString())
+
+        for (lineText in lines) {
+            val drawY = topY - consumed - fontSize
+            if (drawY < minY) break
+            val lineW = getTextWidth(selectedFont, lineText, fontSize)
+            val xOffset = when (alignment) {
+                "ctr" -> x + (maxWidth - lineW) / 2f
+                "r" -> x + (maxWidth - lineW)
+                else -> x
+            }
+            cs.beginText()
+            cs.setFont(selectedFont, fontSize)
+            cs.setNonStrokingColor(textR, textG, textB)
+            cs.newLineAtOffset(xOffset, drawY)
+            showPptText(cs, lineText)
+            cs.endText()
+            consumed += lineHeight
+        }
+        return consumed.coerceAtLeast(lineHeight)
+    }
+
     private fun renderSlideContent(
         context: Context,
         pdfDoc: PDDocument,
@@ -1228,7 +1736,6 @@ class ConvertProcessor @Inject constructor() {
     ) {
         val extraHeight = pageHeight - slideHeight
 
-        // Draw slide background
         val bgCol = getSlideBackgroundColorSafe(slide)
         if (bgCol != null) {
             val r = ((bgCol shr 16) and 0xFF) / 255f
@@ -1241,8 +1748,6 @@ class ConvertProcessor @Inject constructor() {
         cs.addRect(0f, extraHeight, slideWidth, slideHeight)
         cs.fill()
 
-        // Render each shape individually — per-shape error handling so one broken shape
-        // doesn't prevent the rest of the slide from rendering
         for (shape in getSlideShapesInPaintOrder(slide)) {
             try {
                 val anchor = getShapeAnchorSafe(shape) ?: continue
@@ -1250,195 +1755,12 @@ class ConvertProcessor @Inject constructor() {
                 val sy = anchor.top
                 val sw = anchor.width()
                 val sh = anchor.height()
-
                 val pdfY = pageHeight - sy - sh
-
-                // Render shape fills and borders
-                if (shape is org.apache.poi.xslf.usermodel.XSLFSimpleShape) {
-                    try {
-                        val fillCol = getFillColorSafe(shape)
-                        if (fillCol != null) {
-                            val r = ((fillCol shr 16) and 0xFF) / 255f
-                            val g = ((fillCol shr 8) and 0xFF) / 255f
-                            val b = (fillCol and 0xFF) / 255f
-                            cs.setNonStrokingColor(r, g, b)
-                            cs.addRect(sx, pdfY, sw, sh)
-                            cs.fill()
-                        }
-                    } catch (e: Throwable) {
-                        Log.w("ConvertProcessor", "Failed to render shape fill", e)
-                    }
-
-                    try {
-                        val lineCol = getLineColorSafe(shape)
-                        if (lineCol != null) {
-                            val r = ((lineCol shr 16) and 0xFF) / 255f
-                            val g = ((lineCol shr 8) and 0xFF) / 255f
-                            val b = (lineCol and 0xFF) / 255f
-                            cs.setStrokingColor(r, g, b)
-                            val lineWidth = try {
-                                shape.lineWidth.toFloat().coerceAtLeast(0.5f)
-                            } catch (_: Throwable) { 1.0f }
-                            cs.setLineWidth(lineWidth)
-                            cs.addRect(sx, pdfY, sw, sh)
-                            cs.stroke()
-                        }
-                    } catch (e: Throwable) {
-                        Log.w("ConvertProcessor", "Failed to render shape border", e)
-                    }
-                }
-
-                // Render embedded images
-                if (shape is org.apache.poi.xslf.usermodel.XSLFPictureShape) {
-                    try {
-                        val picData = shape.pictureData
-                        val bytes = picData.data
-                        val contentType = picData.contentType?.lowercase() ?: ""
-
-                        // Check if it's a format Android can decode
-                        val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-                        if (bitmap != null) {
-                            val pdImage = LosslessFactory.createFromImage(pdfDoc, bitmap)
-                            cs.drawImage(pdImage, sx, pdfY, sw, sh)
-                            bitmap.recycle()
-                        } else {
-                            // Image format not supported by Android (EMF, WMF, etc.)
-                            // Draw a placeholder rectangle with an icon indicator
-                            Log.w("ConvertProcessor", "Unsupported image format in slide: $contentType (${bytes.size} bytes)")
-                            cs.setNonStrokingColor(0.93f, 0.93f, 0.95f)
-                            cs.addRect(sx, pdfY, sw, sh)
-                            cs.fill()
-                            cs.setStrokingColor(0.8f, 0.8f, 0.82f)
-                            cs.setLineWidth(0.5f)
-                            cs.addRect(sx, pdfY, sw, sh)
-                            cs.stroke()
-                            // Draw X across the placeholder to indicate missing image
-                            cs.setStrokingColor(0.75f, 0.75f, 0.78f)
-                            cs.moveTo(sx, pdfY)
-                            cs.lineTo(sx + sw, pdfY + sh)
-                            cs.stroke()
-                            cs.moveTo(sx + sw, pdfY)
-                            cs.lineTo(sx, pdfY + sh)
-                            cs.stroke()
-                        }
-                    } catch (e: Throwable) {
-                        Log.w("ConvertProcessor", "Failed to render image in slide", e)
-                    }
-                }
-
-                // Render text shapes
-                if (shape is XSLFTextShape) {
-                    try {
-                        val textPadding = 6f
-                        var currentYOffset = textPadding
-                        for (paragraph in shape.textParagraphs) {
-                            val text = paragraph.text.trim()
-                            if (text.isEmpty()) {
-                                currentYOffset += defaultFontSize * 0.5f
-                                continue
-                            }
-
-                            // Detect bullet character
-                            val bulletPrefix = getBulletPrefix(paragraph)
-
-                            val isBold = paragraph.textRuns.any { it.isBold }
-                            val isItalic = paragraph.textRuns.any { it.isItalic }
-                            var fontSize = defaultFontSize
-                            paragraph.textRuns.firstOrNull()?.fontSize?.let { fs ->
-                                if (fs > 0) fontSize = fs.toFloat().coerceIn(6f, 72f)
-                            }
-                            // Select font based on bold AND italic
-                            val selectedFont = when {
-                                isBold && isItalic -> PDType1Font.HELVETICA_BOLD_OBLIQUE
-                                isBold -> boldFont
-                                isItalic -> PDType1Font.HELVETICA_OBLIQUE
-                                else -> font
-                            }
-                            val lineHeight = fontSize * 1.2f
-
-                            // Extract actual text color from the first run
-                            val textColor = getTextRunColor(paragraph.textRuns.firstOrNull())
-                            val textR: Float
-                            val textG: Float
-                            val textB: Float
-                            if (textColor != null) {
-                                textR = ((textColor shr 16) and 0xFF) / 255f
-                                textG = ((textColor shr 8) and 0xFF) / 255f
-                                textB = (textColor and 0xFF) / 255f
-                            } else {
-                                textR = 0.1f
-                                textG = 0.1f
-                                textB = 0.1f
-                            }
-
-                            // Detect text alignment
-                            val alignment = getParagraphAlignment(paragraph)
-
-                            val displayText = if (bulletPrefix.isNotEmpty()) "$bulletPrefix $text" else text
-                            val maxTextWidth = sw - 2 * textPadding
-                            val words = displayText.split(" ")
-                            val line = StringBuilder()
-                            for (word in words) {
-                                val testLine = if (line.isEmpty()) word else "$line $word"
-                                val testWidth = try {
-                                    selectedFont.getStringWidth(testLine.filter { it.code in 32..126 }) / 1000f * fontSize
-                                } catch (_: Throwable) {
-                                    testLine.length * fontSize * 0.5f
-                                }
-                                if (testWidth > maxTextWidth && line.isNotEmpty()) {
-                                    val drawY = (pdfY + sh) - currentYOffset - fontSize
-                                    if (drawY >= pdfY) {
-                                        val lineStr = line.toString().filter { it.code in 32..126 }
-                                        val lineW = try { selectedFont.getStringWidth(lineStr) / 1000f * fontSize } catch (_: Throwable) { lineStr.length * fontSize * 0.5f }
-                                        val xOffset = when (alignment) {
-                                            "ctr" -> sx + textPadding + (maxTextWidth - lineW) / 2f
-                                            "r" -> sx + textPadding + (maxTextWidth - lineW)
-                                            else -> sx + textPadding
-                                        }
-                                        cs.beginText()
-                                        cs.setFont(selectedFont, fontSize)
-                                        cs.setNonStrokingColor(textR, textG, textB)
-                                        cs.newLineAtOffset(xOffset, drawY)
-                                        try { cs.showText(lineStr) } catch (_: Throwable) {}
-                                        cs.endText()
-                                    }
-                                    currentYOffset += lineHeight
-                                    line.clear()
-                                    line.append(word)
-                                } else {
-                                    line.clear()
-                                    line.append(testLine)
-                                }
-                            }
-                            if (line.isNotEmpty()) {
-                                val drawY = (pdfY + sh) - currentYOffset - fontSize
-                                if (drawY >= pdfY) {
-                                    val lineStr = line.toString().filter { it.code in 32..126 }
-                                    val lineW = try { selectedFont.getStringWidth(lineStr) / 1000f * fontSize } catch (_: Throwable) { lineStr.length * fontSize * 0.5f }
-                                    val xOffset = when (alignment) {
-                                        "ctr" -> sx + textPadding + (maxTextWidth - lineW) / 2f
-                                        "r" -> sx + textPadding + (maxTextWidth - lineW)
-                                        else -> sx + textPadding
-                                    }
-                                    cs.beginText()
-                                    cs.setFont(selectedFont, fontSize)
-                                    cs.setNonStrokingColor(textR, textG, textB)
-                                    cs.newLineAtOffset(xOffset, drawY)
-                                    try { cs.showText(lineStr) } catch (_: Throwable) {}
-                                    cs.endText()
-                                }
-                                currentYOffset += lineHeight
-                            }
-                        }
-                    } catch (e: Throwable) {
-                        Log.w("ConvertProcessor", "Failed to render text shape", e)
-                    }
-                }
+                renderPptShape(context, pdfDoc, cs, shape, sx, pdfY, sw, sh, font, boldFont, defaultFontSize, 1f)
             } catch (e: Throwable) {
                 Log.w("ConvertProcessor", "Failed to render shape: ${shape.javaClass.simpleName}", e)
             }
         }
-
     }
 
     private fun renderSlideContentFallback(
@@ -1551,173 +1873,8 @@ class ConvertProcessor @Inject constructor() {
                 val sy = anchor.top * scale
                 val sw = anchor.width() * scale
                 val sh = anchor.height() * scale
-
                 val pdfY = y + h - sy - sh
-
-                if (shape is org.apache.poi.xslf.usermodel.XSLFSimpleShape) {
-                    try {
-                        val fillCol = getFillColorSafe(shape)
-                        if (fillCol != null) {
-                            val r = ((fillCol shr 16) and 0xFF) / 255f
-                            val g = ((fillCol shr 8) and 0xFF) / 255f
-                            val b = (fillCol and 0xFF) / 255f
-                            cs.setNonStrokingColor(r, g, b)
-                            cs.addRect(x + sx, pdfY, sw, sh)
-                            cs.fill()
-                        }
-                    } catch (e: Throwable) {
-                        Log.w("ConvertProcessor", "InBounds: Failed to render shape fill", e)
-                    }
-
-                    try {
-                        val lineCol = getLineColorSafe(shape)
-                        if (lineCol != null) {
-                            val r = ((lineCol shr 16) and 0xFF) / 255f
-                            val g = ((lineCol shr 8) and 0xFF) / 255f
-                            val b = (lineCol and 0xFF) / 255f
-                            cs.setStrokingColor(r, g, b)
-                            val lineWidth = try {
-                                shape.lineWidth.toFloat().coerceAtLeast(0.5f) * scale
-                            } catch (_: Throwable) { 1.0f * scale }
-                            cs.setLineWidth(lineWidth)
-                            cs.addRect(x + sx, pdfY, sw, sh)
-                            cs.stroke()
-                        }
-                    } catch (e: Throwable) {
-                        Log.w("ConvertProcessor", "InBounds: Failed to render shape border", e)
-                    }
-                }
-
-                if (shape is org.apache.poi.xslf.usermodel.XSLFPictureShape) {
-                    try {
-                        val picData = shape.pictureData
-                        val bytes = picData.data
-                        val contentType = picData.contentType?.lowercase() ?: ""
-                        val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-                        if (bitmap != null) {
-                            val pdImage = LosslessFactory.createFromImage(pdfDoc, bitmap)
-                            cs.drawImage(pdImage, x + sx, pdfY, sw, sh)
-                            bitmap.recycle()
-                        } else {
-                            Log.w("ConvertProcessor", "InBounds: Unsupported image format: $contentType")
-                            cs.setNonStrokingColor(0.93f, 0.93f, 0.95f)
-                            cs.addRect(x + sx, pdfY, sw, sh)
-                            cs.fill()
-                            cs.setStrokingColor(0.8f, 0.8f, 0.82f)
-                            cs.setLineWidth(0.5f)
-                            cs.addRect(x + sx, pdfY, sw, sh)
-                            cs.stroke()
-                        }
-                    } catch (e: Throwable) {
-                        Log.w("ConvertProcessor", "InBounds: Failed to render image", e)
-                    }
-                }
-
-                if (shape is XSLFTextShape) {
-                    try {
-                        val textPadding = 4f * scale
-                        var currentYOffset = textPadding
-                        for (paragraph in shape.textParagraphs) {
-                            val text = paragraph.text.trim()
-                            if (text.isEmpty()) {
-                                currentYOffset += defaultFontSize * scale * 0.5f
-                                continue
-                            }
-
-                            val bulletPrefix = getBulletPrefix(paragraph)
-
-                            val isBold = paragraph.textRuns.any { it.isBold }
-                            val isItalic = paragraph.textRuns.any { it.isItalic }
-                            var pFontSize = defaultFontSize
-                            paragraph.textRuns.firstOrNull()?.fontSize?.let { fs ->
-                                if (fs > 0) pFontSize = fs.toFloat().coerceIn(6f, 72f)
-                            }
-                            val scaledFontSize = pFontSize * scale
-                            val selectedFont = when {
-                                isBold && isItalic -> PDType1Font.HELVETICA_BOLD_OBLIQUE
-                                isBold -> boldFont
-                                isItalic -> PDType1Font.HELVETICA_OBLIQUE
-                                else -> font
-                            }
-                            val lineHeight = scaledFontSize * 1.2f
-
-                            // Extract actual text color
-                            val textColor = getTextRunColor(paragraph.textRuns.firstOrNull())
-                            val textR: Float
-                            val textG: Float
-                            val textB: Float
-                            if (textColor != null) {
-                                textR = ((textColor shr 16) and 0xFF) / 255f
-                                textG = ((textColor shr 8) and 0xFF) / 255f
-                                textB = (textColor and 0xFF) / 255f
-                            } else {
-                                textR = 0.1f
-                                textG = 0.1f
-                                textB = 0.1f
-                            }
-
-                            val alignment = getParagraphAlignment(paragraph)
-
-                            val displayText = if (bulletPrefix.isNotEmpty()) "$bulletPrefix $text" else text
-                            val maxTextWidth = sw - 2 * textPadding
-                            val words = displayText.split(" ")
-                            val line = StringBuilder()
-                            for (word in words) {
-                                val testLine = if (line.isEmpty()) word else "$line $word"
-                                val testWidth = try {
-                                    selectedFont.getStringWidth(testLine.filter { it.code in 32..126 }) / 1000f * scaledFontSize
-                                } catch (_: Throwable) {
-                                    testLine.length * scaledFontSize * 0.5f
-                                }
-                                if (testWidth > maxTextWidth && line.isNotEmpty()) {
-                                    val drawY = (pdfY + sh) - currentYOffset - scaledFontSize
-                                    if (drawY >= pdfY) {
-                                        val lineStr = line.toString().filter { it.code in 32..126 }
-                                        val lineW = try { selectedFont.getStringWidth(lineStr) / 1000f * scaledFontSize } catch (_: Throwable) { lineStr.length * scaledFontSize * 0.5f }
-                                        val xOffset = when (alignment) {
-                                            "ctr" -> x + sx + textPadding + (maxTextWidth - lineW) / 2f
-                                            "r" -> x + sx + textPadding + (maxTextWidth - lineW)
-                                            else -> x + sx + textPadding
-                                        }
-                                        cs.beginText()
-                                        cs.setFont(selectedFont, scaledFontSize)
-                                        cs.setNonStrokingColor(textR, textG, textB)
-                                        cs.newLineAtOffset(xOffset, drawY)
-                                        try { cs.showText(lineStr) } catch (_: Throwable) {}
-                                        cs.endText()
-                                    }
-                                    currentYOffset += lineHeight
-                                    line.clear()
-                                    line.append(word)
-                                } else {
-                                    line.clear()
-                                    line.append(testLine)
-                                }
-                            }
-                            if (line.isNotEmpty()) {
-                                val drawY = (pdfY + sh) - currentYOffset - scaledFontSize
-                                if (drawY >= pdfY) {
-                                    val lineStr = line.toString().filter { it.code in 32..126 }
-                                    val lineW = try { selectedFont.getStringWidth(lineStr) / 1000f * scaledFontSize } catch (_: Throwable) { lineStr.length * scaledFontSize * 0.5f }
-                                    val xOffset = when (alignment) {
-                                        "ctr" -> x + sx + textPadding + (maxTextWidth - lineW) / 2f
-                                        "r" -> x + sx + textPadding + (maxTextWidth - lineW)
-                                        else -> x + sx + textPadding
-                                    }
-                                    cs.beginText()
-                                    cs.setFont(selectedFont, scaledFontSize)
-                                    cs.setNonStrokingColor(textR, textG, textB)
-                                    cs.newLineAtOffset(xOffset, drawY)
-                                    try { cs.showText(lineStr) } catch (_: Throwable) {}
-                                    cs.endText()
-                                }
-                                currentYOffset += lineHeight
-                            }
-                        }
-                    } catch (e: Throwable) {
-                        Log.w("ConvertProcessor", "InBounds: Failed to render text shape", e)
-                    }
-                }
+                renderPptShape(context, pdfDoc, cs, shape, x + sx, pdfY, sw, sh, font, boldFont, defaultFontSize, scale)
             } catch (e: Throwable) {
                 Log.w("ConvertProcessor", "InBounds: Failed to render shape: ${shape.javaClass.simpleName}", e)
             }
@@ -2967,7 +3124,7 @@ $slideRels
                 }
             }
         } catch (_: Throwable) {
-            // java.awt.Dimension may not be available on Android — fall through
+            // java.awt.Dimension may not be available on Android â€” fall through
         }
 
         // Fallback: parse XML for slide size
@@ -2997,3 +3154,4 @@ $slideRels
         return Pair(720f, 540f)
     }
 }
+
